@@ -1,0 +1,33 @@
+[
+    {
+        "id": "vendor-1",
+        "name": "Acme Corp",
+        "primary_hostname": "acme.example.com",
+        "score": 850,
+        "overallScore": 850,
+        "automatedScore": 820,
+        "category_scores": {
+            "websiteSecurity": 90,
+            "emailSecurity": 80,
+            "networkSecurity": 88,
+            "ipDomainReputation": 95,
+            "operationalRisk": 70,
+            "attackSurface": 60,
+            "vulnerabilityManagement": 75,
+            "encryption": 92,
+            "dns": 85,
+            "dataLeakage": 99,
+            "brandReputation": 91
+        },
+        "tier": "1",
+        "monitored": true,
+        "assessmentStatus": "COMPLETE",
+        "lastAssessed": "2026-06-01T00:00:00.000Z"
+    },
+    {
+        "id": "vendor-2",
+        "name": "Beta LLC",
+        "primary_hostname": "beta.example.com",
+        "monitored": false
+    }
+]

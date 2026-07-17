@@ -1,0 +1,9 @@
+[
+    {
+        "id": "mv-1",
+        "cveId": "CVE-2026-1111",
+        "_machine_id": "machine-1",
+        "fixingKbId": "KB5000001",
+        "severity": "High"
+    }
+]

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "posture"
-version = "0.0.1"
+version = "0.0.2"
 description = ""
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,10 +15,22 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies = []
+dependencies = [
+    "requests>=2.31",
+    "pandas>=2.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "responses>=0.25",
+    "black>=24.0",
+    "ruff>=0.5",
+]
 
 [project.urls]
-Homepage = "https://github.com/philmassyn/posture"
+Homepage = "https://github.com/massyn/posture"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/posture"]

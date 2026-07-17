@@ -1,0 +1,14 @@
+[
+    {
+        "id": "1",
+        "udid": "udid-1",
+        "serialNumber": "SN-1",
+        "lastInventoryUpdateTimestamp": "2026-06-01T00:00:00.000Z",
+        "operatingSystem": {"version": "14.5"}
+    },
+    {
+        "id": "2",
+        "udid": "udid-2",
+        "serialNumber": "SN-2"
+    }
+]

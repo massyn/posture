@@ -1,0 +1,15 @@
+[
+    {
+        "_device_id": "device-1",
+        "created": "2026-01-05T00:00:00.000Z",
+        "managementStatus": "MANAGED",
+        "screenLockType": "PASSCODE",
+        "user": {
+            "id": "user-1",
+            "status": "ACTIVE",
+            "displayName": "Alice Anderson",
+            "created": "2026-01-01T00:00:00.000Z",
+            "profile": {"login": "alice@example.com"}
+        }
+    }
+]

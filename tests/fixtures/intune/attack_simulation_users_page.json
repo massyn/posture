@@ -1,0 +1,31 @@
+[
+    {
+        "isCompromised": true,
+        "compromisedDateTime": "2026-01-01T01:02:01.01Z",
+        "simulationEvents": [
+            {"eventName": "SuccessfullyDeliveredEmail", "eventDateTime": "2026-01-01T01:01:01.01Z"}
+        ],
+        "trainingEvents": [
+            {"displayName": "Sample Training", "latestTrainingStatus": "assigned"}
+        ],
+        "assignedTrainingsCount": 1,
+        "completedTrainingsCount": 0,
+        "inProgressTrainingsCount": 0,
+        "reportedPhishDateTime": "2026-01-01T01:01:01.01Z",
+        "simulationUser": {
+            "userId": "99af58b9-ef1a-412b-a581-cb42fe8c8e21",
+            "displayName": "Reed Flores",
+            "email": "reed@contoso.com"
+        },
+        "_simulation_id": "sim-1"
+    },
+    {
+        "isCompromised": false,
+        "simulationUser": {
+            "userId": "user-2",
+            "displayName": "Someone Else",
+            "email": "someone@contoso.com"
+        },
+        "_simulation_id": "sim-1"
+    }
+]

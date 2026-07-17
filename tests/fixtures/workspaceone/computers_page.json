@@ -1,0 +1,32 @@
+[
+    {
+        "Id": {"Value": 101},
+        "Uuid": "uuid-101",
+        "udid": "udid-101",
+        "serial_number": "SN-101",
+        "mac_address": "00:11:22:33:44:55",
+        "device_friendly_name": "Alice-MacBook",
+        "platform_name": "Apple",
+        "device_type": "MacBook",
+        "model": "MacBookPro18,1",
+        "operating_system": "14.5",
+        "last_seen": "2026-06-01T00:00:00.000Z",
+        "last_enrolled_on": "2026-01-01T00:00:00.000Z",
+        "enrollment_status": "Enrolled",
+        "compliance_status": "Compliant",
+        "is_supervised": true,
+        "ownership": "CorporateOwned",
+        "organization_group_name": "Engineering",
+        "enrollment_user_name": "alice",
+        "enrollment_user_email_address": "alice@example.com",
+        "device_network_info": [
+            {"ip_address": ""},
+            {"ip_address": "10.0.0.5"}
+        ]
+    },
+    {
+        "Id": {"Value": 102},
+        "device_friendly_name": "Bob-Laptop",
+        "is_supervised": false
+    }
+]

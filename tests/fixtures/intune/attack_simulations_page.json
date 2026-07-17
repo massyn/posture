@@ -1,0 +1,13 @@
+[
+    {
+        "id": "sim-1",
+        "displayName": "Phishing Test",
+        "attackType": "phishing",
+        "status": "completed",
+        "isAutomated": true,
+        "durationInDays": 5,
+        "trainingSetting": {"type": "assign"},
+        "createdBy": {"email": "admin@example.com", "id": "u-1", "displayName": "Admin"},
+        "@odata.etag": "W/\"abc123\""
+    }
+]

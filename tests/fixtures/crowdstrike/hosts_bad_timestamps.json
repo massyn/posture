@@ -1,0 +1,10 @@
+[
+    {
+        "device_id": "ddd444",
+        "last_seen": null
+    },
+    {
+        "device_id": "eee555",
+        "last_seen": "not-a-date"
+    }
+]

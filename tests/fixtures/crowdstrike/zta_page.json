@@ -1,0 +1,45 @@
+[
+    {
+        "aid": "agent-1",
+        "cid": "cid-1",
+        "system_serial_number": "SN-1",
+        "event_platform": "Win",
+        "product_type_desc": "Workstation",
+        "modified_time": "2026-06-01T00:00:00Z",
+        "sensor_file_status": "Normal",
+        "assessment": {"sensor_config": 90, "overall": 85, "version": "1.0"},
+        "assessment_items": {
+            "os_signals": [
+                {
+                    "criteria": "os_up_to_date",
+                    "group_name": "OS",
+                    "meets_criteria": "yes",
+                    "signal_id": "sig-1",
+                    "signal_name": "OS Up To Date"
+                }
+            ],
+            "sensor_signals": [
+                {
+                    "criteria": "sensor_healthy",
+                    "group_name": "Sensor",
+                    "meets_criteria": "yes",
+                    "signal_id": "sig-2",
+                    "signal_name": "Sensor Healthy"
+                },
+                {
+                    "criteria": "sensor_tampering",
+                    "group_name": "Sensor",
+                    "meets_criteria": "no",
+                    "signal_id": "sig-3",
+                    "signal_name": "No Tampering Detected"
+                }
+            ]
+        }
+    },
+    {
+        "aid": "agent-2",
+        "cid": "cid-1",
+        "assessment": {},
+        "assessment_items": {"os_signals": [], "sensor_signals": []}
+    }
+]

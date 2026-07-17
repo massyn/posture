@@ -1,0 +1,31 @@
+[
+    {
+        "id": "user-1",
+        "status": "ACTIVE",
+        "created": "2026-01-01T00:00:00.000Z",
+        "activated": "2026-01-01T00:00:00.000Z",
+        "statusChanged": "2026-01-02T00:00:00.000Z",
+        "lastLogin": "2026-06-01T00:00:00.000Z",
+        "lastUpdated": "2026-06-02T00:00:00.000Z",
+        "passwordChanged": "2026-01-03T00:00:00.000Z",
+        "type": {"id": "type-1"},
+        "profile": {
+            "login": "alice@example.com",
+            "firstName": "Alice",
+            "lastName": "Anderson",
+            "email": "alice@example.com",
+            "department": "Engineering",
+            "title": "Engineer"
+        }
+    },
+    {
+        "id": "user-2",
+        "status": "SUSPENDED",
+        "created": "2026-02-01T00:00:00.000Z",
+        "profile": {
+            "login": "bob@example.com",
+            "firstName": "Bob",
+            "lastName": "Brown"
+        }
+    }
+]

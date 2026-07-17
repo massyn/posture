@@ -1,0 +1,13 @@
+[
+    {
+        "id": "dev-1",
+        "deviceName": "LAPTOP-1",
+        "operatingSystem": "Windows",
+        "osVersion": "10.0.22631",
+        "osBuildNumber": "22631"
+    },
+    {
+        "id": "dev-2",
+        "deviceName": "LAPTOP-2"
+    }
+]

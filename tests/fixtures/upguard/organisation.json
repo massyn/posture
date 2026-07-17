@@ -1,0 +1,19 @@
+{
+    "id": "org-1",
+    "name": "Our Org",
+    "primary_hostname": "ourorg.example.com",
+    "automatedScore": 900,
+    "categoryScores": {
+        "websiteSecurity": 95,
+        "emailSecurity": 88,
+        "networkSecurity": 90,
+        "ipDomainReputation": 97,
+        "operationalRisk": 80,
+        "attackSurface": 75,
+        "vulnerabilityManagement": 85,
+        "encryption": 96,
+        "dns": 90,
+        "dataLeakage": 99,
+        "brandReputation": 93
+    }
+}

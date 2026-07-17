@@ -1,0 +1,27 @@
+[
+    {
+        "id": "device-1",
+        "created": "2026-01-01T00:00:00.000Z",
+        "status": "ACTIVE",
+        "lastUpdated": "2026-06-01T00:00:00.000Z",
+        "profile": {
+            "displayName": "Alice's MacBook",
+            "platform": "MACOS",
+            "manufacturer": "Apple",
+            "model": "MacBookPro18,1",
+            "osVersion": "14.5",
+            "registered": true,
+            "secureHardwarePresent": true,
+            "serialNumber": "SN-DEV-1"
+        },
+        "resourceType": "UDDevice",
+        "resourceDisplayName": {"value": "Alice's MacBook", "sensitive": false},
+        "resourceId": "device-1",
+        "resourceAlternateId": "alt-device-1"
+    },
+    {
+        "id": "device-2",
+        "status": "ACTIVE",
+        "profile": {"platform": "WINDOWS", "registered": false}
+    }
+]

@@ -1,0 +1,50 @@
+[
+    {
+        "id": "vuln-1",
+        "aid": "agent-1",
+        "cid": "cid-1",
+        "status": "open",
+        "cve": {
+            "id": "CVE-2026-0001",
+            "description": "Example vulnerability",
+            "exprt_rating": "HIGH",
+            "remediation_level": "O",
+            "severity": "HIGH",
+            "vector": "CVSS:3.1",
+            "published_date": "2026-01-01T00:00:00Z",
+            "spotlight_published_date": "2026-01-02T00:00:00Z",
+            "cisa_info": {"is_cisa_kev": true},
+            "exploit_status": 90,
+            "exploitability_score": 3.9,
+            "impact_score": 5.9,
+            "base_score": 9.8
+        },
+        "suppression_info": {"is_suppressed": false},
+        "created_timestamp": "2026-01-01T00:00:00Z",
+        "updated_timestamp": "2026-01-03T00:00:00Z",
+        "remediation": {
+            "entities": [
+                {
+                    "id": "rem-1",
+                    "action": "Update",
+                    "link": "https://example.com/patch",
+                    "reference": "KB-1",
+                    "title": "Apply patch",
+                    "vendor_url": "https://vendor.example.com"
+                }
+            ]
+        }
+    },
+    {
+        "id": "vuln-2",
+        "aid": "agent-2",
+        "cid": "cid-1",
+        "status": "open",
+        "cve": {
+            "id": "CVE-2026-0002",
+            "exploit_status": 10
+        },
+        "created_timestamp": "2026-01-05T00:00:00Z",
+        "remediation": {"entities": []}
+    }
+]

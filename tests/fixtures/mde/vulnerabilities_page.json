@@ -1,0 +1,11 @@
+[
+    {
+        "id": "CVE-2026-1111",
+        "name": "Example Vuln",
+        "severity": "High",
+        "cvssV3": 8.1,
+        "exposedMachines": 42,
+        "publicExploit": true,
+        "epss": 0.55
+    }
+]

@@ -1,0 +1,14 @@
+[
+    {
+        "id": "cfg-1",
+        "displayName": "Baseline",
+        "description": "Baseline config",
+        "createdDateTime": "2026-01-01T00:00:00Z",
+        "lastModifiedDateTime": "2026-02-01T00:00:00Z",
+        "platforms": "windows10",
+        "technologies": "mdm",
+        "roleScopeTagIds": ["0"],
+        "settings": [{"key": "value"}],
+        "assignments": []
+    }
+]
