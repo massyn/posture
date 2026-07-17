@@ -17,10 +17,43 @@ A source with no credentials configured is skipped, not fatal.
     python scripts/extract_test.py
 """
 
+import json
+import logging
+from datetime import date, datetime
 from pathlib import Path
 
 from posture import CCM
 from posture.exceptions import PostureError
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+
+def _json_default(value: object) -> str:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return str(value)
+
+
+def write_records_json(df, path: Path) -> None:
+    """Stream records to disk as JSON, one at a time.
+
+    pandas' df.to_json() builds the entire output as a single in-memory
+    buffer via its ujson encoder, which can overflow on large DataFrames
+    (observed on Windows: "OverflowError: Could not reserve memory block").
+    Writing incrementally with the stdlib json module avoids ever holding
+    the full serialised document in memory.
+    """
+    with path.open("w", encoding="utf-8") as fp:
+        fp.write("[")
+        for i, record in enumerate(df.to_dict(orient="records")):
+            if i:
+                fp.write(",")
+            fp.write("\n  ")
+            json.dump(record, fp, default=_json_default)
+        fp.write("\n]")
 
 SOURCES_AND_RESOURCES = {
     "crowdstrike": [
@@ -91,8 +124,6 @@ for source, resources in SOURCES_AND_RESOURCES.items():
             continue
 
         output_path = output_dir / f"{source}_{resource}.json"
-        output_path.write_text(
-            df.to_json(orient="records", date_format="iso", indent=2)
-        )
+        write_records_json(df, output_path)
         print(f"Wrote {len(df)} {source}.{resource} to {output_path}")
         print(ccm.report(resource))

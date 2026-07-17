@@ -6,7 +6,7 @@ from posture import CCM
 
 
 @responses.activate
-def test_vendors_pagination_stops_on_partial_page() -> None:
+def test_vendors_pagination_stops_when_no_next_page_token() -> None:
     responses.add(
         responses.GET,
         "https://au.cyber-risk.upguard.com/api/public/vendors",
@@ -19,6 +19,34 @@ def test_vendors_pagination_stops_on_partial_page() -> None:
 
     assert len(df) == 1
     assert ccm.report("vendors")["pages"] == 1
+
+
+@responses.activate
+def test_vendors_follows_next_page_token_cursor() -> None:
+    def vendors_callback(request):
+        params = dict(pair.split("=") for pair in request.url.split("?", 1)[1].split("&"))
+        if "page_token" not in params:
+            body = {
+                "vendors": [{"id": "vendor-1", "primary_hostname": "acme.example.com"}],
+                "next_page_token": "cursor-2",
+            }
+        else:
+            assert params["page_token"] == "cursor-2"
+            body = {"vendors": [{"id": "vendor-2", "primary_hostname": "beta.example.com"}]}
+        return (200, {}, json.dumps(body))
+
+    responses.add_callback(
+        responses.GET,
+        "https://au.cyber-risk.upguard.com/api/public/vendors",
+        callback=vendors_callback,
+        content_type="application/json",
+    )
+
+    ccm = CCM("upguard", {"api_key": "key"})
+    df = ccm.collect("vendors")
+
+    assert len(df) == 2
+    assert ccm.report("vendors")["pages"] == 2
 
 
 @responses.activate

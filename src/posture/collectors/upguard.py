@@ -7,6 +7,12 @@ entirely inside this module (anti-overfitting: nothing here is promoted to
 ``base.py`` until a second collector demonstrably needs concurrent per-parent
 fan-out).
 
+List endpoints (``vendors``, ``domains``, ``breached_identities``) use
+UpGuard's real cursor-based pagination: request ``page_token``/``page_size``,
+response carries the next cursor in ``next_page_token`` (absent when
+exhausted). ``/risks/vendors`` (``vendor_risks``) is not paginated at all —
+one call per vendor returns that vendor's full risk list.
+
 Resources: ``vendors``, ``domains``, ``breached_identities``, ``organisation``,
 ``vendor_risks``.
 """
@@ -26,9 +32,8 @@ from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 logger = logging.getLogger("posture.upguard")
 
 _DEFAULT_BASE_URL = "https://au.cyber-risk.upguard.com/api/public"
-_PAGE_LIMIT = 100
+_PAGE_SIZE = 1000
 _DEFAULT_RISKS_MAX_WORKERS = 8
-_DEFAULT_RISKS_MAX_PAGES = 200
 
 # Per-vendor retry budget inside the vendor_risks thread pool. This is
 # deliberately separate from base.py's outer retry: a 429/timeout on one
@@ -87,7 +92,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
         },
     },
     "breached_identities": {
-        "endpoint": "/breaches/identities",
+        "endpoint": "/breaches",
         "columns": {
             "breached_identity_id": ("id", "str"),
             "identity_name": ("name", "str"),
@@ -126,10 +131,10 @@ MANIFEST: dict[str, dict[str, Any]] = {
         },
     },
     "vendor_risks": {
-        # Not derived_from "vendors": each vendor requires its own paginated
-        # network call (fanned out across a thread pool — UpGuard's own
-        # /risks/vendors sweep regularly takes 1-60s per vendor across ~400
-        # vendors), not data nested inside a raw vendor record.
+        # Not derived_from "vendors": each vendor requires its own (single,
+        # unpaginated) network call, fanned out across a thread pool —
+        # UpGuard's /risks/vendors sweep regularly takes 1-60s per vendor
+        # across ~400 vendors — not data nested inside a raw vendor record.
         # requested_primary_hostname is injected client-side (see
         # _fetch_vendor_risks_page), not present in the API response.
         "endpoint": "/risks/vendors",
@@ -185,17 +190,16 @@ class UpGuardCollector(Collector):
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
         endpoint = self.manifest[resource]["endpoint"]
-        page = cursor if cursor is not None else 1
-        params: dict[str, Any] = {"limit": _PAGE_LIMIT, "page": page}
+        params: dict[str, Any] = {"page_size": _PAGE_SIZE}
+        if cursor is not None:
+            params["page_token"] = cursor
         params.update(kwargs)
 
         response = self._get(self._base_url + endpoint, params=params)
-        records = self._extract_records(resource, response.json())
-        if not records:
-            return [], None
-
-        next_cursor = page + 1 if len(records) == _PAGE_LIMIT else None
-        return records, next_cursor
+        payload = response.json()
+        records = self._extract_records(resource, payload)
+        next_cursor = payload.get("next_page_token") if isinstance(payload, dict) else None
+        return records, next_cursor or None
 
     def _fetch_vendor_risks_page(
         self, kwargs: dict[str, Any], cursor: Any
@@ -207,7 +211,7 @@ class UpGuardCollector(Collector):
         if hostnames is None:
             hostnames = self._all_vendor_hostnames()
         max_workers = kwargs.get("max_workers", _DEFAULT_RISKS_MAX_WORKERS)
-        max_pages = kwargs.get("max_pages", _DEFAULT_RISKS_MAX_PAGES)
+        min_severity = kwargs.get("min_severity")
 
         if not hostnames:
             return [], None
@@ -215,11 +219,25 @@ class UpGuardCollector(Collector):
         all_records: list[dict[str, Any]] = []
         truncated_hostnames: list[str] = []
         workers = max(1, min(max_workers, len(hostnames)))
+        started_at = time.monotonic()
+        completed = 0
+        log_every = max(1, len(hostnames) // 20)  # ~20 progress lines total
+
+        logger.info(
+            "vendor_risks fan-out starting: %d vendors, %d workers",
+            len(hostnames),
+            workers,
+            extra={
+                "source": "upguard",
+                "vendor_count": len(hostnames),
+                "max_workers": workers,
+            },
+        )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
                 executor.submit(
-                    self._fetch_risks_for_hostname, hostname, max_pages
+                    self._fetch_risks_for_hostname, hostname, min_severity
                 ): hostname
                 for hostname in hostnames
             }
@@ -232,70 +250,144 @@ class UpGuardCollector(Collector):
                 if truncated:
                     truncated_hostnames.append(hostname)
 
+                completed += 1
+                logger.debug(
+                    "vendor_risks vendor complete: %s (%d records, truncated=%s)",
+                    hostname,
+                    len(records),
+                    truncated,
+                    extra={
+                        "source": "upguard",
+                        "hostname": hostname,
+                        "records": len(records),
+                        "truncated": truncated,
+                    },
+                )
+                if completed % log_every == 0 or completed == len(hostnames):
+                    elapsed = time.monotonic() - started_at
+                    logger.info(
+                        "vendor_risks progress: %d/%d vendors, %d records so far, "
+                        "%.1fs elapsed",
+                        completed,
+                        len(hostnames),
+                        len(all_records),
+                        elapsed,
+                        extra={
+                            "source": "upguard",
+                            "completed": completed,
+                            "total": len(hostnames),
+                            "records_so_far": len(all_records),
+                            "elapsed_seconds": round(elapsed, 1),
+                        },
+                    )
+
         if truncated_hostnames:
             logger.warning(
-                "vendor_risks incomplete for these hosts (page cap hit or retries "
-                "exhausted) — data loss, not a fatal error",
+                "vendor_risks incomplete for %d hosts (page cap hit or retries "
+                "exhausted) — data loss, not a fatal error: %s",
+                len(truncated_hostnames),
+                truncated_hostnames,
                 extra={"source": "upguard", "hostnames": truncated_hostnames},
             )
+
+        logger.info(
+            "vendor_risks fan-out complete: %d vendors, %d records, %d truncated, "
+            "%.1fs elapsed",
+            len(hostnames),
+            len(all_records),
+            len(truncated_hostnames),
+            time.monotonic() - started_at,
+            extra={
+                "source": "upguard",
+                "vendor_count": len(hostnames),
+                "records": len(all_records),
+                "truncated_count": len(truncated_hostnames),
+                "elapsed_seconds": round(time.monotonic() - started_at, 1),
+            },
+        )
 
         return all_records, None
 
     def _fetch_risks_for_hostname(
-        self, hostname: str, max_pages: int
+        self, hostname: str, min_severity: str | None
     ) -> tuple[list[dict[str, Any]], bool]:
-        """Fetch one vendor's risk pages. Never raises: a single vendor's
-        429/timeout/connection failure must not blow up the whole thread
-        pool and force base.py to restart every vendor's work from scratch.
-        Returns (records, truncated) — truncated covers both "hit max_pages"
-        and "gave up on this vendor after exhausting local retries"."""
-        records: list[dict[str, Any]] = []
-        page = 1
+        """Fetch one vendor's risks. /risks/vendors is not paginated — one
+        call returns the vendor's full risk list. Never raises: a single
+        vendor's 429/timeout/connection failure must not blow up the whole
+        thread pool and force base.py to restart every vendor's work from
+        scratch. Returns (records, truncated) — truncated means retries
+        were exhausted and this vendor's risks were not retrieved."""
+        params: dict[str, Any] = {"primary_hostname": hostname}
+        if min_severity is not None:
+            params["min_severity"] = min_severity
+
         rate_limit_attempt = 0
         connection_attempt = 0
 
-        while page <= max_pages:
-            params = {"limit": _PAGE_LIMIT, "page": page, "primary_hostname": hostname}
+        while True:
             try:
                 response = self._get(self._base_url + "/risks/vendors", params=params)
             except RateLimitedSignal as exc:
                 rate_limit_attempt += 1
                 if rate_limit_attempt > _MAX_HOSTNAME_RETRIES:
                     logger.warning(
-                        "giving up on vendor after rate-limit retries exhausted",
+                        "giving up on vendor %s after rate-limit retries exhausted",
+                        hostname,
                         extra={"source": "upguard", "hostname": hostname},
                     )
-                    return records, True
-                wait = exc.retry_after or _BACKOFF_BASE_SECONDS * (
-                    2**rate_limit_attempt
+                    return [], True
+                wait = min(
+                    exc.retry_after
+                    or _BACKOFF_BASE_SECONDS * (2**rate_limit_attempt),
+                    _BACKOFF_CAP_SECONDS,
                 )
-                time.sleep(min(wait, _BACKOFF_CAP_SECONDS))
+                logger.debug(
+                    "vendor_risks rate-limited on %s, attempt %d, backing off %.1fs",
+                    hostname,
+                    rate_limit_attempt,
+                    wait,
+                    extra={
+                        "source": "upguard",
+                        "hostname": hostname,
+                        "attempt": rate_limit_attempt,
+                        "wait_seconds": wait,
+                    },
+                )
+                time.sleep(wait)
                 continue
             except _TRANSIENT_ERRORS as exc:
                 connection_attempt += 1
                 if connection_attempt > _MAX_HOSTNAME_RETRIES:
                     logger.warning(
-                        "giving up on vendor after connection retries exhausted",
+                        "giving up on vendor %s after connection retries "
+                        "exhausted: %s",
+                        hostname,
+                        exc,
                         extra={
                             "source": "upguard",
                             "hostname": hostname,
                             "error": str(exc),
                         },
                     )
-                    return records, True
-                time.sleep(min(_BACKOFF_BASE_SECONDS * (2**connection_attempt), 30.0))
+                    return [], True
+                wait = min(_BACKOFF_BASE_SECONDS * (2**connection_attempt), 30.0)
+                logger.debug(
+                    "vendor_risks connection error on %s, attempt %d, backing off "
+                    "%.1fs",
+                    hostname,
+                    connection_attempt,
+                    wait,
+                    extra={
+                        "source": "upguard",
+                        "hostname": hostname,
+                        "attempt": connection_attempt,
+                        "wait_seconds": wait,
+                    },
+                )
+                time.sleep(wait)
                 continue
 
-            page_records = self._extract_records("vendor_risks", response.json())
-            if not page_records:
-                return records, False
-            records.extend(page_records)
-            if len(page_records) < _PAGE_LIMIT:
-                return records, False
-            page += 1
-            rate_limit_attempt = 0
-            connection_attempt = 0
-        return records, True  # hit max_pages with a full page still pending
+            return self._extract_records("vendor_risks", response.json()), False
 
     def _all_vendor_hostnames(self) -> list[str]:
         raw_vendors = self._get_raw("vendors", {})

@@ -115,10 +115,12 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `api_key` | `UPGUARD_API_KEY` |
 | `base_url` | `UPGUARD_BASE_URL` (optional — defaults to the AU tenant) |
 
-`vendor_risks` fans a request out per vendor across a thread pool (UpGuard's
-`/risks/vendors` sweep is 1–60s per vendor and there can be hundreds of vendors) —
-the only posture resource that does concurrent per-parent network calls rather than
-sequential pagination. Tune with `collect("vendor_risks", max_workers=8, max_pages=200)`.
+`vendor_risks` fans a single (unpaginated — UpGuard's `/risks/vendors` has no
+pagination) request out per vendor across a thread pool (1–60s per vendor and
+there can be hundreds of vendors) — the only posture resource that does
+concurrent per-parent network calls rather than sequential pagination. Tune
+with `collect("vendor_risks", max_workers=8)`, or pass `min_severity` to filter
+server-side.
 
 ### Jamf configuration
 
