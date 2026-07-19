@@ -1,0 +1,10 @@
+[
+    {
+        "userPrincipalName": "alice@example.com",
+        "createdDateTime": "2026-07-01T08:00:00Z"
+    },
+    {
+        "userPrincipalName": "bob@example.com",
+        "createdDateTime": "2026-07-02T09:30:00Z"
+    }
+]

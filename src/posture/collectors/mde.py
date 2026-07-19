@@ -16,9 +16,13 @@ which conflicts with posture's locked "full pull, point in time, no
 incremental sync, ever" decision. Every collect() here is a full snapshot.
 
 ``machine_vulnerabilities`` fans a request out per machine across a thread
-pool (there can be thousands of machines; the reference uses 25 workers) —
-the second posture resource, after UpGuard's ``vendor_risks``, that does
-concurrent per-parent network calls rather than sequential pagination.
+pool (there can be thousands of machines; defaults to 10 workers — lowered
+from the reference implementation's 25 after large tenants were observed
+tripping MDE's rate limit hard enough to exhaust the whole batch's retry
+budget; it also halves again on each retry of this resource, see
+``_fetch_machine_vulnerabilities_page``) — see CLAUDE.md "Performance:
+per-item fan-out" for the pattern shared with Intune's per-id detail lookups
+and UpGuard's ``vendor_risks``.
 
 Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 ``machine_vulnerabilities`` (requires machines ids).
@@ -34,7 +38,24 @@ from posture.collectors._azure_oauth import fetch_azure_ad_token
 
 _API_BASE_URL = "https://api.security.microsoft.com"
 _PAGE_SIZE = 1000  # comfortably under the documented $top max of 8,000
-_DEFAULT_MACHINE_VULN_MAX_WORKERS = 25
+_DEFAULT_MACHINE_VULN_MAX_WORKERS = 10
+
+# MDE returns this .NET DateTime.MinValue sentinel for datetime fields that
+# have never been set (e.g. quickScanTime on a device never AV-scanned).
+# pandas' datetime64[ns] can't represent year 1, so it must be scrubbed to
+# None here before parse() casts it — otherwise pd.to_datetime raises
+# "Out of bounds nanosecond timestamp".
+_EPOCH_PLACEHOLDER_PREFIX = "0001-01-01"
+
+
+def _sanitize_epoch_placeholders(
+    records: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    for record in records:
+        for key, value in record.items():
+            if isinstance(value, str) and value.startswith(_EPOCH_PLACEHOLDER_PREFIX):
+                record[key] = None
+    return records
 
 _ENDPOINTS = {
     "machines": "/api/machines",
@@ -156,6 +177,14 @@ class MdeCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("tenant_id", "client_id", "client_secret")
 
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
+        super().__init__(config)
+        # Retries of 'machine_vulnerabilities' (see _fetch_machine_vulnerabilities_page)
+        # halve concurrency each attempt — tracked per-instance since base.py's
+        # _request_with_retry redoes the whole batch on RateLimitedSignal without
+        # telling the collector which attempt this is.
+        self._machine_vuln_attempt = 0
+
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(
             self._session,
@@ -171,8 +200,12 @@ class MdeCollector(Collector):
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
         if resource == "machine_vulnerabilities":
-            return self._fetch_machine_vulnerabilities_page(kwargs, cursor)
-        return self._fetch_list_page(resource, kwargs, cursor)
+            records, next_cursor = self._fetch_machine_vulnerabilities_page(
+                kwargs, cursor
+            )
+        else:
+            records, next_cursor = self._fetch_list_page(resource, kwargs, cursor)
+        return _sanitize_epoch_placeholders(records), next_cursor
 
     def _fetch_list_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
@@ -205,7 +238,13 @@ class MdeCollector(Collector):
             return [], None
 
         max_workers = kwargs.get("max_workers", _DEFAULT_MACHINE_VULN_MAX_WORKERS)
-        workers = max(1, min(max_workers, len(machine_ids)))
+        # Each retry of this resource halves concurrency — a tenant large enough
+        # to trip the rate limit at N workers is likely to trip it again at N on
+        # the very next attempt otherwise, burning through the retry budget
+        # without ever backing off the thing that caused it.
+        effective_max_workers = max(1, max_workers // (2**self._machine_vuln_attempt))
+        self._machine_vuln_attempt += 1
+        workers = max(1, min(effective_max_workers, len(machine_ids)))
 
         all_records: list[dict[str, Any]] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:

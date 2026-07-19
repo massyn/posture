@@ -35,6 +35,13 @@ INTUNE_CLIENT_SECRET=xxx
 MDE_TENANT_ID=xxx
 MDE_CLIENT_ID=xxx
 MDE_CLIENT_SECRET=xxx
+AZURE_TENANT_ID=xxx
+AZURE_CLIENT_ID=xxx
+AZURE_CLIENT_SECRET=xxx
+KNOWBE4_API_TOKEN=xxx
+KNOWBE4_REGION=us  # optional, see below
+TENABLEIO_ACCESS_KEY=xxx
+TENABLEIO_SECRET_KEY=xxx
 ```
 
 ## Usage
@@ -51,6 +58,33 @@ ccm.flush_cache()                                  # the only cache invalidation
 
 `collect()` always returns a complete `pandas.DataFrame` for the requested resource, or
 raises — there is no such thing as a partial snapshot in this library.
+
+### Discovering what's available
+
+```python
+from posture import catalog
+
+catalog()
+# {
+#   "crowdstrike": {
+#     "required_config": {"client_id": "CROWDSTRIKE_CLIENT_ID", "client_secret": "CROWDSTRIKE_CLIENT_SECRET"},
+#     "resources": {
+#       "hosts": {"derived_from": None, "columns": ["client_id", "device_id", ...]},
+#       "vulnerability_remediations": {"derived_from": "vulnerabilities", "columns": [...]},
+#       ...
+#     },
+#   },
+#   "knowbe4": {...},
+#   ...
+# }
+```
+
+`catalog()` never instantiates a collector, never touches the network, and needs no
+credentials — it reads sources, required config (as constructor key → env var), and
+resources (including which are derived, and their declared columns) straight off the
+registered `Collector` classes. It only reports *required* config — optional knobs
+(e.g. `region`, `base_url`) aren't tracked as data, so check a source's section below
+for those.
 
 ## Example: export Crowdstrike hosts to local JSON
 
@@ -84,6 +118,9 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `jamf` | `computers_inventory`, `computers_inventory_detail`, `mobile_devices`, `policies`, `categories`, `buildings`, `departments` |
 | `intune` | `managed_devices`, `users`, `device_configurations`, `managed_device_detail`, `device_configuration_detail`, `device_compliance_policies`, `attack_simulations`, `attack_simulation_users` |
 | `mde` | `machines`, `vulnerabilities`, `device_av_info`, `machine_vulnerabilities` |
+| `azure_entra` | `users`, `signins`, `audit_logs` |
+| `knowbe4` | `training_enrollments` |
+| `tenableio` | `assets`, `vulnerabilities` |
 
 ### Crowdstrike configuration
 
@@ -137,18 +174,18 @@ allowlist-only manifest doesn't support. `computers_inventory_detail` fetches on
 computer at a time by id (from `computers_inventory`), same pattern as Okta's
 `device_users`.
 
-### Intune and MDE configuration
+### Intune, MDE, and Azure Entra configuration
 
-Both authenticate via Azure AD client-credentials against the tenant's OAuth2 endpoint
-(shared internal helper, not vendor SDKs).
+All three authenticate via Azure AD client-credentials against the tenant's OAuth2
+endpoint (shared internal helper, not vendor SDKs).
 
 | Constructor key | Env var |
 |---|---|
-| `tenant_id` | `INTUNE_TENANT_ID` / `MDE_TENANT_ID` |
-| `client_id` | `INTUNE_CLIENT_ID` / `MDE_CLIENT_ID` |
-| `client_secret` | `INTUNE_CLIENT_SECRET` / `MDE_CLIENT_SECRET` |
+| `tenant_id` | `INTUNE_TENANT_ID` / `MDE_TENANT_ID` / `AZURE_TENANT_ID` |
+| `client_id` | `INTUNE_CLIENT_ID` / `MDE_CLIENT_ID` / `AZURE_CLIENT_ID` |
+| `client_secret` | `INTUNE_CLIENT_SECRET` / `MDE_CLIENT_SECRET` / `AZURE_CLIENT_SECRET` |
 
-Neither supports incremental sync (the reference implementations do via `$filter`
+None support incremental sync (the reference implementations do via `$filter`
 checkpoints) — every `collect()` is a full snapshot, per posture's locked snapshot
 semantics. `intune`'s `device_configurations` / `device_configuration_detail` only
 carry the fields the accelerator explicitly named as aliases, not the full raw Graph
@@ -157,7 +194,29 @@ out per machine across a thread pool (up to `max_workers`, default 25) — the s
 pattern as UpGuard's `vendor_risks`. `intune`'s `attack_simulation_users` fetches the
 targeted-user report for each `attack_simulations` id (one paginated call per
 simulation, click/report/training events kept as JSON blobs rather than exploded
-into further tables).
+into further tables). `azure_entra`'s `signins` takes an optional `days` kwarg
+(default 180) that narrows the server-side `$filter` on `createdDateTime` — still a
+full point-in-time pull, not a checkpoint.
+
+### KnowBe4 configuration
+
+| Constructor key | Env var |
+|---|---|
+| `api_token` | `KNOWBE4_API_TOKEN` |
+| `region` | `KNOWBE4_REGION` (optional — `us` or `eu`, defaults to `us`) |
+
+### Tenable.io configuration
+
+Requires the optional `pytenable` dependency — install with
+`pip install "posture[tenableio]"`. `pytenable`'s export jobs are bespoke
+server-side machinery (polling, chunking) that the base class's generic REST
+pagination scaffold can't express, so this collector is the one approved
+vendor-SDK exception.
+
+| Constructor key | Env var |
+|---|---|
+| `access_key` | `TENABLEIO_ACCESS_KEY` |
+| `secret_key` | `TENABLEIO_SECRET_KEY` |
 
 ## Development
 

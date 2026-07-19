@@ -1,0 +1,29 @@
+[
+    {
+        "id": "asset-1",
+        "hostnames": ["host1.example.com"],
+        "fqdns": ["host1.example.com"],
+        "ipv4s": ["10.0.0.1"],
+        "ipv6s": [],
+        "mac_addresses": ["00:11:22:33:44:55"],
+        "operating_systems": ["Windows 11 Enterprise"],
+        "network_name": "Default",
+        "has_agent": true,
+        "agent_uuid": "agent-uuid-1",
+        "first_seen": "2026-01-01T00:00:00.000Z",
+        "last_seen": "2026-01-10T00:00:00.000Z",
+        "sources": [{"name": "NESSUS_SCAN"}]
+    },
+    {
+        "id": "asset-2",
+        "hostnames": [],
+        "fqdns": [],
+        "ipv4s": [],
+        "ipv6s": [],
+        "operating_systems": [],
+        "has_agent": false,
+        "first_seen": null,
+        "last_seen": null,
+        "sources": []
+    }
+]

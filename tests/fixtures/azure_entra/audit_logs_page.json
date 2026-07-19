@@ -1,0 +1,16 @@
+[
+    {
+        "id": "audit-1",
+        "activityDisplayName": "Add user",
+        "activityDateTime": "2026-07-01T08:00:00Z",
+        "targetResources": [{"userPrincipalName": "alice@example.com"}],
+        "initiatedBy": {"user": {"userPrincipalName": "admin@example.com"}}
+    },
+    {
+        "id": "audit-2",
+        "activityDisplayName": "Reset password",
+        "activityDateTime": "2026-07-02T09:00:00Z",
+        "targetResources": [{"userPrincipalName": "bob@example.com"}],
+        "initiatedBy": {"app": {"displayName": "Automation App"}}
+    }
+]

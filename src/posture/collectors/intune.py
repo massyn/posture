@@ -23,13 +23,24 @@ Resources: ``managed_devices``, ``users``, ``device_configurations``,
 
 from __future__ import annotations
 
+import concurrent.futures
 from typing import Any
 
 from posture.base import Collector
-from posture.collectors._azure_oauth import fetch_azure_ad_token, odata_get_page
+from posture.collectors._azure_oauth import (
+    fetch_azure_ad_token,
+    graph_get_json,
+    odata_get_page,
+)
 
 _GRAPH_BASE_URL = "https://graph.microsoft.com"
 _PAGE_SIZE = 100
+
+# Per-item fan-out (managed_device_detail, device_configuration_detail,
+# attack_simulation_users) issues one request per id/simulation. Bounded
+# thread pool overlaps network latency instead of paying it serially — see
+# CLAUDE.md "Performance: per-item fan-out" for the pattern and its limits.
+_MAX_FANOUT_WORKERS = 10
 
 _ENDPOINTS = {
     "managed_devices": "/v1.0/deviceManagement/managedDevices",
@@ -232,12 +243,15 @@ class IntuneCollector(Collector):
             return [], None
 
         path_template = _ENDPOINTS[resource]
-        records: list[dict[str, Any]] = []
-        for record_id in ids:
+
+        def _fetch_one(record_id: str) -> dict[str, Any]:
             url = _GRAPH_BASE_URL + path_template.format(id=record_id)
-            response = self._session.get(url, timeout=60)
-            response.raise_for_status()
-            records.append(response.json())
+            return graph_get_json(self._session, url, None)
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=_MAX_FANOUT_WORKERS
+        ) as executor:
+            records = list(executor.map(_fetch_one, ids))
 
         return records, None
 
@@ -257,13 +271,21 @@ class IntuneCollector(Collector):
             return [], None
 
         path_template = _ENDPOINTS["attack_simulation_users"]
-        records: list[dict[str, Any]] = []
-        for simulation_id in simulation_ids:
-            for record in self._drain_simulation_users(
+
+        def _fetch_one(simulation_id: str) -> list[dict[str, Any]]:
+            sim_records = self._drain_simulation_users(
                 path_template.format(id=simulation_id)
-            ):
+            )
+            for record in sim_records:
                 record["_simulation_id"] = simulation_id
-                records.append(record)
+            return sim_records
+
+        records: list[dict[str, Any]] = []
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=_MAX_FANOUT_WORKERS
+        ) as executor:
+            for sim_records in executor.map(_fetch_one, simulation_ids):
+                records.extend(sim_records)
 
         return records, None
 

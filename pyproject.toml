@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "posture"
-version = "0.0.3"
+version = "0.0.4"
 description = ""
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,11 +22,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tenableio = [
+    "pytenable>=1.4",
+]
 dev = [
     "pytest>=8.0",
     "responses>=0.25",
     "black>=24.0",
     "ruff>=0.5",
+    "pytenable>=1.4",
 ]
 
 [project.urls]

@@ -1,0 +1,34 @@
+[
+    {
+        "asset": {
+            "uuid": "asset-uuid-1",
+            "hostname": "host1.example.com",
+            "ipv4": "10.0.0.1",
+            "operating_system": "Windows 11 Enterprise"
+        },
+        "plugin": {
+            "id": 12345,
+            "name": "Example Vulnerable Service",
+            "family_name": "Windows",
+            "cvss_base_score": 7.5,
+            "cvss3_base_score": 8.1,
+            "cve": ["CVE-2026-0001", "CVE-2026-0002"]
+        },
+        "severity": "high",
+        "severity_id": 3,
+        "state": "OPEN",
+        "port": {"port": 443, "protocol": "TCP"},
+        "first_found": "2026-01-02T00:00:00.000Z",
+        "last_found": "2026-01-11T00:00:00.000Z"
+    },
+    {
+        "asset": {"uuid": "asset-uuid-2"},
+        "plugin": {"id": 999, "cve": []},
+        "severity": "info",
+        "severity_id": 0,
+        "state": "OPEN",
+        "port": {},
+        "first_found": null,
+        "last_found": null
+    }
+]

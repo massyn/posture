@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -35,6 +36,13 @@ _BACKOFF_CAP_SECONDS = 60.0
 
 _MAX_CONNECTION_RETRIES = 2
 _CONNECTION_RETRY_WAIT_SECONDS = 5.0
+
+# Collectors that fan out per-item network calls (e.g. one detail request per
+# id) share this session, so the connection pool must be sized to match —
+# otherwise urllib3 logs "Connection pool is full" and serialises anyway.
+# Must stay >= the largest fan-out worker count across collectors (MDE's
+# machine_vulnerabilities defaults to 25 workers).
+_HTTP_POOL_MAXSIZE = 32
 _TRANSIENT_CONNECTION_ERRORS = (
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
@@ -79,6 +87,9 @@ class Collector(ABC):
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
         self._session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_maxsize=_HTTP_POOL_MAXSIZE)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
         self._authenticated = False
         self._cache: dict[tuple[str, tuple], _CacheEntry] = {}
         self._reports: dict[str, _CollectionReport] = {}
@@ -212,8 +223,12 @@ class Collector(ABC):
                         records_so_far=report.records,
                     ) from exc
                 report.retries += 1
-                wait = exc.retry_after or _BACKOFF_BASE_SECONDS * (2**attempt)
-                time.sleep(min(wait, _BACKOFF_CAP_SECONDS))
+                wait = min(exc.retry_after or _BACKOFF_BASE_SECONDS * (2**attempt), _BACKOFF_CAP_SECONDS)
+                # Jitter (+/-25%) so concurrent collector runs against the same
+                # rate-limited source (e.g. several tenants dispatched in parallel
+                # by cron.py, or a fan-out retry racing other resources) don't all
+                # wake up and re-hit the API at the exact same moment.
+                time.sleep(wait * random.uniform(0.75, 1.25))
             except UnauthorizedSignal:
                 attempt += 1
                 if attempt > _MAX_RETRIES:

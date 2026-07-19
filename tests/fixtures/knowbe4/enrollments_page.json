@@ -1,0 +1,36 @@
+[
+    {
+        "enrollment_id": 101,
+        "content_type": "Module",
+        "module_name": "Security Awareness 101",
+        "campaign_name": "Q1 Campaign",
+        "enrollment_date": "2026-01-05T00:00:00.000Z",
+        "start_date": "2026-01-06T00:00:00.000Z",
+        "completion_date": "2026-01-10T00:00:00.000Z",
+        "status": "Passed",
+        "time_spent": 900,
+        "user": {
+            "id": 501,
+            "email": "alice@example.com",
+            "first_name": "Alice",
+            "last_name": "Smith"
+        }
+    },
+    {
+        "enrollment_id": 102,
+        "content_type": "Module",
+        "module_name": "Security Awareness 101",
+        "campaign_name": "Q1 Campaign",
+        "enrollment_date": "2026-01-05T00:00:00.000Z",
+        "start_date": null,
+        "completion_date": null,
+        "status": "Not Started",
+        "time_spent": 0,
+        "user": {
+            "id": 502,
+            "email": "bob@example.com",
+            "first_name": "Bob",
+            "last_name": "Jones"
+        }
+    }
+]

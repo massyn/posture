@@ -54,11 +54,11 @@ def fetch_azure_ad_token(
     return response.json()["access_token"]
 
 
-def odata_get_page(
+def graph_get_json(
     session: requests.Session, url: str, params: dict[str, Any] | None
-) -> tuple[list[dict[str, Any]], str | None]:
-    """Fetch one OData page. If ``params`` is None, ``url`` is an opaque
-    ``@odata.nextLink`` and is fetched as-is."""
+) -> dict[str, Any]:
+    """GET a single Graph resource, translating 429/401/403 into the
+    retry-driving signals the base class's ``_request_with_retry`` catches."""
     response = session.get(url, params=params, timeout=60)
     if response.status_code == 429:
         retry_after = response.headers.get("Retry-After")
@@ -66,8 +66,15 @@ def odata_get_page(
     if response.status_code in (401, 403):
         raise UnauthorizedSignal()
     response.raise_for_status()
+    return response.json()
 
-    body = response.json()
+
+def odata_get_page(
+    session: requests.Session, url: str, params: dict[str, Any] | None
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Fetch one OData page. If ``params`` is None, ``url`` is an opaque
+    ``@odata.nextLink`` and is fetched as-is."""
+    body = graph_get_json(session, url, params)
     records = body.get("value", [])
     next_link = body.get("@odata.nextLink")
     return records, next_link
