@@ -321,6 +321,18 @@ class MdeCollector(Collector):
                 return response.json().get("value", [])
             except requests.exceptions.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
+                if status == 404:
+                    # Machine-specific endpoint: a 404 means this machine has
+                    # no vulnerability data (e.g. offboarded since the machine
+                    # list was pulled), not a collection-wide failure.
+                    logger.info(
+                        "machine_vulnerabilities: no data for machine (404), skipping",
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "machine_id": machine_id,
+                        },
+                    )
+                    return []
                 if status is None or status < 500:
                     raise
                 attempt += 1
