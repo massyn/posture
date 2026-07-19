@@ -1,0 +1,6 @@
+{
+    "widget__c": {
+        "Id": "str",
+        "Widget_Name__c": "str"
+    }
+}

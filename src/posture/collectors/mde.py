@@ -24,6 +24,15 @@ budget; it also halves again on each retry of this resource, see
 per-item fan-out" for the pattern shared with Intune's per-id detail lookups
 and UpGuard's ``vendor_risks``.
 
+All requests (list pagination and the per-machine fan-out alike) are paced
+client-side to stay under MDE's documented ~100 calls/minute per-app-registration
+limit (see ``_pace_request``) — without it, concurrent fan-out workers burst
+past the limit in the first instant, and because a RateLimitedSignal redoes
+the *entire* fan-out from scratch (base.py's all-or-nothing retry contract),
+each retry just re-bursts at lower concurrency instead of avoiding the 429s
+in the first place. This is the same root cause and fix as the KnowBe4
+collector's ``_pace_request``.
+
 Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 ``machine_vulnerabilities`` (requires machines ids).
 """
@@ -31,6 +40,8 @@ Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 from __future__ import annotations
 
 import concurrent.futures
+import threading
+import time
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -40,6 +51,11 @@ _API_BASE_URL = "https://api.security.microsoft.com"
 _PAGE_SIZE = 1000  # comfortably under the documented $top max of 8,000
 _DEFAULT_MACHINE_VULN_MAX_WORKERS = 10
 
+# MDE's documented general API limit is ~100 calls/minute per app registration.
+# Staying comfortably under that (0.65s between requests ~= 92/min) leaves
+# headroom for other traffic against the same app registration.
+_MIN_REQUEST_INTERVAL_SECONDS = 0.65
+
 # MDE returns this .NET DateTime.MinValue sentinel for datetime fields that
 # have never been set (e.g. quickScanTime on a device never AV-scanned).
 # pandas' datetime64[ns] can't represent year 1, so it must be scrubbed to
@@ -48,14 +64,13 @@ _DEFAULT_MACHINE_VULN_MAX_WORKERS = 10
 _EPOCH_PLACEHOLDER_PREFIX = "0001-01-01"
 
 
-def _sanitize_epoch_placeholders(
-    records: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def _sanitize_epoch_placeholders(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for record in records:
         for key, value in record.items():
             if isinstance(value, str) and value.startswith(_EPOCH_PLACEHOLDER_PREFIX):
                 record[key] = None
     return records
+
 
 _ENDPOINTS = {
     "machines": "/api/machines",
@@ -184,6 +199,8 @@ class MdeCollector(Collector):
         # _request_with_retry redoes the whole batch on RateLimitedSignal without
         # telling the collector which attempt this is.
         self._machine_vuln_attempt = 0
+        self._rate_limit_lock = threading.Lock()
+        self._last_request_time = 0.0
 
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(
@@ -270,7 +287,19 @@ class MdeCollector(Collector):
         response = self._get(_API_BASE_URL + endpoint)
         return response.json().get("value", [])
 
+    def _pace_request(self) -> None:
+        # Shared across threads so concurrent machine_vulnerabilities workers
+        # can't collectively exceed the per-minute ceiling even though each
+        # thread only knows about its own requests.
+        with self._rate_limit_lock:
+            elapsed = time.monotonic() - self._last_request_time
+            wait = _MIN_REQUEST_INTERVAL_SECONDS - elapsed
+            if wait > 0:
+                time.sleep(wait)
+            self._last_request_time = time.monotonic()
+
     def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
+        self._pace_request()
         response = self._session.get(url, params=params, timeout=60)
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")

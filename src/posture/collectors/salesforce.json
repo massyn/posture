@@ -1,0 +1,36 @@
+{
+    "fixed_asset__c": {
+        "Id": "str",
+        "Project_Resource__c": "str",
+        "Possession__c": "str",
+        "Status__c": "str",
+        "Type__c": "str",
+        "Serial_Number__c": "str",
+        "Model__c": "str"
+    },
+    "krow__location__c": {
+        "Id": "str",
+        "Name": "str"
+    },
+    "krow__project_resources__c": {
+        "Id": "str",
+        "Name": "str",
+        "User_Email__c": "str",
+        "Employment_End_Date__c": "datetime",
+        "Legal_Name__c": "str",
+        "Domain__c": "str",
+        "Employment_Start_Date__c": "datetime",
+        "Krow__Team__c": "str",
+        "Krow__Active__c": "bool",
+        "Krow__Location__c": "str"
+    },
+    "domain__c": {
+        "Id": "str",
+        "Name": "str",
+        "Active__c": "bool"
+    },
+    "krow__team__c": {
+        "Id": "str",
+        "Name": "str"
+    }
+}

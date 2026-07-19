@@ -119,7 +119,8 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `intune` | `managed_devices`, `users`, `device_configurations`, `managed_device_detail`, `device_configuration_detail`, `device_compliance_policies`, `attack_simulations`, `attack_simulation_users` |
 | `mde` | `machines`, `vulnerabilities`, `device_av_info`, `machine_vulnerabilities` |
 | `azure_entra` | `users`, `signins`, `audit_logs` |
-| `knowbe4` | `training_enrollments` |
+| `knowbe4` | `training_enrollments`, `psts`, `pst_recipients` |
+| `salesforce` | one per object declared in `salesforce.json` (default: `fixed_asset__c`, `krow__location__c`, `krow__project_resources__c`, `domain__c`, `krow__team__c`) |
 | `tenableio` | `assets`, `vulnerabilities` |
 
 ### Crowdstrike configuration
@@ -205,13 +206,40 @@ full point-in-time pull, not a checkpoint.
 | `api_token` | `KNOWBE4_API_TOKEN` |
 | `region` | `KNOWBE4_REGION` (optional — `us` or `eu`, defaults to `us`) |
 
+`pst_recipients` (per-recipient phishing test results — delivered/opened/clicked/
+reported timestamps) fans out one paginated call per PST id across a bounded thread
+pool, mirroring `mde`'s `machine_vulnerabilities`. PST ids are read from `psts`
+internally unless a `pst_ids` kwarg is given; concurrency defaults to 10 workers,
+overridable via a `max_workers` kwarg.
+
+### Salesforce configuration
+
+Requires the optional `simple_salesforce` dependency — install with
+`pip install "posture[salesforce]"`. Auth is username + password + security
+token (no connected app / client id-secret needed) — the alternative would be
+hand-rolling Salesforce's SOAP login flow, so this is an approved vendor-SDK
+exception alongside `pytenable`.
+
+| Constructor key | Env var |
+|---|---|
+| `username` | `SALESFORCE_USERNAME` |
+| `password` | `SALESFORCE_PASSWORD` |
+| `security_token` | `SALESFORCE_SECURITY_TOKEN` |
+| `domain` | `SALESFORCE_DOMAIN` (optional — omit for production, `"test"` for a sandbox, or a custom My Domain) |
+| `schema_file` | `SALESFORCE_SCHEMA_FILE` (optional — path to a JSON file overriding the shipped `salesforce.json`) |
+
+Resources aren't hand-written per endpoint: `salesforce.json` declares one entry
+per Salesforce object as a flat `{field_name: type}` map, and both the SOQL
+query and the manifest are generated from that file. Add an object by editing
+the JSON (or pointing `schema_file` at your own), not by changing collector code.
+
 ### Tenable.io configuration
 
 Requires the optional `pytenable` dependency — install with
 `pip install "posture[tenableio]"`. `pytenable`'s export jobs are bespoke
 server-side machinery (polling, chunking) that the base class's generic REST
-pagination scaffold can't express, so this collector is the one approved
-vendor-SDK exception.
+pagination scaffold can't express, so this collector is one of the two approved
+vendor-SDK exceptions (alongside `simple_salesforce`).
 
 | Constructor key | Env var |
 |---|---|

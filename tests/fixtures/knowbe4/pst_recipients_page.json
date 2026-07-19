@@ -1,0 +1,54 @@
+[
+    {
+        "recipient_id": 9001,
+        "user": {
+            "id": 501,
+            "first_name": "Alice",
+            "last_name": "Smith",
+            "email": "alice@example.com"
+        },
+        "template": {"name": "Invoice Phish Q1"},
+        "scheduled_at": "2026-01-05T00:00:00.000Z",
+        "delivered_at": "2026-01-05T00:01:00.000Z",
+        "opened_at": "2026-01-05T00:05:00.000Z",
+        "clicked_at": "2026-01-05T00:06:00.000Z",
+        "replied_at": null,
+        "attachment_opened_at": null,
+        "macro_enabled_at": null,
+        "data_entered_at": null,
+        "qr_code_scanned_at": null,
+        "reported_at": null,
+        "bounced_at": null,
+        "ip": "203.0.113.5",
+        "ip_location": "US",
+        "browser": "Chrome",
+        "browser_version": "120.0",
+        "os": "Windows 11"
+    },
+    {
+        "recipient_id": 9002,
+        "user": {
+            "id": 502,
+            "first_name": "Bob",
+            "last_name": "Jones",
+            "email": "bob@example.com"
+        },
+        "template": {"name": "Invoice Phish Q1"},
+        "scheduled_at": "2026-01-05T00:00:00.000Z",
+        "delivered_at": "2026-01-05T00:01:00.000Z",
+        "opened_at": null,
+        "clicked_at": null,
+        "replied_at": null,
+        "attachment_opened_at": null,
+        "macro_enabled_at": null,
+        "data_entered_at": null,
+        "qr_code_scanned_at": null,
+        "reported_at": "2026-01-05T00:10:00.000Z",
+        "bounced_at": null,
+        "ip": null,
+        "ip_location": null,
+        "browser": null,
+        "browser_version": null,
+        "os": null
+    }
+]

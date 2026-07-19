@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv()
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.0.3"
+__version__ = "0.2.0"
 
 __all__ = [
     "CCM",
@@ -55,6 +55,7 @@ def _register_sources() -> None:
     from posture.collectors.knowbe4 import Knowbe4Collector
     from posture.collectors.mde import MdeCollector
     from posture.collectors.okta import OktaCollector
+    from posture.collectors.salesforce import SalesforceCollector
     from posture.collectors.tenableio import TenableioCollector
     from posture.collectors.upguard import UpGuardCollector
     from posture.collectors.workspaceone import WorkspaceOneCollector
@@ -66,6 +67,7 @@ def _register_sources() -> None:
     _SOURCES["knowbe4"] = Knowbe4Collector
     _SOURCES["mde"] = MdeCollector
     _SOURCES["okta"] = OktaCollector
+    _SOURCES["salesforce"] = SalesforceCollector
     _SOURCES["tenableio"] = TenableioCollector
     _SOURCES["upguard"] = UpGuardCollector
     _SOURCES["workspaceone"] = WorkspaceOneCollector
