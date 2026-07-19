@@ -248,10 +248,24 @@ class IntuneCollector(Collector):
             url = _GRAPH_BASE_URL + path_template.format(id=record_id)
             return graph_get_json(self._session, url, None)
 
+        records: list[dict[str, Any]] = []
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=_MAX_FANOUT_WORKERS
         ) as executor:
-            records = list(executor.map(_fetch_one, ids))
+            futures = {executor.submit(_fetch_one, record_id): record_id for record_id in ids}
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    records.append(future.result())
+            except BaseException:
+                # A worker failed (e.g. token expired mid-run, raising
+                # UnauthorizedSignal via graph_get_json). Cancel every future
+                # that hasn't started yet so the pool doesn't keep burning
+                # through the remaining queue against a dead token before
+                # __exit__'s shutdown(wait=True) can return control to
+                # base.py's retry/reauth handler.
+                for pending in futures:
+                    pending.cancel()
+                raise
 
         return records, None
 
@@ -284,8 +298,20 @@ class IntuneCollector(Collector):
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=_MAX_FANOUT_WORKERS
         ) as executor:
-            for sim_records in executor.map(_fetch_one, simulation_ids):
-                records.extend(sim_records)
+            futures = {
+                executor.submit(_fetch_one, simulation_id): simulation_id
+                for simulation_id in simulation_ids
+            }
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    records.extend(future.result())
+            except BaseException:
+                # See _fetch_detail_page: cancel unstarted futures on first
+                # failure so a dead token doesn't get retried against the
+                # whole remaining queue before base.py can reauth.
+                for pending in futures:
+                    pending.cancel()
+                raise
 
         return records, None
 

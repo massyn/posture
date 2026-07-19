@@ -271,12 +271,22 @@ class MdeCollector(Collector):
                 ): machine_id
                 for machine_id in machine_ids
             }
-            for future in concurrent.futures.as_completed(futures):
-                machine_id = futures[future]
-                records = future.result()
-                for record in records:
-                    record["_machine_id"] = machine_id
-                all_records.extend(records)
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    machine_id = futures[future]
+                    records = future.result()
+                    for record in records:
+                        record["_machine_id"] = machine_id
+                    all_records.extend(records)
+            except BaseException:
+                # A worker failed (e.g. token expired mid-run, raising
+                # UnauthorizedSignal). Cancel every future that hasn't started
+                # yet so the pool doesn't keep burning through the remaining
+                # queue against a dead token before __exit__'s shutdown(wait=True)
+                # can return control to base.py's retry/reauth handler.
+                for pending in futures:
+                    pending.cancel()
+                raise
 
         return all_records, None
 

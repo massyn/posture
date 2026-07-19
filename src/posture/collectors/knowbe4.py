@@ -22,6 +22,7 @@ import concurrent.futures
 import os
 import threading
 import time
+from collections import deque
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -35,15 +36,19 @@ _REGION_BASE_URLS = {
 _DEFAULT_REGION = "us"
 _PAGE_SIZE = 500
 
-# KnowBe4's documented limits: 4 requests/second, 50 requests/minute burst.
-# ``pst_recipients`` fans out across a thread pool, so without client-side
-# pacing concurrent workers blow through the burst limit in the first instant
-# and every retry re-bursts the same way (the whole fan-out is redone from
-# scratch on RateLimitExhausted — see base.py's all-or-nothing contract),
-# exhausting retries without ever landing a record. Worker count is capped to
-# match the 4 req/s ceiling; the pacing lock enforces it even under retry.
+# KnowBe4's documented limits: 4 requests/second burst, 50 requests/minute
+# sustained. ``pst_recipients`` fans out across a thread pool and can run for
+# well over a minute across many PSTs/pages, so pacing on the 4 req/s figure
+# alone isn't enough — held up for more than ~12s it blows straight through
+# the 50/min sustained cap (4 req/s * 60s = 240/min), and every retry
+# re-bursts the same way (the whole fan-out is redone from scratch on
+# RateLimitExhausted — see base.py's all-or-nothing contract), exhausting
+# retries without ever landing a record. Worker count is capped to match the
+# 4 req/s ceiling; the pacing lock enforces both ceilings even under retry.
 _DEFAULT_PST_RECIPIENTS_MAX_WORKERS = 4
 _MIN_REQUEST_INTERVAL_SECONDS = 0.25
+_MAX_REQUESTS_PER_MINUTE = 50
+_RATE_WINDOW_SECONDS = 60.0
 
 _ENDPOINTS = {
     "training_enrollments": "/v1/training/enrollments",
@@ -149,6 +154,7 @@ class Knowbe4Collector(Collector):
         )
         self._rate_limit_lock = threading.Lock()
         self._last_request_time = 0.0
+        self._request_times: deque[float] = deque()
 
     def _authenticate(self) -> None:
         self._session.headers["Authorization"] = f"Bearer {self._config['api_token']}"
@@ -219,14 +225,26 @@ class Knowbe4Collector(Collector):
 
     def _pace_request(self) -> None:
         # Shared across threads so concurrent pst_recipients workers can't
-        # collectively exceed the 4 req/s ceiling even though each thread
-        # only knows about its own requests.
+        # collectively exceed either ceiling even though each thread only
+        # knows about its own requests: the 4 req/s burst limit (min gap
+        # since the last request) and the 50 req/min sustained limit (a
+        # rolling 60s window over all request timestamps).
         with self._rate_limit_lock:
-            elapsed = time.monotonic() - self._last_request_time
+            now = time.monotonic()
+            elapsed = now - self._last_request_time
             wait = _MIN_REQUEST_INTERVAL_SECONDS - elapsed
+
+            while self._request_times and now - self._request_times[0] > _RATE_WINDOW_SECONDS:
+                self._request_times.popleft()
+            if len(self._request_times) >= _MAX_REQUESTS_PER_MINUTE:
+                wait = max(wait, _RATE_WINDOW_SECONDS - (now - self._request_times[0]))
+
             if wait > 0:
                 time.sleep(wait)
-            self._last_request_time = time.monotonic()
+                now = time.monotonic()
+
+            self._last_request_time = now
+            self._request_times.append(now)
 
     def _get(self, endpoint: str, params: dict[str, Any]) -> Any:
         self._pace_request()
