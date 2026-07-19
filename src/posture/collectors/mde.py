@@ -33,6 +33,11 @@ each retry just re-bursts at lower concurrency instead of avoiding the 429s
 in the first place. This is the same root cause and fix as the KnowBe4
 collector's ``_pace_request``.
 
+A 5xx for a single machine (e.g. a stale/decommissioned device record) is
+handled locally per-machine — see ``_fetch_all_vulns_for_machine`` — rather
+than propagating up to base.py's batch-level retry, which would otherwise
+fail (or re-burst) the whole fan-out over one bad machine.
+
 Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 ``machine_vulnerabilities`` (requires machines ids).
 """
@@ -40,16 +45,31 @@ Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 import threading
 import time
 from typing import Any
 
+import requests
+
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.collectors._azure_oauth import fetch_azure_ad_token
+
+logger = logging.getLogger("posture.collectors.mde")
 
 _API_BASE_URL = "https://api.security.microsoft.com"
 _PAGE_SIZE = 1000  # comfortably under the documented $top max of 8,000
 _DEFAULT_MACHINE_VULN_MAX_WORKERS = 10
+
+# A lone machine 500ing is a per-device MDE fault, not a whole-tenant problem
+# (unlike 429/401, which are meaningful at the batch level and handled by
+# base.py's _request_with_retry). Retrying the entire fan-out for one bad
+# machine would burn the shared retry budget and re-halve concurrency for
+# every other machine, so a 5xx for a single machine is retried locally here
+# and, if it still fails, that machine is skipped rather than failing the
+# whole 'machine_vulnerabilities' resource.
+_MACHINE_VULN_SERVER_ERROR_RETRIES = 2
+_MACHINE_VULN_SERVER_ERROR_WAIT_SECONDS = 60.0
 
 # MDE's documented general API limit is ~100 calls/minute per app registration.
 # Staying comfortably under that (0.65s between requests ~= 92/min) leaves
@@ -294,8 +314,38 @@ class MdeCollector(Collector):
         # No $top/$skip/nextLink documented for this endpoint — it's a
         # single, complete response (unlike the org-wide list endpoints).
         endpoint = _ENDPOINTS["machine_vulnerabilities"].format(id=machine_id)
-        response = self._get(_API_BASE_URL + endpoint)
-        return response.json().get("value", [])
+        attempt = 0
+        while True:
+            try:
+                response = self._get(_API_BASE_URL + endpoint)
+                return response.json().get("value", [])
+            except requests.exceptions.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status is None or status < 500:
+                    raise
+                attempt += 1
+                if attempt > _MACHINE_VULN_SERVER_ERROR_RETRIES:
+                    logger.warning(
+                        "machine_vulnerabilities: skipping machine after repeated "
+                        "server errors",
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "machine_id": machine_id,
+                            "status": status,
+                            "attempts": attempt,
+                        },
+                    )
+                    return []
+                logger.warning(
+                    "machine_vulnerabilities: server error for machine, retrying",
+                    extra={
+                        "source": self.env_prefix.lower(),
+                        "machine_id": machine_id,
+                        "status": status,
+                        "attempt": attempt,
+                    },
+                )
+                time.sleep(_MACHINE_VULN_SERVER_ERROR_WAIT_SECONDS)
 
     def _pace_request(self) -> None:
         # Shared across threads so concurrent machine_vulnerabilities workers

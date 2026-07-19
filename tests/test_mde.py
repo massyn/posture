@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import responses
 
@@ -139,3 +140,86 @@ def test_machine_vulnerabilities_fans_out_and_injects_machine_id() -> None:
 
     assert len(df) == 2
     assert set(df["machine_id"]) == {"machine-1", "machine-2"}
+
+
+@responses.activate
+def test_machine_vulnerabilities_retries_then_recovers_from_server_error() -> None:
+    responses.add(
+        responses.POST,
+        "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
+        json={"access_token": "tok"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines",
+        json={"value": [{"id": "machine-1"}]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines/machine-1/vulnerabilities",
+        status=500,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines/machine-1/vulnerabilities",
+        json={"value": [{"id": "mv-1"}]},
+        status=200,
+    )
+
+    ccm = CCM(
+        "mde", {"tenant_id": "tenant-1", "client_id": "id", "client_secret": "secret"}
+    )
+    with patch("posture.collectors.mde.time.sleep") as mock_sleep:
+        df = ccm.collect("machine_vulnerabilities")
+
+    assert len(df) == 1
+    assert 60.0 in [call.args[0] for call in mock_sleep.call_args_list]
+
+
+@responses.activate
+def test_machine_vulnerabilities_skips_machine_after_repeated_server_errors() -> None:
+    responses.add(
+        responses.POST,
+        "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
+        json={"access_token": "tok"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines",
+        json={"value": [{"id": "machine-1"}, {"id": "machine-2"}]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines/machine-1/vulnerabilities",
+        status=500,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines/machine-1/vulnerabilities",
+        status=500,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines/machine-1/vulnerabilities",
+        status=500,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/machines/machine-2/vulnerabilities",
+        json={"value": [{"id": "mv-2"}]},
+        status=200,
+    )
+
+    ccm = CCM(
+        "mde", {"tenant_id": "tenant-1", "client_id": "id", "client_secret": "secret"}
+    )
+    with patch("posture.collectors.mde.time.sleep"):
+        df = ccm.collect("machine_vulnerabilities")
+
+    # machine-1 is skipped after exhausting retries; machine-2 still succeeds.
+    assert len(df) == 1
+    assert df.iloc[0]["machine_id"] == "machine-2"
