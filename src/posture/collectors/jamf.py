@@ -18,10 +18,13 @@ Resources: ``computers_inventory``, ``computers_inventory_detail`` (requires
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
+
+logger = logging.getLogger("posture.collectors.jamf")
 
 _PAGE_SIZE = 100
 
@@ -130,6 +133,11 @@ class JamfCollector(Collector):
                 source="jamf",
                 hint="check JAMF_CLIENT_ID / JAMF_CLIENT_SECRET",
             )
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "jamf", "status_code": response.status_code},
+            )
         response.raise_for_status()
 
         token = response.json()["access_token"]
@@ -197,5 +205,10 @@ class JamfCollector(Collector):
             )
         if response.status_code in (401, 403):
             raise UnauthorizedSignal()
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "jamf", "status_code": response.status_code},
+            )
         response.raise_for_status()
         return response

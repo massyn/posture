@@ -12,11 +12,14 @@ deliberately left out of scope.
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
+
+logger = logging.getLogger("posture.collectors.okta")
 
 _USERS_PATH = "/api/v1/users"
 _DEVICES_PATH = "/api/v1/devices"
@@ -194,6 +197,11 @@ class OktaCollector(Collector):
             raise RateLimitedSignal(retry_after=retry_after)
         if response.status_code == 401:
             raise UnauthorizedSignal()
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "okta", "status_code": response.status_code},
+            )
         response.raise_for_status()
         return response
 

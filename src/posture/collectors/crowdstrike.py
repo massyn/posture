@@ -11,10 +11,13 @@ Resources: ``hosts``, ``vulnerabilities`` (+ derived ``vulnerability_remediation
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
+
+logger = logging.getLogger("posture.collectors.crowdstrike")
 
 _DEFAULT_TOKEN_URL = "https://api.crowdstrike.com/oauth2/token"
 _DEVICES_QUERY_PATH = "/devices/queries/devices/v1"
@@ -173,6 +176,11 @@ class CrowdstrikeCollector(Collector):
                 source="crowdstrike",
                 hint="check CROWDSTRIKE_CLIENT_ID / CROWDSTRIKE_CLIENT_SECRET",
             )
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "crowdstrike", "status_code": response.status_code},
+            )
         response.raise_for_status()
 
         region = response.headers.get("X-Cs-Region")
@@ -285,4 +293,9 @@ class CrowdstrikeCollector(Collector):
             )
         if response.status_code == 401:
             raise UnauthorizedSignal()
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "crowdstrike", "status_code": response.status_code},
+            )
         response.raise_for_status()

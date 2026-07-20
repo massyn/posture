@@ -10,11 +10,14 @@ Resources: ``computers``.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
+
+logger = logging.getLogger("posture.collectors.workspaceone")
 
 _DEVICES_SEARCH_PATH = "/API/mdm/devices/search"
 _PAGE_SIZE = 500
@@ -97,6 +100,11 @@ class WorkspaceOneCollector(Collector):
                 source="workspaceone",
                 hint="check WORKSPACEONE_CLIENT_ID / WORKSPACEONE_CLIENT_SECRET",
             )
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "workspaceone", "status_code": response.status_code},
+            )
         response.raise_for_status()
 
         token = response.json()["access_token"]
@@ -140,4 +148,9 @@ class WorkspaceOneCollector(Collector):
             )
         if response.status_code == 401:
             raise UnauthorizedSignal()
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "workspaceone", "status_code": response.status_code},
+            )
         response.raise_for_status()

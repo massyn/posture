@@ -16,12 +16,15 @@ using it.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import requests
 
 from posture.base import RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
+
+logger = logging.getLogger("posture.collectors.azure_oauth")
 
 
 def fetch_azure_ad_token(
@@ -50,6 +53,11 @@ def fetch_azure_ad_token(
             hint=f"check {source.upper()}_CLIENT_ID / {source.upper()}_CLIENT_SECRET / "
             f"{source.upper()}_TENANT_ID",
         )
+    if response.status_code != 200:
+        logger.warning(
+            "unexpected status code",
+            extra={"source": source.lower(), "status_code": response.status_code},
+        )
     response.raise_for_status()
     return response.json()["access_token"]
 
@@ -65,6 +73,11 @@ def graph_get_json(
         raise RateLimitedSignal(retry_after=float(retry_after) if retry_after else None)
     if response.status_code in (401, 403):
         raise UnauthorizedSignal()
+    if response.status_code != 200:
+        logger.warning(
+            "unexpected status code",
+            extra={"source": "azure_graph", "status_code": response.status_code},
+        )
     response.raise_for_status()
     return response.json()
 

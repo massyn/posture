@@ -422,5 +422,10 @@ class UpGuardCollector(Collector):
             )
         if response.status_code in (401, 403):
             raise UnauthorizedSignal()
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "upguard", "status_code": response.status_code},
+            )
         response.raise_for_status()
         return response

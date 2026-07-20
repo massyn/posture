@@ -19,6 +19,7 @@ PST ids, fetched internally from ``psts`` when absent).
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 import os
 import threading
 import time
@@ -28,6 +29,7 @@ from typing import Any
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
 logger_name = "posture.knowbe4"
+logger = logging.getLogger(logger_name)
 
 _REGION_BASE_URLS = {
     "us": "https://us.api.knowbe4.com",
@@ -258,5 +260,10 @@ class Knowbe4Collector(Collector):
             )
         if response.status_code == 401:
             raise UnauthorizedSignal()
+        if response.status_code != 200:
+            logger.warning(
+                "unexpected status code",
+                extra={"source": "knowbe4", "status_code": response.status_code},
+            )
         response.raise_for_status()
         return response

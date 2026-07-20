@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from posture.base import Collector
 from posture.exceptions import (
@@ -27,10 +27,10 @@ from posture.exceptions import (
 logging.getLogger("posture").addHandler(logging.NullHandler())
 
 logger = logging.getLogger("posture")
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=False))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.2.4"
+__version__ = "0.2.6"
 
 __all__ = [
     "CCM",

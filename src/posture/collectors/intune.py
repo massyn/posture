@@ -24,7 +24,10 @@ Resources: ``managed_devices``, ``users``, ``device_configurations``,
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 from typing import Any
+
+import requests
 
 from posture.base import Collector
 from posture.collectors._azure_oauth import (
@@ -32,6 +35,8 @@ from posture.collectors._azure_oauth import (
     graph_get_json,
     odata_get_page,
 )
+
+logger = logging.getLogger("posture.collectors.intune")
 
 _GRAPH_BASE_URL = "https://graph.microsoft.com"
 _PAGE_SIZE = 100
@@ -244,9 +249,27 @@ class IntuneCollector(Collector):
 
         path_template = _ENDPOINTS[resource]
 
-        def _fetch_one(record_id: str) -> dict[str, Any]:
+        def _fetch_one(record_id: str) -> dict[str, Any] | None:
             url = _GRAPH_BASE_URL + path_template.format(id=record_id)
-            return graph_get_json(self._session, url, None)
+            try:
+                return graph_get_json(self._session, url, None)
+            except requests.exceptions.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status == 404:
+                    # Per-item detail endpoint: a 404 means this item no
+                    # longer exists (e.g. device deregistered since the list
+                    # was pulled), not a collection-wide failure.
+                    logger.info(
+                        "%s: no detail for id (404), skipping",
+                        resource,
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "resource": resource,
+                            "record_id": record_id,
+                        },
+                    )
+                    return None
+                raise
 
         records: list[dict[str, Any]] = []
         with concurrent.futures.ThreadPoolExecutor(
@@ -255,7 +278,9 @@ class IntuneCollector(Collector):
             futures = {executor.submit(_fetch_one, record_id): record_id for record_id in ids}
             try:
                 for future in concurrent.futures.as_completed(futures):
-                    records.append(future.result())
+                    result = future.result()
+                    if result is not None:
+                        records.append(result)
             except BaseException:
                 # A worker failed (e.g. token expired mid-run, raising
                 # UnauthorizedSignal via graph_get_json). Cancel every future
