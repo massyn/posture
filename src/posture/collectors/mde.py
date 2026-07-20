@@ -18,25 +18,23 @@ incremental sync, ever" decision. Every collect() here is a full snapshot.
 ``machine_vulnerabilities`` fans a request out per machine across a thread
 pool (there can be thousands of machines; defaults to 10 workers — lowered
 from the reference implementation's 25 after large tenants were observed
-tripping MDE's rate limit hard enough to exhaust the whole batch's retry
-budget; it also halves again on each retry of this resource, see
-``_fetch_machine_vulnerabilities_page``) — see CLAUDE.md "Performance:
-per-item fan-out" for the pattern shared with Intune's per-id detail lookups
-and UpGuard's ``vendor_risks``.
+tripping MDE's rate limit hard). A 401 (token expiry) still propagates to
+base.py's batch-level retry, which halves concurrency on each retry of this
+resource, see ``_fetch_machine_vulnerabilities_page`` — see CLAUDE.md
+"Performance: per-item fan-out" for the pattern shared with Intune's per-id
+detail lookups and UpGuard's ``vendor_risks``.
 
 All requests (list pagination and the per-machine fan-out alike) are paced
 client-side to stay under MDE's documented ~100 calls/minute per-app-registration
-limit (see ``_pace_request``) — without it, concurrent fan-out workers burst
-past the limit in the first instant, and because a RateLimitedSignal redoes
-the *entire* fan-out from scratch (base.py's all-or-nothing retry contract),
-each retry just re-bursts at lower concurrency instead of avoiding the 429s
-in the first place. This is the same root cause and fix as the KnowBe4
-collector's ``_pace_request``.
-
-A 5xx for a single machine (e.g. a stale/decommissioned device record) is
-handled locally per-machine — see ``_fetch_all_vulns_for_machine`` — rather
-than propagating up to base.py's batch-level retry, which would otherwise
-fail (or re-burst) the whole fan-out over one bad machine.
+limit (see ``_pace_request``), reducing how often 429s happen in the first
+place — but pacing alone can't guarantee zero 429s (the budget may already be
+partly consumed by other calls against the same app registration), so both
+a 5xx and a 429 for a single machine (e.g. a stale/decommissioned device
+record, or one unlucky request against a shared quota) are handled locally
+per-machine — see ``_fetch_all_vulns_for_machine`` — with their own retry
+budgets, rather than propagating up to base.py's batch-level retry, which
+would otherwise discard every machine already fetched by the rest of the
+fan-out just because one machine got throttled or errored.
 
 Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 ``machine_vulnerabilities`` (requires machines ids).
@@ -46,6 +44,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import random
 import threading
 import time
 from typing import Any
@@ -70,6 +69,17 @@ _DEFAULT_MACHINE_VULN_MAX_WORKERS = 10
 # whole 'machine_vulnerabilities' resource.
 _MACHINE_VULN_SERVER_ERROR_RETRIES = 2
 _MACHINE_VULN_SERVER_ERROR_WAIT_SECONDS = 60.0
+
+# A 429 for a single machine is handled the same way as a 5xx: locally, per
+# machine, rather than propagating up to base.py's batch-level retry — that
+# retry redoes the *entire* fan-out (base.py's all-or-nothing contract),
+# which on a large tenant means throwing away hours of already-fetched
+# machines over one throttled request. High retry budget (not infinite) so a
+# permanently broken quota still eventually surfaces rather than looping
+# forever; backoff mirrors base.py's (exponential, capped, jittered).
+_MACHINE_VULN_RATE_LIMIT_MAX_RETRIES = 100
+_MACHINE_VULN_RATE_LIMIT_BACKOFF_BASE_SECONDS = 1.0
+_MACHINE_VULN_RATE_LIMIT_BACKOFF_CAP_SECONDS = 60.0
 
 # MDE's documented general API limit is ~100 calls/minute per app registration.
 # Staying comfortably under that (0.65s between requests ~= 92/min) leaves
@@ -192,6 +202,11 @@ MANIFEST: dict[str, dict[str, Any]] = {
         # their own paginated network call, fanned out across a thread pool,
         # not data nested inside a raw machine record. _machine_id is
         # injected client-side (see _fetch_machine_vulnerabilities_page).
+        # "requires" tells base.py to cache machines' raw records for this
+        # instance's lifetime, since _fetch_machine_vulnerabilities_page reads
+        # them again internally (see base.py::_get_raw for derived_from vs
+        # requires).
+        "requires": "machines",
         "endpoint": _ENDPOINTS["machine_vulnerabilities"],
         "columns": {
             "machine_vulnerability_id": ("id", "str"),
@@ -205,6 +220,40 @@ MANIFEST: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+
+# ============================================================================
+# TEMP-DEBUG: MDE non-200 diagnostic logging. Remove this whole block (and its
+# call site in _get) once the root cause of MDE's failures has been found.
+# Writes request/response detail for any non-200 response to error.log next
+# to the CWD. Authorization header is redacted — never write secrets to disk.
+# ============================================================================
+_ERROR_LOG_PATH = "error.log"
+_ERROR_LOG_LOCK = threading.Lock()
+
+
+def _log_error_to_file(url: str, params: dict[str, Any] | None, response: Any) -> None:
+    headers = {
+        key: ("<redacted>" if key.lower() == "authorization" else value)
+        for key, value in response.request.headers.items()
+    }
+    entry = (
+        f"{time.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+        f"URL: {url}\n"
+        f"Status: {response.status_code}\n"
+        f"Payload/params: {params!r}\n"
+        f"Request headers: {headers!r}\n"
+        f"Response body: {response.text}\n"
+        f"{'-' * 80}\n"
+    )
+    with _ERROR_LOG_LOCK:
+        with open(_ERROR_LOG_PATH, "a", encoding="utf-8") as fh:
+            fh.write(entry)
+
+
+# ============================================================================
+# END TEMP-DEBUG
+# ============================================================================
 
 
 class MdeCollector(Collector):
@@ -308,6 +357,10 @@ class MdeCollector(Collector):
                     pending.cancel()
                 raise
 
+        # Reset once this run succeeds, so the halving only ever applies
+        # across retries of a single collection — not to every subsequent
+        # 'machine_vulnerabilities' call made against this instance.
+        self._machine_vuln_attempt = 0
         return all_records, None
 
     def _fetch_all_vulns_for_machine(self, machine_id: str) -> list[dict[str, Any]]:
@@ -315,10 +368,40 @@ class MdeCollector(Collector):
         # single, complete response (unlike the org-wide list endpoints).
         endpoint = _ENDPOINTS["machine_vulnerabilities"].format(id=machine_id)
         attempt = 0
+        rate_limit_attempt = 0
         while True:
             try:
                 response = self._get(_API_BASE_URL + endpoint)
                 return response.json().get("value", [])
+            except RateLimitedSignal as exc:
+                rate_limit_attempt += 1
+                if rate_limit_attempt > _MACHINE_VULN_RATE_LIMIT_MAX_RETRIES:
+                    logger.warning(
+                        "machine_vulnerabilities: skipping machine after "
+                        "repeated rate limiting",
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "machine_id": machine_id,
+                            "attempts": rate_limit_attempt,
+                        },
+                    )
+                    return []
+                wait = min(
+                    exc.retry_after
+                    or _MACHINE_VULN_RATE_LIMIT_BACKOFF_BASE_SECONDS
+                    * (2**rate_limit_attempt),
+                    _MACHINE_VULN_RATE_LIMIT_BACKOFF_CAP_SECONDS,
+                )
+                logger.debug(
+                    "machine_vulnerabilities: rate limited for machine, retrying",
+                    extra={
+                        "source": self.env_prefix.lower(),
+                        "machine_id": machine_id,
+                        "attempt": rate_limit_attempt,
+                        "wait": wait,
+                    },
+                )
+                time.sleep(wait * random.uniform(0.75, 1.25))
             except requests.exceptions.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
                 if status == 404:
@@ -373,6 +456,8 @@ class MdeCollector(Collector):
     def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
         self._pace_request()
         response = self._session.get(url, params=params, timeout=60)
+        if response.status_code != 200:
+            _log_error_to_file(url, params, response)  # TEMP-DEBUG: remove once MDE failure root cause is found
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             raise RateLimitedSignal(

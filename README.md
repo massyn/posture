@@ -224,7 +224,7 @@ exception alongside `pytenable`.
 |---|---|
 | `username` | `SALESFORCE_USERNAME` |
 | `password` | `SALESFORCE_PASSWORD` |
-| `security_token` | `SALESFORCE_SECURITY_TOKEN` |
+| `token` | `SALESFORCE_TOKEN` |
 | `domain` | `SALESFORCE_DOMAIN` (optional — omit for production, `"test"` for a sandbox, or a custom My Domain) |
 | `schema_file` | `SALESFORCE_SCHEMA_FILE` (optional — path to a JSON file overriding the shipped `salesforce.json`) |
 

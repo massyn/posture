@@ -8,7 +8,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "salesforce"
 _CONFIG = {
     "username": "user@example.com",
     "password": "pw",
-    "security_token": "token",
+    "token": "token",
 }
 
 
@@ -88,6 +88,11 @@ def test_domain_config_passed_through_to_sandbox() -> None:
         domain="test",
     )
     assert len(df) == 0
+
+
+def test_tables_lists_manifest_resources() -> None:
+    ccm = CCM("salesforce", _CONFIG)
+    assert set(ccm.tables()) == set(ccm.manifest)
 
 
 def test_custom_schema_file_overrides_default_manifest() -> None:

@@ -57,7 +57,7 @@ MANIFEST: dict[str, dict[str, Any]] = _load_manifest(_DEFAULT_SCHEMA_PATH)
 class SalesforceCollector(Collector):
     env_prefix = "SALESFORCE"
     manifest = MANIFEST
-    required_config_keys = ("username", "password", "security_token")
+    required_config_keys = ("username", "password", "token")
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         super().__init__(config)
@@ -92,7 +92,7 @@ class SalesforceCollector(Collector):
             self._sf = Salesforce(
                 username=self._config["username"],
                 password=self._config["password"],
-                security_token=self._config["security_token"],
+                security_token=self._config["token"],
                 domain=self._domain,
             )
         except (
@@ -101,7 +101,7 @@ class SalesforceCollector(Collector):
             raise AuthenticationError(
                 "Salesforce rejected the provided username/password/security token",
                 source="salesforce",
-                hint="check SALESFORCE_USERNAME/PASSWORD/SECURITY_TOKEN",
+                hint="check SALESFORCE_USERNAME/PASSWORD/SALESFORCE_TOKEN",
             ) from exc
 
     def _fetch_page(

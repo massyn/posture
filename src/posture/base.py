@@ -34,6 +34,13 @@ _MAX_RETRIES = 5
 _BACKOFF_BASE_SECONDS = 1.0
 _BACKOFF_CAP_SECONDS = 60.0
 
+# A 429 is a "wait and try again" signal, not a terminal failure — it gets a
+# much higher retry budget than auth/other errors. Not literally unbounded:
+# a permanently misconfigured app registration or a genuinely broken quota
+# must still surface as RateLimitExhausted eventually rather than spinning
+# the process forever. Backoff still caps at _BACKOFF_CAP_SECONDS per attempt.
+_MAX_RATE_LIMIT_RETRIES = 100
+
 _MAX_CONNECTION_RETRIES = 2
 _CONNECTION_RETRY_WAIT_SECONDS = 5.0
 
@@ -145,10 +152,21 @@ class Collector(ABC):
 
         raw_records, report = self._collect_raw(resource, kwargs)
 
-        has_derived = any(
-            m.get("derived_from") == resource for m in self.manifest.values()
+        # Two distinct relationships justify caching: "derived_from" (a
+        # parse-time relationship — another resource's rows are exploded out
+        # of this one's raw records, e.g. vulnerability_remediations out of
+        # vulnerabilities) and "requires" (a collect-time relationship — a
+        # collector needs this resource's raw records again internally, e.g.
+        # MDE's machine_vulnerabilities re-reading machines' ids for its
+        # fan-out). Neither implies the other: a "requires" consumer fetches
+        # its own records over the network rather than exploding this
+        # resource's raw records, so it must not be parsed via derived_from's
+        # record_path/$parent. machinery.
+        is_reused = any(
+            m.get("derived_from") == resource or m.get("requires") == resource
+            for m in self.manifest.values()
         )
-        if has_derived:
+        if is_reused:
             self._cache[cache_key] = _CacheEntry(raw_records, report)
         self._reports[resource] = report
         return raw_records
@@ -208,14 +226,15 @@ class Collector(ABC):
         report: _CollectionReport,
     ) -> tuple[list[dict[str, Any]], Any]:
         attempt = 0
+        rate_limit_attempt = 0
         connection_attempt = 0
         while True:
             try:
                 return self._fetch_page(resource, kwargs, cursor)
             except RateLimitedSignal as exc:
                 report.rate_limited_count += 1
-                attempt += 1
-                if attempt > _MAX_RETRIES:
+                rate_limit_attempt += 1
+                if rate_limit_attempt > _MAX_RATE_LIMIT_RETRIES:
                     raise RateLimitExhausted(
                         f"Rate limit retries exhausted for '{resource}'",
                         source=self.env_prefix.lower(),
@@ -223,7 +242,10 @@ class Collector(ABC):
                         records_so_far=report.records,
                     ) from exc
                 report.retries += 1
-                wait = min(exc.retry_after or _BACKOFF_BASE_SECONDS * (2**attempt), _BACKOFF_CAP_SECONDS)
+                wait = min(
+                    exc.retry_after or _BACKOFF_BASE_SECONDS * (2**rate_limit_attempt),
+                    _BACKOFF_CAP_SECONDS,
+                )
                 # Jitter (+/-25%) so concurrent collector runs against the same
                 # rate-limited source (e.g. several tenants dispatched in parallel
                 # by cron.py, or a fan-out retry racing other resources) don't all
@@ -286,6 +308,10 @@ class Collector(ABC):
             "duration_seconds": rep.duration_seconds,
             "collected_at": rep.collected_at,
         }
+
+    def tables(self) -> list[str]:
+        """Return the resource names this collector's manifest declares."""
+        return list(self.manifest.keys())
 
     def schema(self, resource: str) -> dict[str, Any]:
         manifest = self.manifest.get(resource)
