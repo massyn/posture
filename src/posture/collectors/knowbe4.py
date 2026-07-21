@@ -142,7 +142,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 class Knowbe4Collector(Collector):
     env_prefix = "KNOWBE4"
     manifest = MANIFEST
-    required_config_keys = ("api_token",)
+    required_config_keys = ("token",)
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         super().__init__(config)
@@ -159,7 +159,7 @@ class Knowbe4Collector(Collector):
         self._request_times: deque[float] = deque()
 
     def _authenticate(self) -> None:
-        self._session.headers["Authorization"] = f"Bearer {self._config['api_token']}"
+        self._session.headers["Authorization"] = f"Bearer {self._config['token']}"
         self._session.headers["Accept"] = "application/json"
 
     def _fetch_page(

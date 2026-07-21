@@ -27,7 +27,7 @@ def test_catalog_reports_required_config_as_constructor_key_to_env_var() -> None
         "client_secret": "CROWDSTRIKE_CLIENT_SECRET",
     }
     assert result["knowbe4"]["required_config"] == {
-        "api_token": "KNOWBE4_API_TOKEN",
+        "token": "KNOWBE4_TOKEN",
     }
     assert result["tenableio"]["required_config"] == {
         "access_key": "TENABLEIO_ACCESS_KEY",
@@ -67,4 +67,4 @@ def test_catalog_requires_no_credentials_or_network() -> None:
     # No CCM(...) call, no env vars set — catalog() must never instantiate
     # a collector or touch the network.
     result = catalog()
-    assert result["knowbe4"]["required_config"]["api_token"] == "KNOWBE4_API_TOKEN"
+    assert result["knowbe4"]["required_config"]["token"] == "KNOWBE4_TOKEN"

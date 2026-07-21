@@ -38,10 +38,15 @@ MDE_CLIENT_SECRET=xxx
 AZURE_TENANT_ID=xxx
 AZURE_CLIENT_ID=xxx
 AZURE_CLIENT_SECRET=xxx
-KNOWBE4_API_TOKEN=xxx
+KNOWBE4_TOKEN=xxx
 KNOWBE4_REGION=us  # optional, see below
 TENABLEIO_ACCESS_KEY=xxx
 TENABLEIO_SECRET_KEY=xxx
+SALESFORCE_USERNAME=xxx
+SALESFORCE_PASSWORD=xxx
+SALESFORCE_TOKEN=xxx
+SALESFORCE_DOMAIN=test  # optional, see below
+SALESFORCE_SCHEMA_FILE=/path/to/salesforce.json  # optional, see below
 ```
 
 ## Usage
@@ -203,7 +208,7 @@ full point-in-time pull, not a checkpoint.
 
 | Constructor key | Env var |
 |---|---|
-| `api_token` | `KNOWBE4_API_TOKEN` |
+| `token` | `KNOWBE4_TOKEN` |
 | `region` | `KNOWBE4_REGION` (optional — `us` or `eu`, defaults to `us`) |
 
 `pst_recipients` (per-recipient phishing test results — delivered/opened/clicked/

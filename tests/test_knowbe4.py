@@ -14,7 +14,7 @@ def test_training_enrollments_pagination_stops_on_short_page() -> None:
         status=200,
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token"})
+    ccm = CCM("knowbe4", {"token": "token"})
     df = ccm.collect("training_enrollments")
 
     assert len(df) == 1
@@ -42,7 +42,7 @@ def test_training_enrollments_follows_page_cursor() -> None:
         content_type="application/json",
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token"})
+    ccm = CCM("knowbe4", {"token": "token"})
     df = ccm.collect("training_enrollments")
 
     assert len(df) == 501
@@ -58,7 +58,7 @@ def test_eu_region_routes_to_eu_base_url() -> None:
         status=200,
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token", "region": "eu"})
+    ccm = CCM("knowbe4", {"token": "token", "region": "eu"})
     df = ccm.collect("training_enrollments")
 
     assert len(df) == 0
@@ -73,7 +73,7 @@ def test_psts_pagination_stops_on_short_page() -> None:
         status=200,
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token"})
+    ccm = CCM("knowbe4", {"token": "token"})
     df = ccm.collect("psts")
 
     assert len(df) == 1
@@ -101,7 +101,7 @@ def test_pst_recipients_fans_out_per_pst_id() -> None:
         status=200,
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token"})
+    ccm = CCM("knowbe4", {"token": "token"})
     df = ccm.collect("pst_recipients")
 
     assert len(df) == 2
@@ -136,7 +136,7 @@ def test_pst_recipients_paginates_within_a_single_pst() -> None:
         content_type="application/json",
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token"})
+    ccm = CCM("knowbe4", {"token": "token"})
     df = ccm.collect("pst_recipients")
 
     assert len(df) == 501
@@ -152,7 +152,7 @@ def test_pst_recipients_empty_when_no_psts() -> None:
         status=200,
     )
 
-    ccm = CCM("knowbe4", {"api_token": "token"})
+    ccm = CCM("knowbe4", {"token": "token"})
     df = ccm.collect("pst_recipients")
 
     assert len(df) == 0
