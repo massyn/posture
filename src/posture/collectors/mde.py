@@ -18,23 +18,29 @@ incremental sync, ever" decision. Every collect() here is a full snapshot.
 ``machine_vulnerabilities`` fans a request out per machine across a thread
 pool (there can be thousands of machines; defaults to 10 workers — lowered
 from the reference implementation's 25 after large tenants were observed
-tripping MDE's rate limit hard). A 401 (token expiry) still propagates to
-base.py's batch-level retry, which halves concurrency on each retry of this
-resource, see ``_fetch_machine_vulnerabilities_page`` — see CLAUDE.md
-"Performance: per-item fan-out" for the pattern shared with Intune's per-id
-detail lookups and UpGuard's ``vendor_risks``.
+tripping MDE's rate limit hard). A `RateLimitedSignal` raised outside the
+per-machine fan-out loop (e.g. list pagination) still propagates to base.py's
+batch-level retry, which halves concurrency on each retry of this resource,
+see ``_fetch_machine_vulnerabilities_page`` — see CLAUDE.md "Performance:
+per-item fan-out" for the pattern shared with Intune's per-id detail lookups
+and UpGuard's ``vendor_risks``.
 
 All requests (list pagination and the per-machine fan-out alike) are paced
 client-side to stay under MDE's documented ~100 calls/minute per-app-registration
 limit (see ``_pace_request``), reducing how often 429s happen in the first
 place — but pacing alone can't guarantee zero 429s (the budget may already be
-partly consumed by other calls against the same app registration), so both
-a 5xx and a 429 for a single machine (e.g. a stale/decommissioned device
-record, or one unlucky request against a shared quota) are handled locally
-per-machine — see ``_fetch_all_vulns_for_machine`` — with their own retry
-budgets, rather than propagating up to base.py's batch-level retry, which
-would otherwise discard every machine already fetched by the rest of the
-fan-out just because one machine got throttled or errored.
+partly consumed by other calls against the same app registration), so a 5xx,
+429, or 401 for a single machine (e.g. a stale/decommissioned device record,
+one unlucky request against a shared quota, or a machine outside this app
+registration's RBAC scope) is handled locally per-machine — see
+``_fetch_all_vulns_for_machine`` — with its own retry budget, rather than
+propagating up to base.py's batch-level retry, which would otherwise cancel
+and discard every machine already fetched by the rest of the fan-out just
+because one machine got throttled, errored, or 401'd. A 401 gets exactly one
+reauth-and-retry (single-flight across threads, see ``_reauth_once``) so a
+genuinely expired shared token is still recovered — if the retry with a
+guaranteed-fresh token still 401s, that's specific to the one machine and
+it's skipped, not treated as a session-wide auth failure.
 
 Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
 ``machine_vulnerabilities`` (requires machines ids).
@@ -270,6 +276,15 @@ class MdeCollector(Collector):
         self._machine_vuln_attempt = 0
         self._rate_limit_lock = threading.Lock()
         self._last_request_time = 0.0
+        # Single-flight reauth for the machine_vulnerabilities fan-out: when the
+        # shared token genuinely expires mid-run, every in-flight worker gets a
+        # 401 near-simultaneously. Without coordination each of those threads
+        # would call _authenticate() independently. The epoch counter makes only
+        # the first thread to observe a given epoch perform the reauth; every
+        # other thread that raced in on the same stale epoch just waits on the
+        # lock and then re-checks (its retry uses the now-refreshed header).
+        self._reauth_lock = threading.Lock()
+        self._reauth_epoch = 0
 
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(
@@ -281,6 +296,12 @@ class MdeCollector(Collector):
             source="MDE",
         )
         self._session.headers["Authorization"] = f"Bearer {token}"
+
+    def _reauth_once(self, seen_epoch: int) -> None:
+        with self._reauth_lock:
+            if self._reauth_epoch == seen_epoch:
+                self._authenticate()
+                self._reauth_epoch += 1
 
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
@@ -369,10 +390,41 @@ class MdeCollector(Collector):
         endpoint = _ENDPOINTS["machine_vulnerabilities"].format(id=machine_id)
         attempt = 0
         rate_limit_attempt = 0
+        reauthenticated = False
         while True:
             try:
                 response = self._get(_API_BASE_URL + endpoint)
                 return response.json().get("value", [])
+            except UnauthorizedSignal:
+                # A single machine 401ing is handled here, not by letting it
+                # propagate to base.py's batch-level retry — that would cancel
+                # every other in-flight machine and redo the *entire* fan-out
+                # (potentially thousands of already-fetched machines) for what
+                # is often just this one device's RBAC scope/licensing, not a
+                # dead token. Reauth once (single-flight across threads, see
+                # _reauth_once) and retry this machine; if it's still 401
+                # after a guaranteed-fresh token, it's this machine, not the
+                # session — skip it and let the rest of the fan-out proceed.
+                if reauthenticated:
+                    logger.warning(
+                        "machine_vulnerabilities: skipping machine after "
+                        "unauthorized even with a fresh token",
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "machine_id": machine_id,
+                        },
+                    )
+                    return []
+                logger.debug(
+                    "machine_vulnerabilities: unauthorized for machine, "
+                    "reauthenticating and retrying",
+                    extra={
+                        "source": self.env_prefix.lower(),
+                        "machine_id": machine_id,
+                    },
+                )
+                self._reauth_once(self._reauth_epoch)
+                reauthenticated = True
             except RateLimitedSignal as exc:
                 rate_limit_attempt += 1
                 if rate_limit_attempt > _MACHINE_VULN_RATE_LIMIT_MAX_RETRIES:

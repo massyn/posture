@@ -47,6 +47,9 @@ SALESFORCE_PASSWORD=xxx
 SALESFORCE_TOKEN=xxx
 SALESFORCE_DOMAIN=test  # optional, see below
 SALESFORCE_SCHEMA_FILE=/path/to/salesforce.json  # optional, see below
+QUALYS_USERNAME=xxx
+QUALYS_PASSWORD=xxx
+QUALYS_BASE_URL=https://qualysapi.qualys.com  # platform URL, varies by subscription
 ```
 
 ## Usage
@@ -127,6 +130,7 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `knowbe4` | `training_enrollments`, `psts`, `pst_recipients` |
 | `salesforce` | one per object declared in `salesforce.json` (default: `fixed_asset__c`, `krow__location__c`, `krow__project_resources__c`, `domain__c`, `krow__team__c`) |
 | `tenableio` | `assets`, `vulnerabilities` |
+| `qualys` | `hosts`, `vulnerabilities`, `vulnerability_detections` |
 
 ### Crowdstrike configuration
 
@@ -250,6 +254,25 @@ vendor-SDK exceptions (alongside `simple_salesforce`).
 |---|---|
 | `access_key` | `TENABLEIO_ACCESS_KEY` |
 | `secret_key` | `TENABLEIO_SECRET_KEY` |
+
+### Qualys configuration
+
+Raw `requests` against the Qualys API v2 (`/api/2.0/fo/...`), which returns XML rather
+than JSON — the collector converts each response into plain dicts at fetch time, so
+`parse.py` never has to know XML exists. Auth is HTTP Basic; pagination follows the
+full next-page URL Qualys returns in a truncated response rather than a token.
+
+| Constructor key | Env var |
+|---|---|
+| `username` | `QUALYS_USERNAME` |
+| `password` | `QUALYS_PASSWORD` |
+| `base_url` | `QUALYS_BASE_URL` (required — varies by platform/subscription, e.g. `https://qualysapi.qualys.com` or a `qgN.apps.qualys.com` regional URL) |
+
+`vulnerability_detections` is derived from the per-host detection list (fetched
+internally as `host_detections`) — one row per (host, QID), mirroring the
+`vulnerabilities` / `vulnerability_remediations` shape in `crowdstrike`. `vulnerabilities`
+here is Qualys' KnowledgeBase (the QID catalogue — severity, CVSS, CVE), not a
+per-host finding.
 
 ## Development
 

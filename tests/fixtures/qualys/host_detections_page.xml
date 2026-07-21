@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<HOST_LIST_VM_DETECTION_OUTPUT>
+  <RESPONSE>
+    <DATETIME>2026-07-20T10:00:00Z</DATETIME>
+    <HOST_LIST>
+      <HOST>
+        <ID>12345</ID>
+        <IP>10.0.0.5</IP>
+        <DNS>host1.example.com</DNS>
+        <OS>Windows Server 2022</OS>
+        <DETECTION_LIST>
+          <DETECTION>
+            <QID>38170</QID>
+            <TYPE>Confirmed</TYPE>
+            <SEVERITY>5</SEVERITY>
+            <PORT>443</PORT>
+            <PROTOCOL>tcp</PROTOCOL>
+            <RESULTS>OpenSSL 1.0.1 detected</RESULTS>
+            <STATUS>Active</STATUS>
+            <FIRST_FOUND_DATETIME>2026-06-01T00:00:00Z</FIRST_FOUND_DATETIME>
+            <LAST_FOUND_DATETIME>2026-07-19T22:00:00Z</LAST_FOUND_DATETIME>
+            <LAST_TEST_DATETIME>2026-07-19T22:00:00Z</LAST_TEST_DATETIME>
+            <LAST_UPDATE_DATETIME>2026-07-19T22:05:00Z</LAST_UPDATE_DATETIME>
+            <IS_IGNORED>0</IS_IGNORED>
+            <IS_DISABLED>0</IS_DISABLED>
+          </DETECTION>
+          <DETECTION>
+            <QID>105432</QID>
+            <TYPE>Potential</TYPE>
+            <SEVERITY>2</SEVERITY>
+            <STATUS>New</STATUS>
+            <FIRST_FOUND_DATETIME>2026-07-19T22:00:00Z</FIRST_FOUND_DATETIME>
+            <LAST_FOUND_DATETIME>2026-07-19T22:00:00Z</LAST_FOUND_DATETIME>
+            <IS_IGNORED>1</IS_IGNORED>
+            <IS_DISABLED>0</IS_DISABLED>
+          </DETECTION>
+        </DETECTION_LIST>
+      </HOST>
+      <HOST>
+        <ID>67890</ID>
+        <IP>10.0.0.6</IP>
+        <DNS>host2.example.com</DNS>
+        <OS>Ubuntu 22.04</OS>
+        <DETECTION_LIST>
+          <DETECTION>
+            <QID>38170</QID>
+            <TYPE>Confirmed</TYPE>
+            <SEVERITY>5</SEVERITY>
+            <PORT>22</PORT>
+            <PROTOCOL>tcp</PROTOCOL>
+            <STATUS>Fixed</STATUS>
+            <FIRST_FOUND_DATETIME>2026-05-01T00:00:00Z</FIRST_FOUND_DATETIME>
+            <LAST_FOUND_DATETIME>2026-07-10T00:00:00Z</LAST_FOUND_DATETIME>
+            <IS_IGNORED>0</IS_IGNORED>
+            <IS_DISABLED>0</IS_DISABLED>
+          </DETECTION>
+        </DETECTION_LIST>
+      </HOST>
+      <HOST>
+        <ID>11111</ID>
+        <IP>10.0.0.7</IP>
+        <DNS>host3.example.com</DNS>
+        <OS>macOS 14</OS>
+      </HOST>
+    </HOST_LIST>
+  </RESPONSE>
+</HOST_LIST_VM_DETECTION_OUTPUT>

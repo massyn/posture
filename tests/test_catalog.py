@@ -12,6 +12,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "knowbe4",
         "mde",
         "okta",
+        "qualys",
         "salesforce",
         "tenableio",
         "upguard",

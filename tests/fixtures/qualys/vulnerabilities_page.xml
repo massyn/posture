@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<KNOWLEDGE_BASE_VULN_LIST_OUTPUT>
+  <RESPONSE>
+    <DATETIME>2026-07-20T10:00:00Z</DATETIME>
+    <VULN_LIST>
+      <VULN>
+        <QID>38170</QID>
+        <VULN_TYPE>Vulnerability</VULN_TYPE>
+        <SEVERITY_LEVEL>5</SEVERITY_LEVEL>
+        <TITLE>OpenSSL Remote Code Execution Vulnerability</TITLE>
+        <CATEGORY>General remote services</CATEGORY>
+        <PATCHABLE>1</PATCHABLE>
+        <PCI_FLAG>1</PCI_FLAG>
+        <PUBLISHED_DATETIME>2026-05-01T00:00:00Z</PUBLISHED_DATETIME>
+        <LAST_SERVICE_MODIFICATION_DATETIME>2026-06-15T00:00:00Z</LAST_SERVICE_MODIFICATION_DATETIME>
+        <CVSS>
+          <BASE>9.8</BASE>
+          <TEMPORAL>9.1</TEMPORAL>
+        </CVSS>
+        <CVSS_V3>
+          <BASE>9.8</BASE>
+          <TEMPORAL>9.2</TEMPORAL>
+        </CVSS_V3>
+        <CVE_LIST>
+          <CVE>
+            <ID>CVE-2026-1111</ID>
+            <URL>https://cve.example.com/CVE-2026-1111</URL>
+          </CVE>
+          <CVE>
+            <ID>CVE-2026-1112</ID>
+            <URL>https://cve.example.com/CVE-2026-1112</URL>
+          </CVE>
+        </CVE_LIST>
+      </VULN>
+      <VULN>
+        <QID>105432</QID>
+        <VULN_TYPE>Potential Vulnerability</VULN_TYPE>
+        <SEVERITY_LEVEL>2</SEVERITY_LEVEL>
+        <TITLE>Unconfirmed Internal Finding</TITLE>
+        <CATEGORY>Local</CATEGORY>
+        <PATCHABLE>0</PATCHABLE>
+        <PCI_FLAG>0</PCI_FLAG>
+        <PUBLISHED_DATETIME>2026-01-10T00:00:00Z</PUBLISHED_DATETIME>
+      </VULN>
+    </VULN_LIST>
+  </RESPONSE>
+</KNOWLEDGE_BASE_VULN_LIST_OUTPUT>

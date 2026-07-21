@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<HOST_LIST_OUTPUT>
+  <RESPONSE>
+    <DATETIME>2026-07-20T10:00:00Z</DATETIME>
+    <HOST_LIST>
+      <HOST>
+        <ID>12345</ID>
+        <IP>10.0.0.5</IP>
+        <IPV6>fe80::1</IPV6>
+        <TRACKING_METHOD>QAGENT</TRACKING_METHOD>
+        <DNS>host1.example.com</DNS>
+        <NETBIOS>HOST1</NETBIOS>
+        <OS>Windows Server 2022</OS>
+        <QG_HOSTID>qg-abc-123</QG_HOSTID>
+        <CLOUD_PROVIDER>AWS</CLOUD_PROVIDER>
+        <LAST_BOOT>2026-07-01T03:00:00Z</LAST_BOOT>
+        <LAST_VULN_SCAN_DATETIME>2026-07-19T22:00:00Z</LAST_VULN_SCAN_DATETIME>
+        <LAST_VM_SCANNED_DATE>2026-07-19T22:00:00Z</LAST_VM_SCANNED_DATE>
+        <LAST_PC_SCANNED_DATE>2026-07-18T22:00:00Z</LAST_PC_SCANNED_DATE>
+        <AGENT_INFO>
+          <AGENT_VERSION>5.2.1</AGENT_VERSION>
+          <AGENT_STATUS>Activated</AGENT_STATUS>
+          <LAST_CHECKED_IN_DATE>2026-07-20T09:55:00Z</LAST_CHECKED_IN_DATE>
+        </AGENT_INFO>
+        <TAGS>
+          <TAG>
+            <TAG_ID>1</TAG_ID>
+            <NAME>Production</NAME>
+          </TAG>
+          <TAG>
+            <TAG_ID>2</TAG_ID>
+            <NAME>Windows</NAME>
+          </TAG>
+        </TAGS>
+      </HOST>
+      <HOST>
+        <ID>67890</ID>
+        <IP>10.0.0.6</IP>
+        <TRACKING_METHOD>IP</TRACKING_METHOD>
+        <DNS>host2.example.com</DNS>
+        <OS>Ubuntu 22.04</OS>
+        <LAST_VULN_SCAN_DATETIME>bad-timestamp</LAST_VULN_SCAN_DATETIME>
+        <TAGS>
+          <TAG>
+            <TAG_ID>3</TAG_ID>
+            <NAME>Linux</NAME>
+          </TAG>
+        </TAGS>
+      </HOST>
+    </HOST_LIST>
+  </RESPONSE>
+</HOST_LIST_OUTPUT>

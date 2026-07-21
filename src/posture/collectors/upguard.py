@@ -327,6 +327,20 @@ class UpGuardCollector(Collector):
         while True:
             try:
                 response = self._get(self._base_url + "/risks/vendors", params=params)
+            except requests.exceptions.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status == 404:
+                    # A vendor removed from UpGuard mid-run (or a stale
+                    # hostname) 404s here — that's a per-vendor fact, not a
+                    # collection-wide failure. Skip it rather than letting the
+                    # exception propagate and force base.py to discard every
+                    # other vendor's already-fetched risks.
+                    logger.info(
+                        "vendor_risks: no data for vendor (404), skipping",
+                        extra={"source": "upguard", "hostname": hostname},
+                    )
+                    return [], False
+                raise
             except RateLimitedSignal as exc:
                 rate_limit_attempt += 1
                 if rate_limit_attempt > _MAX_HOSTNAME_RETRIES:

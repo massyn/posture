@@ -312,9 +312,28 @@ class IntuneCollector(Collector):
         path_template = _ENDPOINTS["attack_simulation_users"]
 
         def _fetch_one(simulation_id: str) -> list[dict[str, Any]]:
-            sim_records = self._drain_simulation_users(
-                path_template.format(id=simulation_id)
-            )
+            try:
+                sim_records = self._drain_simulation_users(
+                    path_template.format(id=simulation_id)
+                )
+            except requests.exceptions.HTTPError as exc:
+                status = exc.response.status_code if exc.response is not None else None
+                if status == 404:
+                    # A simulation deleted since attack_simulations was
+                    # pulled 404s here — per-simulation, not a
+                    # collection-wide failure. Skip it rather than letting
+                    # the exception propagate and force base.py to discard
+                    # every other simulation's already-fetched users.
+                    logger.info(
+                        "attack_simulation_users: no data for simulation "
+                        "(404), skipping",
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "simulation_id": simulation_id,
+                        },
+                    )
+                    return []
+                raise
             for record in sim_records:
                 record["_simulation_id"] = simulation_id
             return sim_records
