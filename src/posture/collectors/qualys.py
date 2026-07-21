@@ -236,33 +236,63 @@ class QualysCollector(Collector):
         paginated: bool = True,
     ) -> tuple[list[dict[str, Any]], Any]:
         if cursor is not None:
-            root = self._request_xml(cursor, params=None)
+            response = self._request_xml(cursor, params=None)
         elif paginated:
-            root = self._request_xml(
+            response = self._request_xml(
                 url, params={"truncation_limit": _PAGE_SIZE, **params}
             )
         else:
-            root = self._request_xml(url, params=params)
+            response = self._request_xml(url, params=params)
 
-        records = [
-            _xml_to_dict(elem) for elem in root.findall("./" + "/".join(list_path))
-        ]
-        url_elem = root.find("./RESPONSE/WARNING/URL")
-        next_cursor = (
-            url_elem.text.strip() if url_elem is not None and url_elem.text else None
-        )
+        warning_url_path = ("RESPONSE", "WARNING", "URL")
+        records: list[dict[str, Any]] = []
+        next_cursor: str | None = None
+        path: list[str] = []
+        try:
+            # The KnowledgeBase resource has no server-side pagination
+            # (`truncation_limit` is rejected outright — see the call site
+            # above) and a full-catalogue pull comfortably exceeds 2 GiB of
+            # XML. `ElementTree.fromstring` hands the whole body to expat in
+            # one call, whose length argument is a C `int` — past ~2 GiB
+            # that overflows with `OverflowError: size does not fit in an
+            # int`. Streaming with `iterparse` over the raw socket and
+            # clearing each record element once consumed keeps peak memory
+            # to "one record" instead of "the whole tree" and never hands
+            # expat more than a bounded chunk at a time.
+            response.raw.decode_content = True
+            for event, elem in ElementTree.iterparse(
+                response.raw, events=("start", "end")
+            ):
+                if event == "start":
+                    path.append(elem.tag)
+                    continue
+                # `list_path`/`warning_url_path` are relative to the
+                # document root (mirroring the old `root.findall("./" +
+                # ...)` behaviour), whose own tag varies by endpoint
+                # (`KNOWLEDGE_BASE_VULN_LIST_OUTPUT` vs `SIMPLE_RETURN`
+                # etc.) and isn't part of either path — drop it before
+                # comparing.
+                current_path = tuple(path[1:])
+                path.pop()
+                if current_path == list_path:
+                    records.append(_xml_to_dict(elem))
+                    elem.clear()
+                elif current_path == warning_url_path:
+                    next_cursor = elem.text.strip() if elem.text else None
+        finally:
+            response.close()
+
         return records, next_cursor
 
-    def _request_xml(
-        self, url: str, *, params: dict[str, Any] | None
-    ) -> ElementTree.Element:
+    def _request_xml(self, url: str, *, params: dict[str, Any] | None) -> Any:
         self._pace_request()
         response = self._session.get(
-            url, params=params, timeout=_REQUEST_TIMEOUT_SECONDS
+            url, params=params, timeout=_REQUEST_TIMEOUT_SECONDS, stream=True
         )
         self._record_rate_limit_headers(response.headers)
 
         if response.status_code == 401:
+            response.close()
             raise UnauthorizedSignal()
         if response.status_code == 409:
             error_code, error_text = _parse_simple_return_error(response.content)
@@ -298,7 +328,7 @@ class QualysCollector(Collector):
             wait = response.headers.get("X-RateLimit-ToWait-Sec")
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)
         response.raise_for_status()
-        return ElementTree.fromstring(response.content)
+        return response
 
     def _pace_request(self) -> None:
         # Proactive half of the rate-limit handling: once the previous
