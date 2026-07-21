@@ -29,6 +29,15 @@ PAGE2_XML = b"""<?xml version="1.0"?>
   </RESPONSE>
 </HOST_LIST_OUTPUT>"""
 
+VULN_KB_XML = b"""<?xml version="1.0"?>
+<KNOWLEDGE_BASE_VULN_LIST_OUTPUT>
+  <RESPONSE>
+    <VULN_LIST>
+      <VULN><QID>38170</QID><TITLE>OpenSSL RCE</TITLE></VULN>
+    </VULN_LIST>
+  </RESPONSE>
+</KNOWLEDGE_BASE_VULN_LIST_OUTPUT>"""
+
 
 def _params(request) -> dict:
     return dict(parse_qsl(urlparse(request.url).query))
@@ -140,6 +149,31 @@ def test_exhausted_window_paces_next_request_before_firing(monkeypatch) -> None:
     # immediately and left to be reactively 409'd.
     assert sleep_calls == [5.0]
     assert len(df) == 2
+
+
+@responses.activate
+def test_vulnerabilities_kb_request_omits_truncation_limit() -> None:
+    # KnowledgeBase (/api/2.0/fo/knowledge_base/vuln/) isn't a truncated list
+    # API like asset/host/* — sending truncation_limit gets a 400 back.
+    kb_url = BASE_URL + "/api/2.0/fo/knowledge_base/vuln/"
+
+    def callback(request):
+        params = _params(request)
+        assert "truncation_limit" not in params
+        return (200, {}, VULN_KB_XML)
+
+    responses.add_callback(
+        responses.GET, kb_url, callback=callback, content_type="text/xml"
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+    df = ccm.collect("vulnerabilities")
+
+    assert len(df) == 1
+    assert df.loc[0, "qid"] == "38170"
 
 
 @responses.activate

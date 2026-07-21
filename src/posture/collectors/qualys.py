@@ -193,6 +193,10 @@ class QualysCollector(Collector):
                 url=self._base_url + _KB_ENDPOINT,
                 params={"action": "list", "details": "All", **kwargs},
                 list_path=("RESPONSE", "VULN_LIST", "VULN"),
+                # KnowledgeBase rejects `truncation_limit` outright (400) —
+                # unlike the asset/host/* endpoints, it isn't a paginated
+                # list API and doesn't accept the param at all.
+                paginated=False,
             )
         if resource == "host_detections":
             return self._fetch_list_page(
@@ -210,13 +214,16 @@ class QualysCollector(Collector):
         url: str,
         params: dict[str, Any],
         list_path: tuple[str, ...],
+        paginated: bool = True,
     ) -> tuple[list[dict[str, Any]], Any]:
         if cursor is not None:
             root = self._request_xml(cursor, params=None)
-        else:
+        elif paginated:
             root = self._request_xml(
                 url, params={"truncation_limit": _PAGE_SIZE, **params}
             )
+        else:
+            root = self._request_xml(url, params=params)
 
         records = [
             _xml_to_dict(elem) for elem in root.findall("./" + "/".join(list_path))

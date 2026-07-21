@@ -33,16 +33,18 @@ ccm = CCM("qualys")
 #     },
 # )
 
-try:
-    df = ccm.collect("hosts")
-except PostureError as exc:
-    print(f"hosts: FAILED — {exc}")
-else:
-    if df.empty:
-        print("hosts: 0 rows — skipping CSV write")
-        print(ccm.report("hosts"))
+#for table in ["hosts", "vulnerabilities"]:
+for table in ["vulnerabilities"]:
+    try:
+        df = ccm.collect(table)
+    except PostureError as exc:
+        print(f"{table}: FAILED — {exc}")
     else:
-        output_path = output_dir / "qualys_hosts.csv"
-        df.to_csv(output_path, index=False)
-        print(f"Wrote {len(df)} rows to {output_path}")
-        print(ccm.report("hosts"))
+        if df.empty:
+            print(f"{table}: 0 rows — skipping CSV write")
+            print(ccm.report(table))
+        else:
+            output_path = output_dir / f"qualys_{table}.csv"
+            df.to_csv(output_path, index=False)
+            print(f"Wrote {len(df)} rows to {output_path}")
+            print(ccm.report(table))
