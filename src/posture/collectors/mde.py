@@ -2,60 +2,40 @@
 
 Raw ``requests`` against the Defender for Endpoint API — no vendor SDK. Auth
 is Azure AD client-credentials (shared with ``intune.py`` via
-``_azure_oauth.py``). Pagination is NOT the same as Graph's here: MDE's
-``/api/machines`` and ``/api/vulnerabilities`` never return
-``@odata.nextLink`` (confirmed against Microsoft's own docs, not assumed —
-see ``get-all-vulnerabilities`` and ``exposed-apis-odata-samples``). They
-support ``$top``/``$skip`` instead, so list pagination here increments
-``$skip`` and stops when a page returns fewer than ``$top`` records.
-``/api/machines/{id}/vulnerabilities`` documents no pagination parameters at
-all — treated as a single, complete response.
+``_azure_oauth.py``). Pagination is NOT the same for every resource here:
+
+- ``/api/machines``, ``/api/vulnerabilities``, ``/api/deviceavinfo`` never
+  return ``@odata.nextLink`` (confirmed against Microsoft's own docs, not
+  assumed — see ``get-all-vulnerabilities`` and ``exposed-apis-odata-samples``).
+  They support ``$top``/``$skip`` instead, so list pagination for these
+  increments ``$skip`` and stops when a page returns fewer than ``$top``
+  records.
+- ``machine_vulnerabilities`` uses MDE's bulk export endpoint
+  (``/api/machines/SoftwareVulnerabilitiesByMachine``), which DOES return
+  ``@odata.nextLink`` — a complete, directly-callable URL for the next page
+  — and has its own, much more generous rate limit (30 calls/minute, 1,000/
+  hour) than the ~100/minute shared budget the rest of this collector paces
+  against. One call returns every device's vulnerabilities in one grain
+  (DeviceId x SoftwareVendor x SoftwareName x SoftwareVersion x CveId),
+  replacing what used to be a per-machine fan-out (one request per device —
+  infeasible at scale: tens of thousands of devices meant tens of thousands
+  of requests against a ~100/minute budget). Requires the
+  ``Vulnerability.Read.All`` application permission.
 
 No incremental sync: the reference supports `$filter`-based checkpointing,
 which conflicts with posture's locked "full pull, point in time, no
 incremental sync, ever" decision. Every collect() here is a full snapshot.
 
-``machine_vulnerabilities`` fans a request out per machine across a thread
-pool (there can be thousands of machines; defaults to 10 workers — lowered
-from the reference implementation's 25 after large tenants were observed
-tripping MDE's rate limit hard). A `RateLimitedSignal` raised outside the
-per-machine fan-out loop (e.g. list pagination) still propagates to base.py's
-batch-level retry, which halves concurrency on each retry of this resource,
-see ``_fetch_machine_vulnerabilities_page`` — see CLAUDE.md "Performance:
-per-item fan-out" for the pattern shared with Intune's per-id detail lookups
-and UpGuard's ``vendor_risks``.
-
-All requests (list pagination and the per-machine fan-out alike) are paced
-client-side to stay under MDE's documented ~100 calls/minute per-app-registration
-limit (see ``_pace_request``), reducing how often 429s happen in the first
-place — but pacing alone can't guarantee zero 429s (the budget may already be
-partly consumed by other calls against the same app registration), so a 5xx,
-429, or 401 for a single machine (e.g. a stale/decommissioned device record,
-one unlucky request against a shared quota, or a machine outside this app
-registration's RBAC scope) is handled locally per-machine — see
-``_fetch_all_vulns_for_machine`` — with its own retry budget, rather than
-propagating up to base.py's batch-level retry, which would otherwise cancel
-and discard every machine already fetched by the rest of the fan-out just
-because one machine got throttled, errored, or 401'd. A 401 gets exactly one
-reauth-and-retry (single-flight across threads, see ``_reauth_once``) so a
-genuinely expired shared token is still recovered — if the retry with a
-guaranteed-fresh token still 401s, that's specific to the one machine and
-it's skipped, not treated as a session-wide auth failure.
-
 Resources: ``machines``, ``vulnerabilities``, ``device_av_info``,
-``machine_vulnerabilities`` (requires machines ids).
+``machine_vulnerabilities``.
 """
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
-import random
 import threading
 import time
 from typing import Any
-
-import requests
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.collectors._azure_oauth import fetch_azure_ad_token
@@ -64,33 +44,17 @@ logger = logging.getLogger("posture.collectors.mde")
 
 _API_BASE_URL = "https://api.security.microsoft.com"
 _PAGE_SIZE = 1000  # comfortably under the documented $top max of 8,000
-_DEFAULT_MACHINE_VULN_MAX_WORKERS = 10
-
-# A lone machine 500ing is a per-device MDE fault, not a whole-tenant problem
-# (unlike 429/401, which are meaningful at the batch level and handled by
-# base.py's _request_with_retry). Retrying the entire fan-out for one bad
-# machine would burn the shared retry budget and re-halve concurrency for
-# every other machine, so a 5xx for a single machine is retried locally here
-# and, if it still fails, that machine is skipped rather than failing the
-# whole 'machine_vulnerabilities' resource.
-_MACHINE_VULN_SERVER_ERROR_RETRIES = 2
-_MACHINE_VULN_SERVER_ERROR_WAIT_SECONDS = 60.0
-
-# A 429 for a single machine is handled the same way as a 5xx: locally, per
-# machine, rather than propagating up to base.py's batch-level retry — that
-# retry redoes the *entire* fan-out (base.py's all-or-nothing contract),
-# which on a large tenant means throwing away hours of already-fetched
-# machines over one throttled request. High retry budget (not infinite) so a
-# permanently broken quota still eventually surfaces rather than looping
-# forever; backoff mirrors base.py's (exponential, capped, jittered).
-_MACHINE_VULN_RATE_LIMIT_MAX_RETRIES = 100
-_MACHINE_VULN_RATE_LIMIT_BACKOFF_BASE_SECONDS = 1.0
-_MACHINE_VULN_RATE_LIMIT_BACKOFF_CAP_SECONDS = 60.0
 
 # MDE's documented general API limit is ~100 calls/minute per app registration.
 # Staying comfortably under that (0.65s between requests ~= 92/min) leaves
 # headroom for other traffic against the same app registration.
 _MIN_REQUEST_INTERVAL_SECONDS = 0.65
+
+# Server-side max for machine_vulnerabilities' pageSize param is 200,000.
+# Default kept well under that: 50k records/page at ~1KB/record (per MDE
+# docs) is ~50MB of JSON per response, a reasonable balance against memory/
+# retry cost of one giant page. Override via the 'page_size' kwarg if needed.
+_MACHINE_VULN_PAGE_SIZE = 50_000
 
 # MDE returns this .NET DateTime.MinValue sentinel for datetime fields that
 # have never been set (e.g. quickScanTime on a device never AV-scanned).
@@ -112,7 +76,7 @@ _ENDPOINTS = {
     "machines": "/api/machines",
     "vulnerabilities": "/api/vulnerabilities",
     "device_av_info": "/api/deviceavinfo",
-    "machine_vulnerabilities": "/api/machines/{id}/vulnerabilities",
+    "machine_vulnerabilities": "/api/machines/SoftwareVulnerabilitiesByMachine",
 }
 
 MANIFEST: dict[str, dict[str, Any]] = {
@@ -204,25 +168,28 @@ MANIFEST: dict[str, dict[str, Any]] = {
         },
     },
     "machine_vulnerabilities": {
-        # Not derived_from "machines": each machine's vulnerabilities are
-        # their own paginated network call, fanned out across a thread pool,
-        # not data nested inside a raw machine record. _machine_id is
-        # injected client-side (see _fetch_machine_vulnerabilities_page).
-        # "requires" tells base.py to cache machines' raw records for this
-        # instance's lifetime, since _fetch_machine_vulnerabilities_page reads
-        # them again internally (see base.py::_get_raw for derived_from vs
-        # requires).
-        "requires": "machines",
         "endpoint": _ENDPOINTS["machine_vulnerabilities"],
         "columns": {
             "machine_vulnerability_id": ("id", "str"),
+            "machine_id": ("deviceId", "str"),
+            "device_name": ("deviceName", "str"),
             "cve_id": ("cveId", "str"),
-            "machine_id": ("_machine_id", "str"),
-            "fixing_kb_id": ("fixingKbId", "str"),
-            "product_name": ("productName", "str"),
-            "product_vendor": ("productVendor", "str"),
-            "product_version": ("productVersion", "str"),
-            "severity": ("severity", "str"),
+            "cvss_score": ("cvssScore", "float"),
+            "vulnerability_severity_level": ("vulnerabilitySeverityLevel", "str"),
+            "exploitability_level": ("exploitabilityLevel", "str"),
+            "product_vendor": ("softwareVendor", "str"),
+            "product_name": ("softwareName", "str"),
+            "product_version": ("softwareVersion", "str"),
+            "os_platform": ("osPlatform", "str"),
+            "rbac_group_name": ("rbacGroupName", "str"),
+            "rbac_group_id": ("rbacGroupId", "str"),
+            "recommended_security_update": ("recommendedSecurityUpdate", "str"),
+            "recommended_security_update_id": ("recommendedSecurityUpdateId", "str"),
+            "security_update_available": ("securityUpdateAvailable", "bool"),
+            "disk_paths": ("diskPaths", "json"),
+            "registry_paths": ("registryPaths", "json"),
+            "first_seen_timestamp": ("firstSeenTimestamp", "datetime"),
+            "last_seen_timestamp": ("lastSeenTimestamp", "datetime"),
         },
     },
 }
@@ -269,22 +236,8 @@ class MdeCollector(Collector):
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         super().__init__(config)
-        # Retries of 'machine_vulnerabilities' (see _fetch_machine_vulnerabilities_page)
-        # halve concurrency each attempt — tracked per-instance since base.py's
-        # _request_with_retry redoes the whole batch on RateLimitedSignal without
-        # telling the collector which attempt this is.
-        self._machine_vuln_attempt = 0
         self._rate_limit_lock = threading.Lock()
         self._last_request_time = 0.0
-        # Single-flight reauth for the machine_vulnerabilities fan-out: when the
-        # shared token genuinely expires mid-run, every in-flight worker gets a
-        # 401 near-simultaneously. Without coordination each of those threads
-        # would call _authenticate() independently. The epoch counter makes only
-        # the first thread to observe a given epoch perform the reauth; every
-        # other thread that raced in on the same stale epoch just waits on the
-        # lock and then re-checks (its retry uses the now-refreshed header).
-        self._reauth_lock = threading.Lock()
-        self._reauth_epoch = 0
 
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(
@@ -297,12 +250,6 @@ class MdeCollector(Collector):
         )
         self._session.headers["Authorization"] = f"Bearer {token}"
 
-    def _reauth_once(self, seen_epoch: int) -> None:
-        with self._reauth_lock:
-            if self._reauth_epoch == seen_epoch:
-                self._authenticate()
-                self._reauth_epoch += 1
-
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
@@ -313,6 +260,25 @@ class MdeCollector(Collector):
         else:
             records, next_cursor = self._fetch_list_page(resource, kwargs, cursor)
         return _sanitize_epoch_placeholders(records), next_cursor
+
+    def _fetch_machine_vulnerabilities_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
+        # cursor is the full "@odata.nextLink" URL from the previous page (or
+        # None for the first page) — MDE documents this endpoint's nextLink as
+        # a complete, directly-callable URL, unlike the $skip-based pagination
+        # used elsewhere in this collector.
+        if cursor is not None:
+            response = self._get(cursor)
+        else:
+            page_size = kwargs.get("page_size", _MACHINE_VULN_PAGE_SIZE)
+            url = _API_BASE_URL + _ENDPOINTS["machine_vulnerabilities"]
+            response = self._get(url, params={"pageSize": page_size})
+
+        payload = response.json()
+        records = payload.get("value", [])
+        next_cursor = payload.get("@odata.nextLink")
+        return records, next_cursor
 
     def _fetch_list_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
@@ -329,175 +295,7 @@ class MdeCollector(Collector):
         next_cursor = skip + _PAGE_SIZE if len(records) == _PAGE_SIZE else None
         return records, next_cursor
 
-    def _fetch_machine_vulnerabilities_page(
-        self, kwargs: dict[str, Any], cursor: Any
-    ) -> tuple[list[dict[str, Any]], Any]:
-        if cursor is not None:
-            return [], None  # entire fan-out already completed on first call
-
-        machine_ids = kwargs.get("machine_ids")
-        if machine_ids is None:
-            raw_machines = self._get_raw("machines", {})
-            machine_ids = [
-                str(m["id"]) for m in raw_machines if m.get("id") is not None
-            ]
-        if not machine_ids:
-            return [], None
-
-        max_workers = kwargs.get("max_workers", _DEFAULT_MACHINE_VULN_MAX_WORKERS)
-        # Each retry of this resource halves concurrency — a tenant large enough
-        # to trip the rate limit at N workers is likely to trip it again at N on
-        # the very next attempt otherwise, burning through the retry budget
-        # without ever backing off the thing that caused it.
-        effective_max_workers = max(1, max_workers // (2**self._machine_vuln_attempt))
-        self._machine_vuln_attempt += 1
-        workers = max(1, min(effective_max_workers, len(machine_ids)))
-
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(
-                    self._fetch_all_vulns_for_machine, machine_id
-                ): machine_id
-                for machine_id in machine_ids
-            }
-            try:
-                for future in concurrent.futures.as_completed(futures):
-                    machine_id = futures[future]
-                    records = future.result()
-                    for record in records:
-                        record["_machine_id"] = machine_id
-                    all_records.extend(records)
-            except BaseException:
-                # A worker failed (e.g. token expired mid-run, raising
-                # UnauthorizedSignal). Cancel every future that hasn't started
-                # yet so the pool doesn't keep burning through the remaining
-                # queue against a dead token before __exit__'s shutdown(wait=True)
-                # can return control to base.py's retry/reauth handler.
-                for pending in futures:
-                    pending.cancel()
-                raise
-
-        # Reset once this run succeeds, so the halving only ever applies
-        # across retries of a single collection — not to every subsequent
-        # 'machine_vulnerabilities' call made against this instance.
-        self._machine_vuln_attempt = 0
-        return all_records, None
-
-    def _fetch_all_vulns_for_machine(self, machine_id: str) -> list[dict[str, Any]]:
-        # No $top/$skip/nextLink documented for this endpoint — it's a
-        # single, complete response (unlike the org-wide list endpoints).
-        endpoint = _ENDPOINTS["machine_vulnerabilities"].format(id=machine_id)
-        attempt = 0
-        rate_limit_attempt = 0
-        reauthenticated = False
-        while True:
-            try:
-                response = self._get(_API_BASE_URL + endpoint)
-                return response.json().get("value", [])
-            except UnauthorizedSignal:
-                # A single machine 401ing is handled here, not by letting it
-                # propagate to base.py's batch-level retry — that would cancel
-                # every other in-flight machine and redo the *entire* fan-out
-                # (potentially thousands of already-fetched machines) for what
-                # is often just this one device's RBAC scope/licensing, not a
-                # dead token. Reauth once (single-flight across threads, see
-                # _reauth_once) and retry this machine; if it's still 401
-                # after a guaranteed-fresh token, it's this machine, not the
-                # session — skip it and let the rest of the fan-out proceed.
-                if reauthenticated:
-                    logger.warning(
-                        "machine_vulnerabilities: skipping machine after "
-                        "unauthorized even with a fresh token",
-                        extra={
-                            "source": self.env_prefix.lower(),
-                            "machine_id": machine_id,
-                        },
-                    )
-                    return []
-                logger.debug(
-                    "machine_vulnerabilities: unauthorized for machine, "
-                    "reauthenticating and retrying",
-                    extra={
-                        "source": self.env_prefix.lower(),
-                        "machine_id": machine_id,
-                    },
-                )
-                self._reauth_once(self._reauth_epoch)
-                reauthenticated = True
-            except RateLimitedSignal as exc:
-                rate_limit_attempt += 1
-                if rate_limit_attempt > _MACHINE_VULN_RATE_LIMIT_MAX_RETRIES:
-                    logger.warning(
-                        "machine_vulnerabilities: skipping machine after "
-                        "repeated rate limiting",
-                        extra={
-                            "source": self.env_prefix.lower(),
-                            "machine_id": machine_id,
-                            "attempts": rate_limit_attempt,
-                        },
-                    )
-                    return []
-                wait = min(
-                    exc.retry_after
-                    or _MACHINE_VULN_RATE_LIMIT_BACKOFF_BASE_SECONDS
-                    * (2**rate_limit_attempt),
-                    _MACHINE_VULN_RATE_LIMIT_BACKOFF_CAP_SECONDS,
-                )
-                logger.debug(
-                    "machine_vulnerabilities: rate limited for machine, retrying",
-                    extra={
-                        "source": self.env_prefix.lower(),
-                        "machine_id": machine_id,
-                        "attempt": rate_limit_attempt,
-                        "wait": wait,
-                    },
-                )
-                time.sleep(wait * random.uniform(0.75, 1.25))
-            except requests.exceptions.HTTPError as exc:
-                status = exc.response.status_code if exc.response is not None else None
-                if status == 404:
-                    # Machine-specific endpoint: a 404 means this machine has
-                    # no vulnerability data (e.g. offboarded since the machine
-                    # list was pulled), not a collection-wide failure.
-                    logger.info(
-                        "machine_vulnerabilities: no data for machine (404), skipping",
-                        extra={
-                            "source": self.env_prefix.lower(),
-                            "machine_id": machine_id,
-                        },
-                    )
-                    return []
-                if status is None or status < 500:
-                    raise
-                attempt += 1
-                if attempt > _MACHINE_VULN_SERVER_ERROR_RETRIES:
-                    logger.warning(
-                        "machine_vulnerabilities: skipping machine after repeated "
-                        "server errors",
-                        extra={
-                            "source": self.env_prefix.lower(),
-                            "machine_id": machine_id,
-                            "status": status,
-                            "attempts": attempt,
-                        },
-                    )
-                    return []
-                logger.warning(
-                    "machine_vulnerabilities: server error for machine, retrying",
-                    extra={
-                        "source": self.env_prefix.lower(),
-                        "machine_id": machine_id,
-                        "status": status,
-                        "attempt": attempt,
-                    },
-                )
-                time.sleep(_MACHINE_VULN_SERVER_ERROR_WAIT_SECONDS)
-
     def _pace_request(self) -> None:
-        # Shared across threads so concurrent machine_vulnerabilities workers
-        # can't collectively exceed the per-minute ceiling even though each
-        # thread only knows about its own requests.
         with self._rate_limit_lock:
             elapsed = time.monotonic() - self._last_request_time
             wait = _MIN_REQUEST_INTERVAL_SECONDS - elapsed

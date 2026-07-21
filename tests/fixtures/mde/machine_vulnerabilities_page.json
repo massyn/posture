@@ -1,9 +1,12 @@
 [
     {
         "id": "mv-1",
+        "deviceId": "machine-1",
         "cveId": "CVE-2026-1111",
-        "_machine_id": "machine-1",
-        "fixingKbId": "KB5000001",
-        "severity": "High"
+        "softwareVendor": "adobe",
+        "softwareName": "acrobat",
+        "softwareVersion": "1.0.0",
+        "vulnerabilitySeverityLevel": "High",
+        "securityUpdateAvailable": true
     }
 ]

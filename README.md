@@ -199,9 +199,11 @@ None support incremental sync (the reference implementations do via `$filter`
 checkpoints) — every `collect()` is a full snapshot, per posture's locked snapshot
 semantics. `intune`'s `device_configurations` / `device_configuration_detail` only
 carry the fields the accelerator explicitly named as aliases, not the full raw Graph
-payload it also flattens generically. `mde`'s `machine_vulnerabilities` fans a request
-out per machine across a thread pool (up to `max_workers`, default 25) — the same
-pattern as UpGuard's `vendor_risks`. `intune`'s `attack_simulation_users` fetches the
+payload it also flattens generically. `mde`'s `machine_vulnerabilities` uses MDE's bulk
+export endpoint (`/api/machines/SoftwareVulnerabilitiesByMachine`, `@odata.nextLink`
+pagination, page size overridable via a `page_size` kwarg) rather than a per-machine
+fan-out — one call returns every device's vulnerabilities. `intune`'s
+`attack_simulation_users` fetches the
 targeted-user report for each `attack_simulations` id (one paginated call per
 simulation, click/report/training events kept as JSON blobs rather than exploded
 into further tables). `azure_entra`'s `signins` takes an optional `days` kwarg
@@ -217,9 +219,9 @@ full point-in-time pull, not a checkpoint.
 
 `pst_recipients` (per-recipient phishing test results — delivered/opened/clicked/
 reported timestamps) fans out one paginated call per PST id across a bounded thread
-pool, mirroring `mde`'s `machine_vulnerabilities`. PST ids are read from `psts`
-internally unless a `pst_ids` kwarg is given; concurrency defaults to 10 workers,
-overridable via a `max_workers` kwarg.
+pool, the same per-item fan-out pattern as UpGuard's `vendor_risks`. PST ids are read
+from `psts` internally unless a `pst_ids` kwarg is given; concurrency defaults to 10
+workers, overridable via a `max_workers` kwarg.
 
 ### Salesforce configuration
 
