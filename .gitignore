@@ -217,3 +217,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local AI-assistant instructions (kept out of the repo deliberately —
+# design content lives in docs/ARCHITECTURE.md instead)
+CLAUDE.md

@@ -62,16 +62,35 @@ logger = logging.getLogger("posture.collectors.qualys")
 # observed on responses, EOL notice included) in favour of /api/5.0 — same
 # request params and XML response shape, only the path version changed.
 _HOST_LIST_ENDPOINT = "/api/5.0/fo/asset/host/"
-_KB_ENDPOINT = "/api/2.0/fo/knowledge_base/vuln/"
+# /api/2.0/fo/knowledge_base/vuln/ carries the same EOS warning in favour of
+# /api/4.0 — same request params and XML response shape, only the path
+# version changed.
+_KB_ENDPOINT = "/api/4.0/fo/knowledge_base/vuln/"
 _HOST_DETECTION_ENDPOINT = "/api/2.0/fo/asset/host/vm/detection/"
 
 _PAGE_SIZE = 1000
+
+# KnowledgeBase pulls are a single unpaginated request (see `paginated=False`
+# below) — for an operator running against the full/broad KB, the response
+# body can legitimately take longer than a typical page fetch to arrive.
+# 120s was tight enough to trip on that, well within the 2 transient-error
+# retries CLAUDE.md's base-class contract already grants, so retrying didn't
+# help. Widened per-request read timeout rather than the retry budget, since
+# the problem is response size/latency, not flakiness.
+_REQUEST_TIMEOUT_SECONDS = 600
 
 # Qualys reuses HTTP 409 for permanent account errors, not just its
 # concurrency limit. CODE 2003 = "Registration must be completed before API
 # requests will be served for this account" — a setup problem the retry
 # budget cannot resolve, so it's treated as fatal rather than throttling.
-_FATAL_409_CODES = {"2003"}
+# CODE 1960 = "This API cannot be run again until N currently running
+# instance(s) have finished" — a per-API single-concurrent-run limit (not
+# the general concurrency limit the 409 retry path already handles), raised
+# by another instance of the same API already in flight (e.g. triggered
+# outside this collector, or a prior run that never terminated). Retrying
+# just burns the rate-limit budget waiting on a run this process doesn't
+# control and has no way to wait for, so it's treated as fatal too.
+_FATAL_409_CODES = {"2003", "1960"}
 
 # Qualys XML wraps repeated children in a "_LIST" element (HOST_LIST/HOST,
 # VULN_LIST/VULN, DETECTION_LIST/DETECTION, CVE_LIST/CVE, TAGS/TAG) but
@@ -238,7 +257,9 @@ class QualysCollector(Collector):
         self, url: str, *, params: dict[str, Any] | None
     ) -> ElementTree.Element:
         self._pace_request()
-        response = self._session.get(url, params=params, timeout=120)
+        response = self._session.get(
+            url, params=params, timeout=_REQUEST_TIMEOUT_SECONDS
+        )
         self._record_rate_limit_headers(response.headers)
 
         if response.status_code == 401:
@@ -258,13 +279,21 @@ class QualysCollector(Collector):
                 extra={"source": "qualys"},
             )
             if error_code in _FATAL_409_CODES:
+                hint = (
+                    "another instance of this API is already running on "
+                    "this Qualys account and must finish before this one "
+                    "can — this is not a rate limit and will not resolve "
+                    "by retrying"
+                    if error_code == "1960"
+                    else "check the account's registration/activation status "
+                    "in the Qualys portal — this is not a rate limit and "
+                    "will not resolve by retrying"
+                )
                 raise AuthenticationError(
                     f"Qualys rejected the request (CODE {error_code}): "
                     f"{error_text or 'no message'}",
                     source="qualys",
-                    hint="check the account's registration/activation status "
-                    "in the Qualys portal — this is not a rate limit and "
-                    "will not resolve by retrying",
+                    hint=hint,
                 )
             wait = response.headers.get("X-RateLimit-ToWait-Sec")
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)

@@ -85,6 +85,11 @@ class Collector(ABC):
     #: Env var prefix used for config resolution, e.g. "CROWDSTRIKE".
     env_prefix: str = ""
 
+    #: Human-readable source name for catalog()/reporting, e.g.
+    #: "Microsoft Defender for Endpoint" for the "mde" source. Falls back to
+    #: env_prefix when a collector doesn't set it, so this is opt-in.
+    display_name: str = ""
+
     #: resource name -> manifest dict (see parse.py for manifest shape).
     manifest: dict[str, dict[str, Any]] = {}
 

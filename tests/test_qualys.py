@@ -153,9 +153,9 @@ def test_exhausted_window_paces_next_request_before_firing(monkeypatch) -> None:
 
 @responses.activate
 def test_vulnerabilities_kb_request_omits_truncation_limit() -> None:
-    # KnowledgeBase (/api/2.0/fo/knowledge_base/vuln/) isn't a truncated list
+    # KnowledgeBase (/api/4.0/fo/knowledge_base/vuln/) isn't a truncated list
     # API like asset/host/* — sending truncation_limit gets a 400 back.
-    kb_url = BASE_URL + "/api/2.0/fo/knowledge_base/vuln/"
+    kb_url = BASE_URL + "/api/4.0/fo/knowledge_base/vuln/"
 
     def callback(request):
         params = _params(request)
@@ -174,6 +174,33 @@ def test_vulnerabilities_kb_request_omits_truncation_limit() -> None:
 
     assert len(df) == 1
     assert df.loc[0, "qid"] == "38170"
+
+
+@responses.activate
+def test_vulnerabilities_kwargs_override_built_in_defaults() -> None:
+    # Operators must be able to narrow a KnowledgeBase pull (e.g. to a QID
+    # range or a tighter `details` scope) at their discretion — kwargs win
+    # over this collector's own defaults for the same param name.
+    kb_url = BASE_URL + "/api/4.0/fo/knowledge_base/vuln/"
+    seen_params: dict[str, str] = {}
+
+    def callback(request):
+        nonlocal seen_params
+        seen_params = _params(request)
+        return (200, {}, VULN_KB_XML)
+
+    responses.add_callback(
+        responses.GET, kb_url, callback=callback, content_type="text/xml"
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+    ccm.collect("vulnerabilities", details="Basic", ids="38170")
+
+    assert seen_params["details"] == "Basic"
+    assert seen_params["ids"] == "38170"
 
 
 @responses.activate
@@ -212,6 +239,53 @@ def test_409_registration_error_fails_immediately_without_retrying() -> None:
     except IncompleteCollection as exc:
         assert "2003" in str(exc)
         assert "Registration must be completed" in str(exc)
+
+    # exactly one request — no rate-limit retry loop for a fatal 409
+    assert call_count == 1
+
+
+@responses.activate
+def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
+    # CODE 1960 = "This API cannot be run again until N currently running
+    # instance(s) have finished" — another run of the same API is already in
+    # flight on this account. This process has no way to wait it out, so it
+    # must fail the collection outright, not burn the rate-limit retry budget.
+    call_count = 0
+    body = b"""<?xml version="1.0"?>
+<SIMPLE_RETURN>
+  <RESPONSE>
+    <DATETIME>2026-07-21T21:08:51Z</DATETIME>
+    <CODE>1960</CODE>
+    <TEXT>This API cannot be run again until 1 currently running instance has finished.</TEXT>
+    <ITEM_LIST>
+      <ITEM>
+        <KEY>CALLS_TO_FINISH</KEY>
+        <VALUE>1</VALUE>
+      </ITEM>
+    </ITEM_LIST>
+  </RESPONSE>
+</SIMPLE_RETURN>"""
+
+    def callback(request):
+        nonlocal call_count
+        call_count += 1
+        return (409, {}, body)
+
+    responses.add_callback(
+        responses.GET, HOSTS_URL, callback=callback, content_type="text/xml"
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+
+    try:
+        ccm.collect("hosts")
+        assert False, "expected IncompleteCollection"
+    except IncompleteCollection as exc:
+        assert "1960" in str(exc)
+        assert "currently running instance" in str(exc)
 
     # exactly one request — no rate-limit retry loop for a fatal 409
     assert call_count == 1

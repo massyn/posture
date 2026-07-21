@@ -231,6 +231,7 @@ def _log_error_to_file(url: str, params: dict[str, Any] | None, response: Any) -
 
 class MdeCollector(Collector):
     env_prefix = "MDE"
+    display_name = "Microsoft Defender for Endpoint"
     manifest = MANIFEST
     required_config_keys = ("tenant_id", "client_id", "client_secret")
 

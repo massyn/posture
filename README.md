@@ -4,6 +4,10 @@ Runtime-agnostic Python library for CCM (Continuous Control Monitoring) data col
 The entire contract: credentials in, DataFrame out. Runs unchanged in Docker, Airflow,
 Databricks — the library never knows or cares where it executes.
 
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design behind this
+library — the collect/parse split, locked design decisions, manifest schema, and
+per-collector implementation notes.
+
 ## Installation
 
 ```bash
@@ -162,12 +166,10 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `api_key` | `UPGUARD_API_KEY` |
 | `base_url` | `UPGUARD_BASE_URL` (optional — defaults to the AU tenant) |
 
-`vendor_risks` fans a single (unpaginated — UpGuard's `/risks/vendors` has no
-pagination) request out per vendor across a thread pool (1–60s per vendor and
-there can be hundreds of vendors) — the only posture resource that does
-concurrent per-parent network calls rather than sequential pagination. Tune
-with `collect("vendor_risks", max_workers=8)`, or pass `min_severity` to filter
-server-side.
+Tune `vendor_risks` with `collect("vendor_risks", max_workers=8)`, or pass
+`min_severity` to filter server-side (see
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes)
+for why this one fans out per vendor).
 
 ### Jamf configuration
 
@@ -177,12 +179,10 @@ server-side.
 | `client_id` | `JAMF_CLIENT_ID` |
 | `client_secret` | `JAMF_CLIENT_SECRET` |
 
-Only the fields the accelerator explicitly renamed are ported for `computers_inventory`,
-`computers_inventory_detail`, and `mobile_devices` — the reference implementation
-passes the rest of each response through via generic flattening, which posture's
-allowlist-only manifest doesn't support. `computers_inventory_detail` fetches one
-computer at a time by id (from `computers_inventory`), same pattern as Okta's
-`device_users`.
+`computers_inventory_detail` fetches one computer at a time by id, so expect one
+request per device on top of the initial listing call. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for
+which fields are ported.
 
 ### Intune, MDE, and Azure Entra configuration
 
@@ -195,20 +195,13 @@ endpoint (shared internal helper, not vendor SDKs).
 | `client_id` | `INTUNE_CLIENT_ID` / `MDE_CLIENT_ID` / `AZURE_CLIENT_ID` |
 | `client_secret` | `INTUNE_CLIENT_SECRET` / `MDE_CLIENT_SECRET` / `AZURE_CLIENT_SECRET` |
 
-None support incremental sync (the reference implementations do via `$filter`
-checkpoints) — every `collect()` is a full snapshot, per posture's locked snapshot
-semantics. `intune`'s `device_configurations` / `device_configuration_detail` only
-carry the fields the accelerator explicitly named as aliases, not the full raw Graph
-payload it also flattens generically. `mde`'s `machine_vulnerabilities` uses MDE's bulk
-export endpoint (`/api/machines/SoftwareVulnerabilitiesByMachine`, `@odata.nextLink`
-pagination, page size overridable via a `page_size` kwarg) rather than a per-machine
-fan-out — one call returns every device's vulnerabilities. `intune`'s
-`attack_simulation_users` fetches the
-targeted-user report for each `attack_simulations` id (one paginated call per
-simulation, click/report/training events kept as JSON blobs rather than exploded
-into further tables). `azure_entra`'s `signins` takes an optional `days` kwarg
-(default 180) that narrows the server-side `$filter` on `createdDateTime` — still a
-full point-in-time pull, not a checkpoint.
+Every `collect()` is a full snapshot — none of the three support incremental sync.
+`mde`'s `machine_vulnerabilities` page size is overridable via a `page_size` kwarg.
+`azure_entra`'s `signins` takes an optional `days` kwarg (default 180) that narrows
+the server-side `$filter` on `createdDateTime` — still a full point-in-time pull,
+not a checkpoint. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for
+endpoint-level detail on all three.
 
 ### KnowBe4 configuration
 
@@ -218,18 +211,14 @@ full point-in-time pull, not a checkpoint.
 | `region` | `KNOWBE4_REGION` (optional — `us` or `eu`, defaults to `us`) |
 
 `pst_recipients` (per-recipient phishing test results — delivered/opened/clicked/
-reported timestamps) fans out one paginated call per PST id across a bounded thread
-pool, the same per-item fan-out pattern as UpGuard's `vendor_risks`. PST ids are read
-from `psts` internally unless a `pst_ids` kwarg is given; concurrency defaults to 10
-workers, overridable via a `max_workers` kwarg.
+reported timestamps) reads PST ids from `psts` internally unless a `pst_ids` kwarg is
+given; concurrency defaults to 10 workers, overridable via a `max_workers` kwarg.
 
 ### Salesforce configuration
 
 Requires the optional `simple_salesforce` dependency — install with
-`pip install "posture[salesforce]"`. Auth is username + password + security
-token (no connected app / client id-secret needed) — the alternative would be
-hand-rolling Salesforce's SOAP login flow, so this is an approved vendor-SDK
-exception alongside `pytenable`.
+`pip install "posture[salesforce]"`. Auth is username + password + security token
+(no connected app / client id-secret needed).
 
 | Constructor key | Env var |
 |---|---|
@@ -247,10 +236,7 @@ the JSON (or pointing `schema_file` at your own), not by changing collector code
 ### Tenable.io configuration
 
 Requires the optional `pytenable` dependency — install with
-`pip install "posture[tenableio]"`. `pytenable`'s export jobs are bespoke
-server-side machinery (polling, chunking) that the base class's generic REST
-pagination scaffold can't express, so this collector is one of the two approved
-vendor-SDK exceptions (alongside `simple_salesforce`).
+`pip install "posture[tenableio]"`.
 
 | Constructor key | Env var |
 |---|---|
@@ -259,10 +245,7 @@ vendor-SDK exceptions (alongside `simple_salesforce`).
 
 ### Qualys configuration
 
-Raw `requests` against the Qualys API v2 (`/api/2.0/fo/...`), which returns XML rather
-than JSON — the collector converts each response into plain dicts at fetch time, so
-`parse.py` never has to know XML exists. Auth is HTTP Basic; pagination follows the
-full next-page URL Qualys returns in a truncated response rather than a token.
+Auth is HTTP Basic.
 
 | Constructor key | Env var |
 |---|---|
@@ -270,11 +253,10 @@ full next-page URL Qualys returns in a truncated response rather than a token.
 | `password` | `QUALYS_PASSWORD` |
 | `base_url` | `QUALYS_BASE_URL` (required — varies by platform/subscription, e.g. `https://qualysapi.qualys.com` or a `qgN.apps.qualys.com` regional URL) |
 
-`vulnerability_detections` is derived from the per-host detection list (fetched
-internally as `host_detections`) — one row per (host, QID), mirroring the
-`vulnerabilities` / `vulnerability_remediations` shape in `crowdstrike`. `vulnerabilities`
-here is Qualys' KnowledgeBase (the QID catalogue — severity, CVSS, CVE), not a
-per-host finding.
+`vulnerabilities` here is Qualys' KnowledgeBase (the QID catalogue — severity, CVSS,
+CVE), not a per-host finding; `vulnerability_detections` is the per-host one. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for
+how both are fetched.
 
 ## Development
 

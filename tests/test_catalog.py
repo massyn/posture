@@ -64,6 +64,15 @@ def test_catalog_lists_resources_with_derived_and_columns() -> None:
     ]
 
 
+def test_catalog_reports_display_name() -> None:
+    result = catalog()
+
+    # Explicit display_name set on the collector.
+    assert result["mde"]["display_name"] == "Microsoft Defender for Endpoint"
+    # No display_name set -> falls back to env_prefix.
+    assert result["crowdstrike"]["display_name"] == "CROWDSTRIKE"
+
+
 def test_catalog_requires_no_credentials_or_network() -> None:
     # No CCM(...) call, no env vars set — catalog() must never instantiate
     # a collector or touch the network.

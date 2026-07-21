@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=False))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.4.2"
+__version__ = "0.4.4"
 
 __all__ = [
     "CCM",
@@ -101,6 +101,7 @@ def catalog() -> dict[str, Any]:
     sources: dict[str, Any] = {}
     for name, cls in sorted(_SOURCES.items()):
         sources[name] = {
+            "display_name": cls.display_name or cls.env_prefix,
             "required_config": {
                 key: f"{cls.env_prefix}_{key.upper()}"
                 for key in cls.required_config_keys
