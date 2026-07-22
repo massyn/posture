@@ -1,0 +1,13 @@
+[
+    {
+        "id": "vuln-1",
+        "name": "OpenSSL vulnerable version",
+        "description": "Outdated OpenSSL package detected",
+        "severity": "high",
+        "cve": "CVE-2024-0001",
+        "assetId": "asset-1",
+        "status": "open",
+        "detectedAt": "2024-04-01T00:00:00Z",
+        "remediateBy": "2024-05-01T00:00:00Z"
+    }
+]

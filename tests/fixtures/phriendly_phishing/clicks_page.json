@@ -1,0 +1,34 @@
+[
+    {
+        "id": "clk-2001",
+        "user_id": "usr-501",
+        "email": "alice@example.com",
+        "first_name": "Alice",
+        "last_name": "Anderson",
+        "group": "Engineering",
+        "campaign_name": "Q1 Invoice Scam",
+        "template_name": "Fake Invoice",
+        "sent_date": "2026-02-01T08:00:00Z",
+        "clicked_date": "2026-02-01T08:12:00Z",
+        "reported_date": null,
+        "ip_address": "203.0.113.45",
+        "browser": "Chrome 120",
+        "operating_system": "Windows 11"
+    },
+    {
+        "id": "clk-2002",
+        "user_id": "usr-502",
+        "email": "bob@example.com",
+        "first_name": "Bob",
+        "last_name": "Baker",
+        "group": "Sales",
+        "campaign_name": "Q1 Invoice Scam",
+        "template_name": "Fake Invoice",
+        "sent_date": "2026-02-01T08:00:00Z",
+        "clicked_date": null,
+        "reported_date": "2026-02-01T08:05:00Z",
+        "ip_address": null,
+        "browser": null,
+        "operating_system": null
+    }
+]

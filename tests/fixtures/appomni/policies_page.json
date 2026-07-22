@@ -1,0 +1,25 @@
+{
+    "results": [
+        {
+            "id": "pol-1",
+            "name": "MFA Required",
+            "description": "Enforce MFA for all admin users",
+            "policyType": "identity",
+            "severity": "high",
+            "is_reference": true,
+            "enabled": true,
+            "created": "2023-01-15T09:30:00.000Z",
+            "updated": "2024-03-01T12:00:00.000Z"
+        },
+        {
+            "id": "pol-2",
+            "name": "Public Sharing Disabled",
+            "policyType": "data_sharing",
+            "severity": "medium",
+            "is_reference": true,
+            "enabled": false,
+            "created": "2022-06-01T08:00:00.000Z"
+        }
+    ],
+    "next": null
+}

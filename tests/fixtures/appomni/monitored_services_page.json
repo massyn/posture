@@ -1,0 +1,18 @@
+[
+    {
+        "id": "svc-1",
+        "name": "Salesforce Prod",
+        "app_type": "salesforce",
+        "instance_url": "https://acme.my.salesforce.com",
+        "status": "connected",
+        "created": "2023-01-15T09:30:00.000Z",
+        "updated": "2024-03-01T12:00:00.000Z"
+    },
+    {
+        "id": "svc-2",
+        "name": "Workday Prod",
+        "app_type": "workday",
+        "status": "disconnected",
+        "created": "2022-06-01T08:00:00.000Z"
+    }
+]

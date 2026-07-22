@@ -262,6 +262,29 @@ why something is built the way it is, not how to configure or call it.
 - **Tenable.io** — `pytenable`'s export jobs are bespoke server-side machinery
   (polling, chunking) that the base class's generic REST pagination scaffold can't
   express, so this is the other approved vendor-SDK exception.
+- **Tenable.sc** — also `pytenable`, for the same reason as Tenable.io
+  (`sc.analysis.vulns` is a job-backed export generator). Unlike Tenable.io,
+  Tenable.sc is self-hosted with no shared cloud host, so `endpoint` is
+  required config. `hosts` and `asset_ips` go through pytenable's raw
+  `sc.get(...)` passthrough rather than a dedicated SDK accessor — pyTenable
+  has none for these two endpoints — ported from an existing in-house
+  extraction script. Both are scoped to a single named Tenable.sc asset list
+  (default `"Non Crowdstrike Assets"`, since Crowdstrike-covered hosts are
+  already collected via `crowdstrike.py`) via an `asset_name` kwarg, resolved
+  to the list's asset id through one `asset` lookup cached per name on the
+  instance. `asset_ips` is not `derived_from` `assets`: Tenable.sc returns a
+  list's member IPs as a blob of newline-separated IP addresses/ranges
+  (`viewableIPs[].ipList`) from a separate per-asset-id endpoint, not a
+  nested list of objects on the asset list response — expanding that blob
+  into one row per IP happens in `_fetch_page` as a fetch-time transform of
+  raw text, the same shape as `qualys.py` converting XML into dicts before
+  parse.py ever sees the data.
+  **Caveat:** `MANIFEST` column paths in `tenablesc.py` were built from the
+  reference extraction script and Tenable.sc's public API reference, not a
+  live schema introspection against a real instance — same caveat as
+  `wiz.py`, `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`,
+  `phriendly_phishing.py`, and `vanta.py`. Verify field names/nesting
+  against a real instance's response before relying on this collector.
 - **Qualys** — raw `requests` against API v2 (mostly; the KnowledgeBase endpoint
   moved to v4 — see `qualys.py`'s module docstring for the EOS history), which
   returns XML rather than JSON. The collector converts each response into plain
@@ -272,6 +295,160 @@ why something is built the way it is, not how to configure or call it.
   the `vulnerabilities` / `vulnerability_remediations` shape in `crowdstrike`.
   `vulnerabilities` here is Qualys' KnowledgeBase (the QID catalogue — severity,
   CVSS, CVE), not a per-host finding.
+- **Wiz** — raw `requests` against Wiz's single GraphQL endpoint (`.../graphql`,
+  tenant/region-specific — no cross-tenant discovery mechanism exists, unlike
+  Crowdstrike's `X-Cs-Region` header, so `api_endpoint` is required config).
+  Auth is OAuth2 client-credentials (`grant_type=client_credentials`,
+  `audience=wiz-api`) against a token URL that defaults to Wiz's shared Auth0
+  endpoint but is overridable via `token_url`, since some tenants are
+  provisioned on Cognito with a different URL. All three resources
+  (`cloud_security_issues`, `inventory`, `vulnerabilities`) use direct
+  cursor-paginated GraphQL queries (`first`/`after`, `pageInfo.hasNextPage`/
+  `endCursor`) rather than Wiz's async report-export flow — a deliberate
+  choice over the Tenable.io-style export-job pattern, accepting the tradeoff
+  that very large tenants may need a future report-based path if direct
+  pagination proves too slow or rate-limited in practice.
+  **Caveat:** the GraphQL query field paths in `wiz.py`'s `MANIFEST` were built
+  from third-party connector documentation, not a live schema introspection —
+  Wiz's own docs were unreachable at the time this collector was written.
+  Verify field names/nesting against a real tenant's response before relying
+  on this collector, and correct `MANIFEST` if they don't match.
+
+- **SailPoint** — targets Identity Security Cloud (ISC, the cloud SaaS product
+  formerly IdentityNow), not IdentityIQ (self-hosted, a different API entirely).
+  Raw `requests` against REST API v3 — generic OAuth2 client-credentials REST,
+  no vendor SDK needed. Unlike Wiz, the OAuth token endpoint lives on the same
+  host as the API (`<base_url>/oauth/token`), so no separate `token_url`
+  config exists. Pagination is offset/limit (`_fetch_page` advances
+  `offset + limit` each page), not cursor-based like Okta's Link header or
+  Wiz's GraphQL cursor — pagination ends when a page returns fewer than
+  `limit` records. `identities`, `accounts`, `access_profiles`, and `roles`
+  only carry the fields named in `MANIFEST`; nested entitlement lists on
+  `access_profiles`/`roles` are out of scope for this initial cut (no derived
+  resource declared for them).
+
+- **AppOmni** — auth is a static bearer token issued out-of-band in the
+  AppOmni console (no OAuth flow), the same "just set the header" shape as
+  UpGuard's `api_key`. Base URL is tenant-specific
+  (`https://<instance>.appomni.com`, `instance` required config, no
+  cross-tenant discovery). Pagination is DRF-style: each page's `next` is
+  already a complete, pre-parameterised URL, so the cursor threaded through
+  `_fetch_page` is that URL rather than an offset/limit pair — once the
+  first page is fetched, subsequent requests just `GET` the given `next`
+  URL directly. `monitored_services` is the one resource with no
+  pagination envelope at all (a bare JSON list). `policies` and
+  `posture_policies` hit the same `/policy/` endpoint with different
+  default query filters (reference policies vs. monitored-service-config
+  policies) — two separate resources, not `derived_from`, since each needs
+  its own network call with its own filter.
+  **Caveat:** `MANIFEST` column paths in `appomni.py` were built from
+  AppOmni's public API reference and a prior in-house extraction script,
+  not a live schema introspection against a real tenant — same caveat as
+  `wiz.py`. Verify field names/nesting against a real tenant's response
+  before relying on this collector.
+
+- **Snyk** — raw `requests` against REST API v3 (JSON:API envelope) plus one
+  v1 endpoint that has no REST equivalent (`members`, org members — a bare
+  unpaginated list). Static token auth (`Authorization: token <TOKEN>`),
+  same "just set the header" shape as AppOmni/UpGuard. `organizations` is
+  the only real top-level paginated resource — REST v3's `links.next` is
+  already a complete relative path, mirroring `appomni.py`'s DRF `next` URL
+  but relative rather than absolute. Snyk has no "all orgs" endpoint for
+  members/projects/issues, so each fans out one call (`members`) or one
+  paginated loop (`projects`/`issues`) per org id across a thread pool —
+  the same per-item fan-out shape as `knowbe4.py`'s `pst_recipients` (fan
+  out, then paginate internally per item), not `derived_from`, since each
+  org's members/projects/issues are their own network call rather than
+  data nested in the org list response. `_org_id` is injected client-side
+  into every member/project/issue record.
+  **Caveat:** `MANIFEST` column paths in `snyk.py` were built from Snyk's
+  public API reference and a prior in-house extraction script, not a live
+  schema introspection against a real tenant — same caveat as `wiz.py` and
+  `appomni.py`. Verify field names/nesting against a real tenant's response
+  before relying on this collector.
+
+- **Cloudflare** — raw `requests` against REST API v4, static API token auth
+  (`Authorization: Bearer ...`), same "just set the header" shape as
+  AppOmni/Snyk. Base URL is global (`https://api.cloudflare.com/client/v4`)
+  — no tenant subdomain or cross-tenant discovery, since the token itself is
+  scoped to whatever zones it was issued against. `zones` is the only real
+  top-level paginated resource (`page`/`per_page` with a `result_info`
+  envelope). Cloudflare has no "all zones' records" endpoint, so
+  `dns_records` and `cdn_protected_domains` each fan out one paginated call
+  per zone id across a thread pool — the same per-item fan-out shape as
+  `snyk.py`'s `projects`/`issues` (`requires: "zones"`, not `derived_from`,
+  since each zone's records are their own network call). `dns_records` and
+  `cdn_protected_domains` hit the same `/zones/{zone_id}/dns_records`
+  endpoint with different default filters — `cdn_protected_domains` passes
+  `proxied=true` server-side to return only the records actually routed
+  through Cloudflare's CDN — mirroring `appomni.py`'s
+  `policies`/`posture_policies` pair.
+  **Caveat:** `MANIFEST` column paths in `cloudflare.py` were built from
+  Cloudflare's public API reference, not a live schema introspection
+  against a real tenant — same caveat as `wiz.py`, `appomni.py`, and
+  `snyk.py`. Verify field names/nesting against a real tenant's response
+  before relying on this collector.
+
+- **DNSimple** — raw `requests` against REST API v2, static bearer token
+  auth (`Authorization: Bearer <token>`), same "just set the header" shape
+  as AppOmni/Snyk/Cloudflare. Every v2 endpoint is scoped under an account
+  id that isn't known up front, so `_authenticate` calls `whoami` once to
+  discover it and caches it on the instance for every subsequent request —
+  the same "discover, then route" shape as Crowdstrike's cloud-region
+  lookup, just an account id instead of a base URL. Base URL defaults to
+  DNSimple's production endpoint but is overridable via `endpoint` config
+  (DNSimple also runs a sandbox environment at a different host).
+  `domains` is the only resource — page/per_page with a `pagination`
+  envelope (`total_pages`), the same shape as `cloudflare.py`'s `zones`.
+  The reference implementation this collector was ported from also did
+  live DNS resolution (MX/TXT/DMARC/DKIM lookups against a hardcoded public
+  resolver) per domain; that was deliberately left out here since it
+  requires a new dependency (`dnspython`) outside posture's approved
+  dependency list and isn't a DNSimple API response at all — revisit only
+  with explicit approval to add the dependency.
+  **Caveat:** `MANIFEST` column paths in `dnsimple.py` were built from
+  DNSimple's public API reference, not a live schema introspection against
+  a real account — same caveat as `wiz.py`, `appomni.py`, `snyk.py`, and
+  `cloudflare.py`. Verify field names/nesting against a real account's
+  response before relying on this collector.
+
+- **PhriendlyPhishing** — raw `requests` against REST API v0.1, OAuth2
+  client-credentials auth, but against a dedicated auth host
+  (`auth.api.phriendlyphishing.com`) separate from the API host
+  (`api.phriendlyphishing.com`) — the same "auth host differs from API
+  host" shape as Wiz, just without Wiz's regional discovery, since
+  PhriendlyPhishing has one fixed pair of hosts. Pagination is a plain
+  `page`/`page_size` scheme, the same shape as `knowbe4.py`'s list
+  resources. `clicks` also takes a server-side `start_time`/`end_time`
+  date range; the collector defaults it to the trailing 366 days (plus
+  one day forward, mirroring the reference extraction script this
+  collector was ported from) but kwargs win over that default per the
+  locked kwargs-override-defaults rule.
+  **Caveat:** `MANIFEST` column paths in `phriendly_phishing.py` were
+  built from the reference extraction script, not a live schema
+  introspection against a real tenant — same caveat as `wiz.py`,
+  `appomni.py`, `snyk.py`, `cloudflare.py`, and `dnsimple.py`. Verify
+  field names/nesting against a real tenant's response before relying on
+  this collector.
+
+- **Vanta** — raw `requests` against REST API v1, OAuth2 client-credentials
+  auth against a fixed global host (`https://api.vanta.com/oauth/token`,
+  scope `vanta-api.all:read vanta-api.all:write`) — the same
+  client-credentials shape as `wiz.py`, but with no regional/tenant
+  discovery or `token_url` override, since Vanta has one shared API host
+  for every tenant. Every resource (`controls`, `documents`, `frameworks`,
+  `groups`, `integrations`, `monitored_computers`, `people`, `tests`,
+  `vulnerabilities`, `vulnerable_assets`, `vulnerability_remediations`) is
+  its own top-level paginated endpoint — no fan-out, no `derived_from`.
+  Pagination is cursor-based (`pageSize`/`pageCursor` query params) with a
+  `results.data` / `results.pageInfo.hasNextPage` / `results.pageInfo.endCursor`
+  envelope, ported from an existing in-house extraction script.
+  **Caveat:** `MANIFEST` column paths in `vanta.py` were built from Vanta's
+  public API reference and that extraction script, not a live schema
+  introspection against a real tenant — same caveat as `wiz.py`,
+  `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`, and
+  `phriendly_phishing.py`. Verify field names/nesting against a real
+  tenant's response before relying on this collector.
 
 ## Version bumps
 

@@ -1,0 +1,30 @@
+{
+    "data": [
+        {
+            "id": "org-1",
+            "type": "org",
+            "attributes": {
+                "name": "Acme Corp",
+                "slug": "acme-corp"
+            },
+            "relationships": {
+                "group": {
+                    "data": {
+                        "id": "group-1"
+                    }
+                }
+            }
+        },
+        {
+            "id": "org-2",
+            "type": "org",
+            "attributes": {
+                "name": "Acme Sandbox",
+                "slug": "acme-sandbox"
+            }
+        }
+    ],
+    "links": {
+        "next": null
+    }
+}

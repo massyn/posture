@@ -1,0 +1,23 @@
+[
+    {
+        "id": "person-1",
+        "email": "alice@example.com",
+        "fullName": "Alice Example",
+        "givenName": "Alice",
+        "familyName": "Example",
+        "isVantaOwner": true,
+        "employmentStatus": "employed",
+        "hireDate": "2023-06-01T00:00:00Z"
+    },
+    {
+        "id": "person-2",
+        "email": "bob@example.com",
+        "fullName": "Bob Example",
+        "givenName": "Bob",
+        "familyName": "Example",
+        "isVantaOwner": false,
+        "employmentStatus": "terminated",
+        "hireDate": "2022-01-10T00:00:00Z",
+        "endDate": "2024-05-01T00:00:00Z"
+    }
+]

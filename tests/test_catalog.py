@@ -5,17 +5,26 @@ def test_catalog_lists_all_registered_sources() -> None:
     result = catalog()
 
     assert set(result) == {
+        "appomni",
         "azure_entra",
+        "cloudflare",
         "crowdstrike",
+        "dnsimple",
         "intune",
         "jamf",
         "knowbe4",
         "mde",
         "okta",
+        "phriendly_phishing",
         "qualys",
+        "sailpoint",
         "salesforce",
+        "snyk",
         "tenableio",
+        "tenablesc",
         "upguard",
+        "vanta",
+        "wiz",
         "workspaceone",
     }
 

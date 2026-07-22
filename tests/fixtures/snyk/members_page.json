@@ -1,0 +1,20 @@
+[
+    {
+        "id": "mem-1",
+        "username": "jsmith",
+        "name": "Jane Smith",
+        "email": "jane.smith@example.com",
+        "role": "admin",
+        "active": true,
+        "_org_id": "org-1"
+    },
+    {
+        "id": "mem-2",
+        "username": "bwayne",
+        "name": "Bruce Wayne",
+        "email": "bruce.wayne@example.com",
+        "role": "collaborator",
+        "active": false,
+        "_org_id": "org-1"
+    }
+]

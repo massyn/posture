@@ -1,0 +1,14 @@
+[
+  {
+    "asset_id": "1",
+    "asset_name": "Non Crowdstrike Assets",
+    "repository_name": "Primary Repo",
+    "ip": "10.8.16.26"
+  },
+  {
+    "asset_id": "1",
+    "asset_name": "Non Crowdstrike Assets",
+    "repository_name": "Primary Repo",
+    "ip": "10.8.16.27"
+  }
+]

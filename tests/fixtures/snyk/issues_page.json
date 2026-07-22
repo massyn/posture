@@ -1,0 +1,41 @@
+{
+    "data": [
+        {
+            "id": "issue-1",
+            "type": "issue",
+            "attributes": {
+                "title": "Prototype Pollution",
+                "type": "package_vulnerability",
+                "effective_severity_level": "high",
+                "status": "open",
+                "ignored": false,
+                "created_at": "2023-02-10T14:00:00.000Z",
+                "updated_at": "2023-02-11T09:00:00.000Z"
+            },
+            "relationships": {
+                "scan_item": {
+                    "data": {
+                        "id": "proj-1"
+                    }
+                }
+            },
+            "_org_id": "org-1"
+        },
+        {
+            "id": "issue-2",
+            "type": "issue",
+            "attributes": {
+                "title": "GPL-3.0 License",
+                "type": "license",
+                "effective_severity_level": "medium",
+                "status": "resolved",
+                "ignored": true,
+                "created_at": "2022-09-01T00:00:00.000Z"
+            },
+            "_org_id": "org-1"
+        }
+    ],
+    "links": {
+        "next": null
+    }
+}

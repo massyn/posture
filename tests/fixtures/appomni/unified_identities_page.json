@@ -1,0 +1,22 @@
+{
+    "results": [
+        {
+            "id": "uid-1",
+            "name": "alice.smith",
+            "email": "alice@example.com",
+            "identity_type": "human",
+            "num_users_linked": 3,
+            "risk_score": 72.5,
+            "created": "2023-01-15T09:30:00.000Z",
+            "updated": "2024-03-01T12:00:00.000Z"
+        },
+        {
+            "id": "uid-2",
+            "name": "svc-integration",
+            "identity_type": "service_account",
+            "num_users_linked": 1,
+            "created": "2022-06-01T08:00:00.000Z"
+        }
+    ],
+    "next": null
+}

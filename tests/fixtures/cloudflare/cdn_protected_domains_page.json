@@ -1,0 +1,15 @@
+[
+    {
+        "id": "rec-1",
+        "zone_name": "example.com",
+        "name": "www.example.com",
+        "type": "A",
+        "content": "203.0.113.10",
+        "ttl": 1,
+        "proxied": true,
+        "created_on": "2024-01-15T10:05:00Z",
+        "modified_on": "2024-02-01T08:35:00Z",
+        "_zone_id": "zone-1",
+        "_zone_name": "example.com"
+    }
+]

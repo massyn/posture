@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1",
+    "uuid": "asset-uuid-1",
+    "name": "Non Crowdstrike Assets",
+    "description": "Assets not covered by Crowdstrike",
+    "type": "static",
+    "status": "1",
+    "createdTime": "1699000000",
+    "modifiedTime": "1700100000",
+    "owner": {"id": "10", "name": "Alice Smith"},
+    "ownerGroup": {"id": "0", "name": "Full Access"},
+    "ipCount": "2",
+    "targetGroup": [],
+    "groups": [],
+    "repositories": [{"id": "1", "name": "Primary Repo"}],
+    "tags": "",
+    "creator": {"id": "10", "name": "Alice Smith"}
+  },
+  {
+    "id": "2",
+    "uuid": "asset-uuid-2",
+    "name": "All Servers",
+    "description": "",
+    "type": "combination",
+    "status": "1",
+    "createdTime": "1699000000",
+    "modifiedTime": "1700100000",
+    "owner": {"id": "10", "name": "Alice Smith"},
+    "ownerGroup": {"id": "0", "name": "Full Access"},
+    "ipCount": "0",
+    "targetGroup": [],
+    "groups": [],
+    "repositories": [],
+    "tags": "",
+    "creator": {"id": "10", "name": "Alice Smith"}
+  }
+]

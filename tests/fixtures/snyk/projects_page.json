@@ -1,0 +1,35 @@
+{
+    "data": [
+        {
+            "id": "proj-1",
+            "type": "project",
+            "attributes": {
+                "name": "acme/webapp",
+                "type": "npm",
+                "origin": "github",
+                "status": "active",
+                "created": "2022-04-01T10:00:00.000Z",
+                "target_reference": "main",
+                "business_criticality": ["high"],
+                "environment": ["backend"],
+                "lifecycle": ["production"]
+            },
+            "_org_id": "org-1"
+        },
+        {
+            "id": "proj-2",
+            "type": "project",
+            "attributes": {
+                "name": "acme/mobile-app",
+                "type": "maven",
+                "origin": "cli",
+                "status": "inactive",
+                "created": "2021-11-15T08:30:00.000Z"
+            },
+            "_org_id": "org-1"
+        }
+    ],
+    "links": {
+        "next": null
+    }
+}

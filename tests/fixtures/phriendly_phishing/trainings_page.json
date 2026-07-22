@@ -1,0 +1,30 @@
+[
+    {
+        "id": "trn-1001",
+        "user_id": "usr-501",
+        "email": "alice@example.com",
+        "first_name": "Alice",
+        "last_name": "Anderson",
+        "group": "Engineering",
+        "training_name": "Phishing Fundamentals",
+        "status": "completed",
+        "assigned_date": "2026-01-05T00:00:00Z",
+        "started_date": "2026-01-06T09:15:00Z",
+        "completed_date": "2026-01-06T09:42:00Z",
+        "score": 92.5
+    },
+    {
+        "id": "trn-1002",
+        "user_id": "usr-502",
+        "email": "bob@example.com",
+        "first_name": "Bob",
+        "last_name": "Baker",
+        "group": "Sales",
+        "training_name": "Phishing Fundamentals",
+        "status": "assigned",
+        "assigned_date": "2026-01-05T00:00:00Z",
+        "started_date": null,
+        "completed_date": null,
+        "score": null
+    }
+]

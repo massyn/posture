@@ -1,0 +1,50 @@
+[
+  {
+    "id": "101",
+    "uuid": "host-uuid-1",
+    "tenableUUID": "tenable-uuid-1",
+    "name": "host1",
+    "ipAddress": "10.0.0.5",
+    "os": "Linux",
+    "firstSeen": "1700000000",
+    "lastSeen": "1700100000",
+    "macAddress": "00:11:22:33:44:55",
+    "source": "NESSUS_SCAN",
+    "repID": "1",
+    "netBios": "",
+    "netBiosWorkgroup": "",
+    "createdTime": "1699000000",
+    "modifiedTime": "1700100000",
+    "acr": "5",
+    "aes": "600",
+    "repository": {
+      "id": "1",
+      "name": "Primary Repo",
+      "description": "Main repository"
+    }
+  },
+  {
+    "id": "102",
+    "uuid": "host-uuid-2",
+    "tenableUUID": "tenable-uuid-2",
+    "name": "host2",
+    "ipAddress": "10.0.0.6",
+    "os": "Windows",
+    "firstSeen": "1700000000",
+    "lastSeen": "1700100000",
+    "macAddress": "00:11:22:33:44:66",
+    "source": "NESSUS_SCAN",
+    "repID": "1",
+    "netBios": "HOST2",
+    "netBiosWorkgroup": "WORKGROUP",
+    "createdTime": "1699000000",
+    "modifiedTime": "1700100000",
+    "acr": "3",
+    "aes": "400",
+    "repository": {
+      "id": "1",
+      "name": "Primary Repo",
+      "description": "Main repository"
+    }
+  }
+]

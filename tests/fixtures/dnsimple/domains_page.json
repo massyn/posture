@@ -1,0 +1,28 @@
+[
+    {
+        "id": 181984,
+        "account_id": 1385,
+        "registrant_id": 2715,
+        "name": "example.com",
+        "unicode_name": "example.com",
+        "state": "registered",
+        "auto_renew": true,
+        "private_whois": false,
+        "expires_on": "2027-06-01",
+        "expires_at": "2027-06-01T02:00:00Z",
+        "created_at": "2019-06-01T02:00:00Z",
+        "updated_at": "2025-05-01T02:00:00Z"
+    },
+    {
+        "id": 181985,
+        "account_id": 1385,
+        "registrant_id": null,
+        "name": "hosted-only.example",
+        "unicode_name": "hosted-only.example",
+        "state": "hosted",
+        "auto_renew": false,
+        "private_whois": false,
+        "created_at": "2020-02-10T08:00:00Z",
+        "updated_at": "2020-02-10T08:00:00Z"
+    }
+]

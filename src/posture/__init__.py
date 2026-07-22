@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=False))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.4.6"
+__version__ = "0.5.0"
 
 __all__ = [
     "CCM",
@@ -48,30 +48,48 @@ _SOURCES: dict[str, type[Collector]] = {}
 def _register_sources() -> None:
     if _SOURCES:
         return
+    from posture.collectors.appomni import AppOmniCollector
     from posture.collectors.azure_entra import AzureEntraCollector
+    from posture.collectors.cloudflare import CloudflareCollector
     from posture.collectors.crowdstrike import CrowdstrikeCollector
+    from posture.collectors.dnsimple import DnsimpleCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
     from posture.collectors.knowbe4 import Knowbe4Collector
     from posture.collectors.mde import MdeCollector
     from posture.collectors.okta import OktaCollector
+    from posture.collectors.phriendly_phishing import PhriendlyPhishingCollector
     from posture.collectors.qualys import QualysCollector
+    from posture.collectors.sailpoint import SailpointCollector
     from posture.collectors.salesforce import SalesforceCollector
+    from posture.collectors.snyk import SnykCollector
     from posture.collectors.tenableio import TenableioCollector
+    from posture.collectors.tenablesc import TenablescCollector
     from posture.collectors.upguard import UpGuardCollector
+    from posture.collectors.vanta import VantaCollector
+    from posture.collectors.wiz import WizCollector
     from posture.collectors.workspaceone import WorkspaceOneCollector
 
+    _SOURCES["appomni"] = AppOmniCollector
     _SOURCES["azure_entra"] = AzureEntraCollector
+    _SOURCES["cloudflare"] = CloudflareCollector
     _SOURCES["crowdstrike"] = CrowdstrikeCollector
+    _SOURCES["dnsimple"] = DnsimpleCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector
     _SOURCES["knowbe4"] = Knowbe4Collector
     _SOURCES["mde"] = MdeCollector
     _SOURCES["okta"] = OktaCollector
+    _SOURCES["phriendly_phishing"] = PhriendlyPhishingCollector
     _SOURCES["qualys"] = QualysCollector
+    _SOURCES["sailpoint"] = SailpointCollector
     _SOURCES["salesforce"] = SalesforceCollector
+    _SOURCES["snyk"] = SnykCollector
     _SOURCES["tenableio"] = TenableioCollector
+    _SOURCES["tenablesc"] = TenablescCollector
     _SOURCES["upguard"] = UpGuardCollector
+    _SOURCES["vanta"] = VantaCollector
+    _SOURCES["wiz"] = WizCollector
     _SOURCES["workspaceone"] = WorkspaceOneCollector
 
 

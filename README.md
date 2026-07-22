@@ -54,6 +54,19 @@ SALESFORCE_SCHEMA_FILE=/path/to/salesforce.json  # optional, see below
 QUALYS_USERNAME=xxx
 QUALYS_PASSWORD=xxx
 QUALYS_BASE_URL=https://qualysapi.qualys.com  # platform URL, varies by subscription
+WIZ_CLIENT_ID=xxx
+WIZ_CLIENT_SECRET=xxx
+WIZ_API_ENDPOINT=https://api.us1.app.wiz.io/graphql
+WIZ_TOKEN_URL=https://auth.app.wiz.io/oauth/token  # optional, see below
+SAILPOINT_BASE_URL=https://your-tenant.api.identitynow.com
+SAILPOINT_CLIENT_ID=xxx
+SAILPOINT_CLIENT_SECRET=xxx
+SNYK_TOKEN=xxx
+SNYK_ENDPOINT=https://api.snyk.io  # optional, see below
+DNSIMPLE_TOKEN=xxx
+DNSIMPLE_ENDPOINT=https://api.dnsimple.com/v2/  # optional, see below
+PHRIENDLY_PHISHING_CLIENT_ID=xxx
+PHRIENDLY_PHISHING_CLIENT_SECRET=xxx
 ```
 
 ## Usage
@@ -134,7 +147,16 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `knowbe4` | `training_enrollments`, `psts`, `pst_recipients` |
 | `salesforce` | one per object declared in `salesforce.json` (default: `fixed_asset__c`, `krow__location__c`, `krow__project_resources__c`, `domain__c`, `krow__team__c`) |
 | `tenableio` | `assets`, `vulnerabilities` |
+| `tenablesc` | `vulnerabilities`, `hosts`, `assets`, `asset_ips` |
 | `qualys` | `hosts`, `vulnerabilities`, `vulnerability_detections` |
+| `wiz` | `cloud_security_issues`, `inventory`, `vulnerabilities` |
+| `sailpoint` | `identities`, `accounts`, `access_profiles`, `roles` |
+| `appomni` | `monitored_services`, `policies`, `open_policy_issues`, `posture_policies`, `unified_identities` |
+| `snyk` | `organizations`, `members`, `projects`, `issues` |
+| `cloudflare` | `zones`, `dns_records`, `cdn_protected_domains` |
+| `dnsimple` | `domains` |
+| `phriendly_phishing` | `trainings`, `clicks` |
+| `vanta` | `controls`, `documents`, `frameworks`, `groups`, `integrations`, `monitored_computers`, `people`, `tests`, `vulnerabilities`, `vulnerable_assets`, `vulnerability_remediations` |
 
 ### Crowdstrike configuration
 
@@ -243,6 +265,24 @@ Requires the optional `pytenable` dependency — install with
 | `access_key` | `TENABLEIO_ACCESS_KEY` |
 | `secret_key` | `TENABLEIO_SECRET_KEY` |
 
+### Tenable.sc configuration
+
+Requires the optional `pytenable` dependency — install with
+`pip install "posture[tenablesc]"`.
+
+| Constructor key | Env var |
+|---|---|
+| `endpoint` | `TENABLESC_ENDPOINT` |
+| `access_key` | `TENABLESC_ACCESS_KEY` |
+| `secret_key` | `TENABLESC_SECRET_KEY` |
+
+`vulnerabilities` takes optional `filters` / `tool` kwargs (defaults: exclude
+informational severity, last seen in 30 days; `vulndetails` tool). `hosts` and
+`asset_ips` are scoped to a named Tenable.sc asset list via an `asset_name`
+kwarg (default `"Non Crowdstrike Assets"`). See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes)
+for why `asset_ips` isn't a `derived_from` of `assets`.
+
 ### Qualys configuration
 
 Auth is HTTP Basic.
@@ -257,6 +297,115 @@ Auth is HTTP Basic.
 CVE), not a per-host finding; `vulnerability_detections` is the per-host one. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for
 how both are fetched.
+
+### Wiz configuration
+
+| Constructor key | Env var |
+|---|---|
+| `client_id` | `WIZ_CLIENT_ID` |
+| `client_secret` | `WIZ_CLIENT_SECRET` |
+| `api_endpoint` | `WIZ_API_ENDPOINT` (required — tenant/region-specific GraphQL endpoint, e.g. `https://api.us1.app.wiz.io/graphql`, shown in your Wiz console under Settings -> API) |
+| `token_url` | `WIZ_TOKEN_URL` (optional — defaults to the shared Auth0 endpoint; override if your tenant is provisioned on Cognito, per the console) |
+
+Direct cursor-paginated GraphQL queries (no report-export flow). See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for a
+caveat on the GraphQL field paths used here.
+
+### SailPoint configuration
+
+| Constructor key | Env var |
+|---|---|
+| `base_url` | `SAILPOINT_BASE_URL` (required — tenant API URL, e.g. `https://your-tenant.api.identitynow.com`) |
+| `client_id` | `SAILPOINT_CLIENT_ID` |
+| `client_secret` | `SAILPOINT_CLIENT_SECRET` |
+
+Targets Identity Security Cloud (ISC, the cloud SaaS product formerly known as
+IdentityNow) — not IdentityIQ. OAuth2 client-credentials against
+`<base_url>/oauth/token`, then offset/limit-paginated REST API v3 calls.
+
+### AppOmni configuration
+
+| Constructor key | Env var |
+|---|---|
+| `access_token` | `APPOMNI_ACCESS_TOKEN` (static bearer token issued in the AppOmni console) |
+| `instance` | `APPOMNI_INSTANCE` (tenant subdomain, e.g. `acme` for `acme.appomni.com`) |
+
+Static bearer token auth (no OAuth flow). `policies` and `posture_policies` hit the
+same `/policy/` endpoint with different default filters (reference policies vs.
+monitored-service-config policies). See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for a
+caveat on the manifest field paths used here.
+
+### Snyk configuration
+
+| Constructor key | Env var |
+|---|---|
+| `token` | `SNYK_TOKEN` |
+| `endpoint` | `SNYK_ENDPOINT` (optional — defaults to `https://api.snyk.io`) |
+
+Static token auth (`Authorization: token ...`). `members`, `projects`, and `issues`
+have no "all orgs" endpoint, so each fans out per organisation id across a thread
+pool — org ids are read from `organizations` internally unless an `org_ids` kwarg is
+given; concurrency defaults to 8 workers, overridable via a `max_workers` kwarg. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for a
+caveat on the manifest field paths used here.
+
+### Cloudflare configuration
+
+| Constructor key | Env var |
+|---|---|
+| `api_token` | `CLOUDFLARE_API_TOKEN` |
+
+Static API token auth (`Authorization: Bearer ...`), global API base URL (no tenant
+subdomain). `dns_records` and `cdn_protected_domains` have no "all zones" endpoint, so
+each fans out per zone id across a thread pool — zone ids are read from `zones`
+internally unless a `zone_ids` kwarg is given; concurrency defaults to 8 workers,
+overridable via a `max_workers` kwarg. `cdn_protected_domains` hits the same
+`/zones/{zone_id}/dns_records` endpoint as `dns_records` with `proxied=true` passed
+server-side, returning only the records actually routed through Cloudflare's CDN. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes) for a
+caveat on the manifest field paths used here.
+
+### DNSimple configuration
+
+| Constructor key | Env var |
+|---|---|
+| `token` | `DNSIMPLE_TOKEN` |
+| `endpoint` | `DNSIMPLE_ENDPOINT` (optional — defaults to `https://api.dnsimple.com/v2/`) |
+
+Static bearer token auth. Every v2 endpoint is scoped under an account id, so
+`_authenticate` calls DNSimple's `whoami` once to discover it before the first
+request. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes)
+for a caveat on the manifest field paths used here.
+
+### PhriendlyPhishing configuration
+
+| Constructor key | Env var |
+|---|---|
+| `client_id` | `PHRIENDLY_PHISHING_CLIENT_ID` |
+| `client_secret` | `PHRIENDLY_PHISHING_CLIENT_SECRET` |
+
+OAuth2 client-credentials against a dedicated auth host
+(`auth.api.phriendlyphishing.com`), separate from the API host. `clicks`
+defaults its server-side `start_time`/`end_time` range to the trailing 366
+days (plus one day forward); pass `start_time`/`end_time` kwargs
+(`YYYY-MM-DD`) to override. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes)
+for a caveat on the manifest field paths used here.
+
+### Vanta configuration
+
+| Constructor key | Env var |
+|---|---|
+| `client_id` | `VANTA_CLIENT_ID` |
+| `client_secret` | `VANTA_CLIENT_SECRET` |
+
+OAuth2 client-credentials against Vanta's global token host
+(`https://api.vanta.com/oauth/token`) — no tenant subdomain or regional
+discovery. Every resource is a real top-level paginated endpoint (cursor-based
+`pageSize`/`pageCursor`), no fan-out. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#collector-implementation-notes)
+for a caveat on the manifest field paths used here.
 
 ## Development
 

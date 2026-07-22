@@ -1,0 +1,20 @@
+{
+    "results": [
+        {
+            "id": "iss-1",
+            "policy": {"id": "pol-1", "name": "MFA Required"},
+            "severity": "high",
+            "status": "open",
+            "monitored_service": {"id": "svc-1", "name": "Salesforce Prod"},
+            "created": "2024-02-01T10:00:00.000Z",
+            "resolved": null
+        },
+        {
+            "id": "iss-2",
+            "severity": "medium",
+            "status": "open",
+            "created": "2024-02-10T11:00:00.000Z"
+        }
+    ],
+    "next": "https://acme.appomni.com/api/v1/core/ruleevent/?offset=2&limit=25"
+}

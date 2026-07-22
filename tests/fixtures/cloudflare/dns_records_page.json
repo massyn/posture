@@ -1,0 +1,35 @@
+[
+    {
+        "id": "rec-1",
+        "zone_name": "example.com",
+        "name": "www.example.com",
+        "type": "A",
+        "content": "203.0.113.10",
+        "ttl": 1,
+        "proxiable": true,
+        "proxied": true,
+        "locked": false,
+        "comment": "primary web host",
+        "tags": ["prod"],
+        "created_on": "2024-01-15T10:05:00Z",
+        "modified_on": "2024-02-01T08:35:00Z",
+        "_zone_id": "zone-1",
+        "_zone_name": "example.com"
+    },
+    {
+        "id": "rec-2",
+        "zone_name": "example.com",
+        "name": "mail.example.com",
+        "type": "MX",
+        "content": "mail.example.com",
+        "ttl": 3600,
+        "proxiable": false,
+        "proxied": false,
+        "locked": false,
+        "tags": [],
+        "created_on": "2024-01-15T10:06:00Z",
+        "modified_on": "2024-01-15T10:06:00Z",
+        "_zone_id": "zone-1",
+        "_zone_name": "example.com"
+    }
+]

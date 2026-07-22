@@ -1,0 +1,19 @@
+[
+    {
+        "id": "control-1",
+        "name": "Access control policy",
+        "description": "Company maintains an access control policy",
+        "question": "Does the company have an access control policy?",
+        "createdAt": "2024-01-15T10:00:00Z",
+        "updatedAt": "2024-02-01T08:30:00Z"
+    },
+    {
+        "id": "control-2",
+        "name": "Encryption at rest",
+        "description": "Data is encrypted at rest",
+        "question": "Is data encrypted at rest?",
+        "createdAt": "2024-01-16T10:00:00Z",
+        "updatedAt": "2024-01-16T10:00:00Z",
+        "deletedAt": "2024-03-01T00:00:00Z"
+    }
+]

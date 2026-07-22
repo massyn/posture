@@ -1,0 +1,19 @@
+[
+    {
+        "id": "role-1",
+        "name": "Finance Analyst",
+        "description": "Standard access for finance analysts",
+        "created": "2022-01-01T00:00:00.000Z",
+        "modified": "2023-05-01T00:00:00.000Z",
+        "enabled": true,
+        "requestable": true,
+        "owner": {"id": "id-2", "name": "Bob Jones"}
+    },
+    {
+        "id": "role-2",
+        "name": "Deprecated Role",
+        "created": "2019-01-01T00:00:00.000Z",
+        "enabled": false,
+        "requestable": false
+    }
+]

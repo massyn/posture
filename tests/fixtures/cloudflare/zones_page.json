@@ -1,0 +1,28 @@
+[
+    {
+        "id": "zone-1",
+        "name": "example.com",
+        "status": "active",
+        "paused": false,
+        "type": "full",
+        "development_mode": 0,
+        "name_servers": ["ns1.cloudflare.com", "ns2.cloudflare.com"],
+        "original_name_servers": ["ns1.example-registrar.com"],
+        "account": {"id": "acct-1", "name": "Acme Corp"},
+        "plan": {"id": "plan-1", "name": "Free Website"},
+        "created_on": "2024-01-15T10:00:00Z",
+        "modified_on": "2024-02-01T08:30:00Z",
+        "activated_on": "2024-01-16T09:00:00Z"
+    },
+    {
+        "id": "zone-2",
+        "name": "example.org",
+        "status": "pending",
+        "paused": true,
+        "type": "full",
+        "development_mode": 0,
+        "name_servers": [],
+        "created_on": "2024-03-01T00:00:00Z",
+        "modified_on": "2024-03-01T00:00:00Z"
+    }
+]

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "posture"
-version = "0.4.6"
+version = "0.5.0"
 description = "Runtime-agnostic Python library for CCM (Continuous Control Monitoring) data collection."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,9 @@ dependencies = [
 
 [project.optional-dependencies]
 tenableio = [
+    "pytenable>=1.4",
+]
+tenablesc = [
     "pytenable>=1.4",
 ]
 salesforce = [
