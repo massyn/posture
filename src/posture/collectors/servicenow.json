@@ -1,0 +1,23 @@
+{
+    "cmdb_ci": {
+        "sys_id": "str",
+        "name": "str",
+        "sys_class_name": "str",
+        "operational_status": "str",
+        "install_status": "str",
+        "sys_created_on": "datetime",
+        "sys_updated_on": "datetime"
+    },
+    "cmdb_ci_service": {
+        "sys_id": "str",
+        "name": "str",
+        "operational_status": "str",
+        "sys_updated_on": "datetime"
+    },
+    "cmdb_rel_ci": {
+        "sys_id": "str",
+        "parent": "str",
+        "child": "str",
+        "type": "str"
+    }
+}

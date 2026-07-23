@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=False))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.5.0"
+__version__ = "0.5.2"
 
 __all__ = [
     "CCM",
@@ -62,6 +62,7 @@ def _register_sources() -> None:
     from posture.collectors.qualys import QualysCollector
     from posture.collectors.sailpoint import SailpointCollector
     from posture.collectors.salesforce import SalesforceCollector
+    from posture.collectors.servicenow import ServicenowCollector
     from posture.collectors.snyk import SnykCollector
     from posture.collectors.tenableio import TenableioCollector
     from posture.collectors.tenablesc import TenablescCollector
@@ -84,6 +85,7 @@ def _register_sources() -> None:
     _SOURCES["qualys"] = QualysCollector
     _SOURCES["sailpoint"] = SailpointCollector
     _SOURCES["salesforce"] = SalesforceCollector
+    _SOURCES["servicenow"] = ServicenowCollector
     _SOURCES["snyk"] = SnykCollector
     _SOURCES["tenableio"] = TenableioCollector
     _SOURCES["tenablesc"] = TenablescCollector
@@ -93,8 +95,17 @@ def _register_sources() -> None:
     _SOURCES["workspaceone"] = WorkspaceOneCollector
 
 
-def CCM(source: str, config: dict[str, Any] | None = None) -> Collector:
-    """Construct a collector for ``source``. One instance = one snapshot."""
+def CCM(
+    source: str,
+    config: dict[str, Any] | None = None,
+    *,
+    record_limit: int | None = None,
+) -> Collector:
+    """Construct a collector for ``source``. One instance = one snapshot.
+
+    ``record_limit`` caps raw records per resource — for a quick smoke test
+    of a source's extraction, not a full collection run.
+    """
     _register_sources()
     try:
         collector_cls = _SOURCES[source]
@@ -102,7 +113,7 @@ def CCM(source: str, config: dict[str, Any] | None = None) -> Collector:
         raise ValueError(
             f"Unknown source '{source}'. Available: {sorted(_SOURCES)}"
         ) from None
-    return collector_cls(config)
+    return collector_cls(config, record_limit=record_limit)
 
 
 def catalog() -> dict[str, Any]:

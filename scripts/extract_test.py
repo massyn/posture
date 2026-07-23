@@ -9,8 +9,10 @@ test, either in the environment or a .env file in the current directory; see
 names. A source with no credentials configured is skipped, not fatal.
 
     python scripts/extract_test.py
+    python scripts/extract_test.py --limit 10
 """
 
+import argparse
 import json
 import logging
 import os
@@ -25,6 +27,15 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+
+_args = argparse.ArgumentParser(description=__doc__)
+_args.add_argument(
+    "--limit",
+    type=int,
+    default=None,
+    help="cap raw records per resource, for a quick smoke test instead of a full run",
+)
+record_limit = _args.parse_args().limit
 
 
 def _json_default(value: object) -> str:
@@ -97,7 +108,7 @@ for source, info in catalog().items():
         continue
 
     try:
-        ccm = CCM(source)
+        ccm = CCM(source, record_limit=record_limit)
     except ValueError as exc:
         print(f"{source}: SKIPPED — {exc}")
         summary.append(

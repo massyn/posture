@@ -96,7 +96,12 @@ class Collector(ABC):
     #: Required config keys, resolved from constructor dict or env vars.
     required_config_keys: tuple[str, ...] = ()
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        config: dict[str, Any] | None = None,
+        *,
+        record_limit: int | None = None,
+    ) -> None:
         self._config = self._resolve_config(config or {})
         self._session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_maxsize=_HTTP_POOL_MAXSIZE)
@@ -105,6 +110,14 @@ class Collector(ABC):
         self._authenticated = False
         self._cache: dict[tuple[str, tuple], _CacheEntry] = {}
         self._reports: dict[str, _CollectionReport] = {}
+        #: Caps raw records per resource, for a quick smoke test instead of a
+        #: full collection run. Truncates after whichever page crosses the
+        #: limit rather than requesting an exact count — a page or two of
+        #: over-fetch is a non-issue next to the runtime this is meant to
+        #: avoid. Fan-out resources (e.g. Intune's managed_device_detail)
+        #: inherit the cap for free: their per-id requests are driven by
+        #: their source resource's raw records, which are already truncated.
+        self._record_limit = record_limit
 
     def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
         resolved: dict[str, Any] = {}
@@ -199,6 +212,13 @@ class Collector(ABC):
                         "records": report.records,
                     },
                 )
+                if (
+                    self._record_limit is not None
+                    and len(records) >= self._record_limit
+                ):
+                    records = records[: self._record_limit]
+                    report.records = len(records)
+                    break
         except IncompleteCollection:
             raise
         except Exception as exc:  # noqa: BLE001 - convert to domain exception

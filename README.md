@@ -67,6 +67,13 @@ DNSIMPLE_TOKEN=xxx
 DNSIMPLE_ENDPOINT=https://api.dnsimple.com/v2/  # optional, see below
 PHRIENDLY_PHISHING_CLIENT_ID=xxx
 PHRIENDLY_PHISHING_CLIENT_SECRET=xxx
+SERVICENOW_INSTANCE=acme
+SERVICENOW_AUTH_TYPE=oauth2  # optional, defaults to oauth2 — see below
+SERVICENOW_CLIENT_ID=xxx
+SERVICENOW_CLIENT_SECRET=xxx
+SERVICENOW_USERNAME=xxx
+SERVICENOW_PASSWORD=xxx
+SERVICENOW_SCHEMA_FILE=/path/to/servicenow.json  # optional, see below
 ```
 
 ## Usage
@@ -157,6 +164,7 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `dnsimple` | `domains` |
 | `phriendly_phishing` | `trainings`, `clicks` |
 | `vanta` | `controls`, `documents`, `frameworks`, `groups`, `integrations`, `monitored_computers`, `people`, `tests`, `vulnerabilities`, `vulnerable_assets`, `vulnerability_remediations` |
+| `servicenow` | one per table declared in `servicenow.json` (default: `cmdb_ci`, `cmdb_ci_service`, `cmdb_rel_ci`) |
 
 ### Crowdstrike configuration
 
@@ -254,6 +262,36 @@ Resources aren't hand-written per endpoint: `salesforce.json` declares one entry
 per Salesforce object as a flat `{field_name: type}` map, and both the SOQL
 query and the manifest are generated from that file. Add an object by editing
 the JSON (or pointing `schema_file` at your own), not by changing collector code.
+
+### ServiceNow configuration
+
+Raw REST against the Table API — no vendor SDK. Supports two auth modes,
+chosen by `auth_type` (defaults to `"oauth2"` if unset):
+
+| Constructor key | Env var |
+|---|---|
+| `instance` | `SERVICENOW_INSTANCE` (the `<instance>` in `https://<instance>.service-now.com`) |
+| `auth_type` | `SERVICENOW_AUTH_TYPE` (optional — `"oauth2"` (default) or `"basic"`) |
+| `client_id` | `SERVICENOW_CLIENT_ID` (oauth2 only) |
+| `client_secret` | `SERVICENOW_CLIENT_SECRET` (oauth2 only) |
+| `username` | `SERVICENOW_USERNAME` |
+| `password` | `SERVICENOW_PASSWORD` |
+| `schema_file` | `SERVICENOW_SCHEMA_FILE` (optional — path to a JSON file overriding the shipped `servicenow.json`) |
+
+`oauth2` mode needs `client_id`/`client_secret`/`username`/`password` (ServiceNow's
+resource-owner password grant); `basic` mode needs only `username`/`password`.
+
+```python
+ccm = CCM("servicenow")                              # oauth2 (default)
+ccm = CCM("servicenow", {"auth_type": "basic"})       # basic auth instead
+```
+
+Resources aren't hand-written per endpoint: `servicenow.json` declares one entry
+per table as a flat `{field_name: type}` map, and the manifest (including the
+`sysparm_fields` list) is generated from that file. Add a table by editing the
+JSON (or pointing `schema_file` at your own), not by changing collector code.
+Filter results with the vendor's own query syntax via a `sysparm_query` kwarg,
+e.g. `ccm.collect("cmdb_ci", sysparm_query="active=true")`.
 
 ### Tenable.io configuration
 

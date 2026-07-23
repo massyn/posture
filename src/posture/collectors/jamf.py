@@ -28,6 +28,18 @@ logger = logging.getLogger("posture.collectors.jamf")
 
 _PAGE_SIZE = 100
 
+# Sections requested for computers-inventory-detail: without these the
+# response omits security/general/user/OS data entirely (cf02 needs all
+# four for FileVault, SIP, firewall, Gatekeeper, secure boot, last contact,
+# user email and OS version). The Jamf Pro API takes repeated `section`
+# query params, not a comma-joined value.
+_COMPUTER_DETAIL_SECTIONS = [
+    "SECURITY",
+    "GENERAL",
+    "USER_AND_LOCATION",
+    "OPERATING_SYSTEM",
+]
+
 _ENDPOINTS = {
     "computers_inventory": "/api/v2/computers-inventory",
     "computers_inventory_detail": "/api/v2/computers-inventory-detail/{id}",
@@ -55,12 +67,27 @@ MANIFEST: dict[str, dict[str, Any]] = {
     "computers_inventory_detail": {
         # Not derived_from "computers_inventory": each computer's detail is
         # its own network call by id, not data nested inside the inventory
-        # list record.
+        # list record. Requires the SECURITY, GENERAL, USER_AND_LOCATION and
+        # OPERATING_SYSTEM sections (see _COMPUTER_DETAIL_SECTIONS) — without
+        # them the response omits these fields entirely.
         "endpoint": _ENDPOINTS["computers_inventory_detail"],
         "columns": {
             "computer_inventory_detail_id": ("id", "str"),
             "serial_number": ("serialNumber", "str"),
             "device_udid": ("udid", "str"),
+            "hostname": ("general.name", "str"),
+            "last_contact_time": ("general.lastContactTime", "datetime"),
+            "user_email": ("userAndLocation.email", "str"),
+            "operating_system_version": ("operatingSystem.version", "str"),
+            "boot_partition_filevault2_state": (
+                "security.bootPartitionEncryptionDetails.partitionFileVault2State",
+                "str",
+            ),
+            "sip_status": ("security.sipStatus", "str"),
+            "firewall_enabled": ("security.firewallEnabled", "bool"),
+            "auto_login_disabled": ("security.autoLoginDisabled", "bool"),
+            "gatekeeper_status": ("security.gatekeeperStatus", "str"),
+            "secure_boot_level": ("security.secureBootLevel", "str"),
         },
     },
     "mobile_devices": {
@@ -180,10 +207,11 @@ class JamfCollector(Collector):
             return [], None
 
         detail_path = _ENDPOINTS["computers_inventory_detail"]
+        params: dict[str, Any] = {"section": _COMPUTER_DETAIL_SECTIONS}
         records: list[dict[str, Any]] = []
         for computer_id in computer_ids:
             url = self._base_url + detail_path.format(id=computer_id)
-            response = self._get(url)
+            response = self._get(url, params=params)
             records.append(response.json())
 
         return records, None

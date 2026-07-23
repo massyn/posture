@@ -314,6 +314,32 @@ why something is built the way it is, not how to configure or call it.
   Verify field names/nesting against a real tenant's response before relying
   on this collector, and correct `MANIFEST` if they don't match.
 
+- **ServiceNow** — raw `requests` against the Table API
+  (`/api/now/table/{table}`), no vendor SDK. Resources aren't hand-written
+  per endpoint: `servicenow.json` declares one entry per table as a flat
+  `{field_name: type}` map, the same pattern as `salesforce.json` (schema
+  drives `sysparm_fields` instead of a SOQL query), including the
+  `schema_file`/`SERVICENOW_SCHEMA_FILE` override. Supports two auth modes
+  chosen by `auth_type` (config key or `SERVICENOW_AUTH_TYPE`, default
+  `"oauth2"`): OAuth2 resource-owner password grant against
+  `/oauth_token.do` (`client_id`/`client_secret`/`username`/`password`) or
+  HTTP basic auth directly against the REST API user
+  (`username`/`password`). Base's flat `required_config_keys` can't express
+  "one of these two credential sets", so `servicenow.py` overrides
+  `_resolve_config` entirely rather than extending the base class — kept
+  local per the anti-overfitting rule since no other collector needs this
+  shape yet; `required_config_keys` itself only declares `instance`, so
+  `catalog()`'s required-config listing doesn't surface the credential keys
+  for either auth mode. Pagination is offset/limit
+  (`sysparm_offset`/`sysparm_limit`), the same shape as `sailpoint.py`.
+  Query filtering (ServiceNow's encoded-query syntax) is a `sysparm_query`
+  kwarg at `collect()` time, never a manifest default.
+  **Caveat:** `servicenow.json`'s table/field selection was built from
+  ServiceNow's public Table API documentation, not a live schema
+  introspection against a real instance — same caveat as `wiz.py` and
+  `appomni.py`. Verify field names against a real instance's response
+  before relying on this collector.
+
 - **SailPoint** — targets Identity Security Cloud (ISC, the cloud SaaS product
   formerly IdentityNow), not IdentityIQ (self-hosted, a different API entirely).
   Raw `requests` against REST API v3 — generic OAuth2 client-credentials REST,

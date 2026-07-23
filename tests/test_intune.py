@@ -54,7 +54,17 @@ def test_managed_device_detail_batches_ids_from_managed_devices() -> None:
     responses.add(
         responses.GET,
         "https://graph.microsoft.com/beta/deviceManagement/managedDevices/dev-1",
-        json={"id": "dev-1", "deviceName": "LAPTOP-1"},
+        json={
+            "id": "dev-1",
+            "deviceName": "LAPTOP-1",
+            "isEncrypted": True,
+            "complianceState": "compliant",
+            "deviceGuardVirtualizationBasedSecurityState": "running",
+            "deviceGuardLocalSystemAuthorityCredentialGuardState": "running",
+            "windowsActiveMalwareCount": 0,
+            "lastSyncDateTime": "2026-07-20T00:00:00Z",
+            "userPrincipalName": "user@example.com",
+        },
         status=200,
     )
 
@@ -66,6 +76,12 @@ def test_managed_device_detail_batches_ids_from_managed_devices() -> None:
 
     assert len(df) == 1
     assert df.loc[0, "device_name"] == "LAPTOP-1"
+    assert bool(df.loc[0, "is_encrypted"]) is True
+    assert df.loc[0, "compliance_state"] == "compliant"
+    assert df.loc[0, "device_guard_vbs_state"] == "running"
+    assert df.loc[0, "device_guard_credential_guard_state"] == "running"
+    assert df.loc[0, "windows_active_malware_count"] == 0
+    assert df.loc[0, "user_principal_name"] == "user@example.com"
 
 
 @responses.activate

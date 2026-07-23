@@ -19,6 +19,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "qualys",
         "sailpoint",
         "salesforce",
+        "servicenow",
         "snyk",
         "tenableio",
         "tenablesc",

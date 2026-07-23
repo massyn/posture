@@ -66,6 +66,24 @@ _DEVICE_COLUMNS = {
     "os_build_number": ("osBuildNumber", "str"),
 }
 
+# managed_device_detail hits the beta managedDevices/{id} endpoint, which
+# carries several top-level fields the v1.0 list endpoint doesn't — cf02
+# needs all of them, so they're only added here rather than to the shared
+# _DEVICE_COLUMNS used by the v1.0 managed_devices list.
+_DEVICE_DETAIL_COLUMNS = {
+    **_DEVICE_COLUMNS,
+    "is_encrypted": ("isEncrypted", "bool"),
+    "compliance_state": ("complianceState", "str"),
+    "device_guard_vbs_state": ("deviceGuardVirtualizationBasedSecurityState", "str"),
+    "device_guard_credential_guard_state": (
+        "deviceGuardLocalSystemAuthorityCredentialGuardState",
+        "str",
+    ),
+    "windows_active_malware_count": ("windowsActiveMalwareCount", "int"),
+    "last_sync_datetime": ("lastSyncDateTime", "datetime"),
+    "user_principal_name": ("userPrincipalName", "str"),
+}
+
 _CONFIGURATION_COLUMNS = {
     "configuration_id": ("id", "str"),
     "display_name": ("displayName", "str"),
@@ -108,7 +126,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
         # Not derived_from "managed_devices": each device's detail is its own
         # network call by id, not data nested inside the list record.
         "endpoint": _ENDPOINTS["managed_device_detail"],
-        "columns": _DEVICE_COLUMNS,
+        "columns": _DEVICE_DETAIL_COLUMNS,
     },
     "device_configuration_detail": {
         "endpoint": _ENDPOINTS["device_configuration_detail"],
@@ -275,7 +293,9 @@ class IntuneCollector(Collector):
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=_MAX_FANOUT_WORKERS
         ) as executor:
-            futures = {executor.submit(_fetch_one, record_id): record_id for record_id in ids}
+            futures = {
+                executor.submit(_fetch_one, record_id): record_id for record_id in ids
+            }
             try:
                 for future in concurrent.futures.as_completed(futures):
                     result = future.result()
