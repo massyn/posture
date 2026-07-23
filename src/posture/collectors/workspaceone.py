@@ -75,8 +75,10 @@ class WorkspaceOneCollector(Collector):
     # default below (accelerator parity), not fail-fast like the rest.
     required_config_keys = ("client_id", "client_secret", "api_server")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = ""
         self._token_url = (
             (config or {}).get("token_url")

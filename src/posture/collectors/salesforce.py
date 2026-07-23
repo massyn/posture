@@ -59,8 +59,10 @@ class SalesforceCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("username", "password", "token")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         # None = production (login.salesforce.com); "test" = sandbox
         # (test.salesforce.com); simple_salesforce also accepts a custom My
         # Domain string here for orgs that need one.

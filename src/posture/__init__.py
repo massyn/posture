@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=False))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.5.2"
+__version__ = "0.6.0"
 
 __all__ = [
     "CCM",
@@ -139,6 +139,9 @@ def catalog() -> dict[str, Any]:
                 resource: {
                     "derived_from": manifest.get("derived_from"),
                     "columns": list(manifest["columns"]),
+                    "column_types": {
+                        col: type_ for col, (_, type_) in manifest["columns"].items()
+                    },
                 }
                 for resource, manifest in cls.manifest.items()
             },

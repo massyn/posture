@@ -129,8 +129,10 @@ class SnykCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("token",)
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = (
             (config or {}).get("endpoint")
             or os.environ.get("SNYK_ENDPOINT")

@@ -215,8 +215,10 @@ class WizCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("client_id", "client_secret", "api_endpoint")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._token_url = self._config.get("token_url") or _DEFAULT_TOKEN_URL
         self._api_endpoint = self._config["api_endpoint"]
 

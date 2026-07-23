@@ -1,0 +1,18 @@
+[
+  {
+    "id": "hg-1",
+    "name": "Production servers",
+    "description": "All prod-tagged hosts",
+    "group_type": "dynamic",
+    "assignment_rule": "tags:'prod'",
+    "created_by": "admin@example.com",
+    "created_timestamp": "2026-01-01T00:00:00Z",
+    "modified_by": "admin@example.com",
+    "modified_timestamp": "2026-06-15T09:30:00Z"
+  },
+  {
+    "id": "hg-2",
+    "name": "Workstations",
+    "group_type": "static"
+  }
+]

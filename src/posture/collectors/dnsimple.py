@@ -64,8 +64,10 @@ class DnsimpleCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("token",)
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = self._config["endpoint"]
         self._account_id: str | None = None
 

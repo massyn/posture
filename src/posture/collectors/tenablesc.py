@@ -184,8 +184,10 @@ class TenablescCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("endpoint", "access_key", "secret_key")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._asset_id_cache: dict[str, str] = {}
 
     def _authenticate(self) -> None:

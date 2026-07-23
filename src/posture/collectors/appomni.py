@@ -136,8 +136,10 @@ class AppOmniCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("access_token", "instance")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = f"https://{self._config['instance']}.appomni.com"
 
     def _authenticate(self) -> None:

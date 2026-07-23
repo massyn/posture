@@ -4,9 +4,9 @@ Raw ``requests`` against the generic Falcon REST API — no FalconPy. Auth,
 retry, pagination, caching, and reporting all come from the base Collector;
 this module only knows Crowdstrike's endpoints and resource manifests.
 
-Resources: ``hosts``, ``vulnerabilities`` (+ derived ``vulnerability_remediations``),
-``zero_trust_assessment`` (+ derived ``zero_trust_assessment_os_signals`` and
-``zero_trust_assessment_sensor_signals``).
+Resources: ``hosts``, ``host_groups``, ``vulnerabilities`` (+ derived
+``vulnerability_remediations``), ``zero_trust_assessment`` (+ derived
+``zero_trust_assessment_os_signals`` and ``zero_trust_assessment_sensor_signals``).
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ _DEVICES_QUERY_PATH = "/devices/queries/devices/v1"
 _DEVICES_ENTITIES_PATH = "/devices/entities/devices/v2"
 _SPOTLIGHT_VULNERABILITIES_PATH = "/spotlight/combined/vulnerabilities/v1"
 _ZTA_ASSESSMENT_PATH = "/zero-trust-assessment/entities/assessments/v1"
+_HOST_GROUPS_COMBINED_PATH = "/devices/combined/host-groups/v1"
 
 _PAGE_LIMIT = 500
 _VULN_PAGE_LIMIT = 400
@@ -62,6 +63,20 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "host_status": ("status", "str"),
             "system_manufacturer": ("system_manufacturer", "str"),
             "system_product_name": ("system_product_name", "str"),
+        },
+    },
+    "host_groups": {
+        "endpoint": _HOST_GROUPS_COMBINED_PATH,
+        "columns": {
+            "id": ("id", "str"),
+            "name": ("name", "str"),
+            "description": ("description", "str"),
+            "group_type": ("group_type", "str"),
+            "assignment_rule": ("assignment_rule", "str"),
+            "created_by": ("created_by", "str"),
+            "created_at": ("created_timestamp", "datetime"),
+            "modified_by": ("modified_by", "str"),
+            "modified_at": ("modified_timestamp", "datetime"),
         },
     },
     "vulnerabilities": {
@@ -157,8 +172,10 @@ class CrowdstrikeCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("client_id", "client_secret")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = _REGION_BASE_URLS["us-1"]
 
     def _authenticate(self) -> None:
@@ -195,6 +212,8 @@ class CrowdstrikeCollector(Collector):
     ) -> tuple[list[dict[str, Any]], Any]:
         if resource == "hosts":
             return self._fetch_hosts_page(kwargs, cursor)
+        if resource == "host_groups":
+            return self._fetch_host_groups_page(kwargs, cursor)
         if resource == "vulnerabilities":
             return self._fetch_vulnerabilities_page(kwargs, cursor)
         if resource == "zero_trust_assessment":
@@ -216,6 +235,28 @@ class CrowdstrikeCollector(Collector):
         self._raise_for_transient_errors(entities_response)
         entities = entities_response.json().get("resources", [])
         return entities, next_cursor
+
+    def _fetch_host_groups_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
+        params: dict[str, Any] = {"limit": _PAGE_LIMIT}
+        if "filter" in kwargs:
+            params["filter"] = kwargs["filter"]
+        if cursor is not None:
+            params["offset"] = cursor
+
+        response = self._session.get(
+            self._base_url + _HOST_GROUPS_COMBINED_PATH, params=params, timeout=30
+        )
+        self._raise_for_transient_errors(response)
+        body = response.json()
+
+        resources = body.get("resources", [])
+        pagination = body.get("meta", {}).get("pagination", {})
+        total = pagination.get("total", 0)
+        offset = pagination.get("offset", 0)
+        next_cursor = offset if offset < total else None
+        return resources, next_cursor
 
     def _fetch_vulnerabilities_page(
         self, kwargs: dict[str, Any], cursor: Any
@@ -247,8 +288,8 @@ class CrowdstrikeCollector(Collector):
     ) -> tuple[list[dict[str, Any]], Any]:
         # CANDIDATE: promote a shared "collect hosts, then batch-call an
         # entity endpoint against their ids" helper if a third resource
-        # (host_groups) needs the same shape — this re-runs device-id
-        # discovery independently of the hosts resource.
+        # needs the same shape — this re-runs device-id discovery
+        # independently of the hosts resource.
         device_ids, next_cursor = self._query_device_ids(kwargs, cursor)
         if not device_ids:
             return [], None

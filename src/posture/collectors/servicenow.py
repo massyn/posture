@@ -77,8 +77,10 @@ class ServicenowCollector(Collector):
     # can't express "one of these two credential sets").
     required_config_keys = ("instance",)
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = f"https://{self._config['instance']}.service-now.com"
 
         schema_file = (config or {}).get("schema_file") or os.environ.get(

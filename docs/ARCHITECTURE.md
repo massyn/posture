@@ -173,6 +173,31 @@ over these is the dominant cost of the whole collection.
   promote the fan-out helper to `base.py` only once a second collector demonstrably
   needs the identical shape.
 
+### Collector `__init__` overrides must forward `record_limit`
+
+`Collector.__init__` (`base.py`) takes `config` and a keyword-only `record_limit:
+int | None = None`, and `CCM()` (`src/posture/__init__.py`) always passes
+`record_limit` through to the constructor. Any collector that overrides `__init__`
+(to set up a base URL, region, cache, etc.) MUST repeat both parameters and forward
+`record_limit` to `super().__init__()`:
+
+```python
+def __init__(
+    self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+) -> None:
+    super().__init__(config, record_limit=record_limit)
+    ...
+```
+
+Omitting `record_limit` from the override's signature doesn't silently no-op it —
+`CCM()` calls every collector with `record_limit` as a keyword argument, so a
+collector whose `__init__` doesn't accept it fails with `TypeError: unexpected
+keyword argument 'record_limit'` the moment it's constructed. This has bitten every
+collector in the codebase at once before (each one independently overrides
+`__init__`, so the base class can't enforce it) — when adding a new collector, copy
+the signature above rather than the older `def __init__(self, config: dict[str, Any]
+| None = None) -> None:` shape still visible in some diffs/history.
+
 ## Observability
 
 - **Exceptions** (`exceptions.py`): `AuthenticationError`, `RateLimitExhausted`,
@@ -223,6 +248,11 @@ Per-source rationale and mechanics that don't belong in the user-facing README �
 why something is built the way it is, not how to configure or call it.
 
 - **Crowdstrike** — cloud-region auto-discovery is covered under Guardrails above.
+  `host_groups` hits the combined endpoint (`/devices/combined/host-groups/v1`)
+  directly — group entities come back in one paginated call, offset/limit like
+  `_query_device_ids`, with no separate query-then-entities round trip (unlike
+  `hosts` and `zero_trust_assessment`, which query device ids first and batch-fetch
+  entities against them).
 - **Jamf** — only the fields the accelerator explicitly renamed are ported for
   `computers_inventory`, `computers_inventory_detail`, and `mobile_devices`. The
   reference implementation passes the rest of each response through via generic

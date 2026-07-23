@@ -170,6 +170,16 @@ def _coerce_datetime(
         if parsed is None and "format" in hints:
             parsed = _parse_with_format(text, hints["format"])
 
+    if parsed is not None and not (
+        pd.Timestamp.min.tz_localize("UTC")
+        <= parsed
+        <= pd.Timestamp.max.tz_localize("UTC")
+    ):
+        logger.warning(
+            "Out-of-range datetime for %s.%s: sample=%r", resource, column, value
+        )
+        return pd.NaT
+
     if parsed is None:
         logger.warning(
             "Unparseable datetime for %s.%s: sample=%r", resource, column, value

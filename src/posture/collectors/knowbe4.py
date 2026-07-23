@@ -144,8 +144,10 @@ class Knowbe4Collector(Collector):
     manifest = MANIFEST
     required_config_keys = ("token",)
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         region = (
             (config or {}).get("region")
             or os.environ.get("KNOWBE4_REGION")

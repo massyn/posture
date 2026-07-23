@@ -63,25 +63,37 @@ _DEVICE_COLUMNS = {
     "device_name": ("deviceName", "str"),
     "operating_system": ("operatingSystem", "str"),
     "os_version": ("osVersion", "str"),
-    "os_build_number": ("osBuildNumber", "str"),
+    "is_encrypted": ("isEncrypted", "bool"),
+    "compliance_state": ("complianceState", "str"),
+    "last_sync_datetime": ("lastSyncDateTime", "datetime"),
+    "user_principal_name": ("userPrincipalName", "str"),
 }
 
 # managed_device_detail hits the beta managedDevices/{id} endpoint, which
-# carries several top-level fields the v1.0 list endpoint doesn't — cf02
-# needs all of them, so they're only added here rather than to the shared
-# _DEVICE_COLUMNS used by the v1.0 managed_devices list.
+# carries a few fields the v1.0 list endpoint doesn't — cf02 needs them, so
+# they're only added here rather than to the shared _DEVICE_COLUMNS used by
+# the v1.0 managed_devices list.
+#
+# deviceGuardVirtualizationBasedSecurityState,
+# deviceGuardLocalSystemAuthorityCredentialGuardState, and osBuildNumber are
+# NOT top-level managedDevice properties in either API version (confirmed
+# against $metadata and live calls) — Graph 400s if you $select them
+# directly. They live nested inside the hardwareInformation complex
+# property, hence the dotted source path. hardwareInformation itself only
+# exists in beta — that's why os_build_number isn't in the shared
+# _DEVICE_COLUMNS: v1.0's managed_devices list has no way to populate it.
 _DEVICE_DETAIL_COLUMNS = {
     **_DEVICE_COLUMNS,
-    "is_encrypted": ("isEncrypted", "bool"),
-    "compliance_state": ("complianceState", "str"),
-    "device_guard_vbs_state": ("deviceGuardVirtualizationBasedSecurityState", "str"),
+    "os_build_number": ("hardwareInformation.osBuildNumber", "str"),
+    "device_guard_vbs_state": (
+        "hardwareInformation.deviceGuardVirtualizationBasedSecurityState",
+        "str",
+    ),
     "device_guard_credential_guard_state": (
-        "deviceGuardLocalSystemAuthorityCredentialGuardState",
+        "hardwareInformation.deviceGuardLocalSystemAuthorityCredentialGuardState",
         "str",
     ),
     "windows_active_malware_count": ("windowsActiveMalwareCount", "int"),
-    "last_sync_datetime": ("lastSyncDateTime", "datetime"),
-    "user_principal_name": ("userPrincipalName", "str"),
 }
 
 _CONFIGURATION_COLUMNS = {
@@ -266,11 +278,36 @@ class IntuneCollector(Collector):
             return [], None
 
         path_template = _ENDPOINTS[resource]
+        # Graph's default GET on managedDevices/{id} omits several beta
+        # properties (windowsActiveMalwareCount, and hardwareInformation's
+        # deviceGuard* fields) unless explicitly named in $select — they
+        # don't come back as null, the keys are simply absent. Request every
+        # top-level source field named in the manifest so opt-in properties
+        # are actually returned.
+        #
+        # This is scoped to managed_device_detail only. deviceConfigurations
+        # is a polymorphic type (base deviceConfiguration plus subtypes like
+        # windowsUpdateForBusinessConfiguration) — $select only accepts
+        # properties declared on the base type, so building it generically
+        # from device_configuration_detail's manifest columns 400s on
+        # subtype-only fields (settings, roleScopeTagIds, technologies,
+        # platforms). That resource already returns everything by default
+        # with no $select, so it's left alone (confirmed live).
+        detail_params: dict[str, Any] | None = None
+        if resource == "managed_device_detail":
+            select_fields = sorted(
+                {
+                    source.split(".", 1)[0]
+                    for source, _ in MANIFEST[resource]["columns"].values()
+                    if not source.startswith("_")
+                }
+            )
+            detail_params = {"$select": ",".join(select_fields)}
 
         def _fetch_one(record_id: str) -> dict[str, Any] | None:
             url = _GRAPH_BASE_URL + path_template.format(id=record_id)
             try:
-                return graph_get_json(self._session, url, None)
+                return graph_get_json(self._session, url, detail_params)
             except requests.exceptions.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
                 if status == 404:

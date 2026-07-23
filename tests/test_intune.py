@@ -59,8 +59,10 @@ def test_managed_device_detail_batches_ids_from_managed_devices() -> None:
             "deviceName": "LAPTOP-1",
             "isEncrypted": True,
             "complianceState": "compliant",
-            "deviceGuardVirtualizationBasedSecurityState": "running",
-            "deviceGuardLocalSystemAuthorityCredentialGuardState": "running",
+            "hardwareInformation": {
+                "deviceGuardVirtualizationBasedSecurityState": "running",
+                "deviceGuardLocalSystemAuthorityCredentialGuardState": "running",
+            },
             "windowsActiveMalwareCount": 0,
             "lastSyncDateTime": "2026-07-20T00:00:00Z",
             "userPrincipalName": "user@example.com",

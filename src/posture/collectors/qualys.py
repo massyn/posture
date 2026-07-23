@@ -171,8 +171,10 @@ class QualysCollector(Collector):
     manifest = MANIFEST
     required_config_keys = ("username", "password", "base_url")
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
-        super().__init__(config)
+    def __init__(
+        self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
+    ) -> None:
+        super().__init__(config, record_limit=record_limit)
         self._base_url = self._config["base_url"].rstrip("/")
         # Proactive pacing state, set from the previous response's
         # X-RateLimit-* headers (see _request_xml). None until a request has

@@ -95,6 +95,25 @@ def test_derived_resource_zero_children_yields_zero_rows() -> None:
     assert list(df.columns) == ["parent_id", "child_id"]
 
 
+HOST_GROUPS_MANIFEST = MANIFEST["host_groups"]
+HOST_GROUPS_COLUMNS = list(HOST_GROUPS_MANIFEST["columns"].keys())
+
+
+def test_host_groups_page() -> None:
+    df = parse(
+        _load("host_groups_page.json"), HOST_GROUPS_MANIFEST, resource="host_groups"
+    )
+
+    assert list(df.columns) == HOST_GROUPS_COLUMNS
+    assert len(df) == 2
+    assert df.loc[0, "id"] == "hg-1"
+    assert df.loc[0, "name"] == "Production servers"
+    assert df.loc[0, "group_type"] == "dynamic"
+    assert df["created_at"].dtype == "datetime64[ns, UTC]"
+    assert df.loc[0, "created_at"] == pd.Timestamp("2026-01-01T00:00:00Z")
+    assert pd.isna(df.loc[1, "description"])  # absent in fixture
+
+
 VULNERABILITIES_MANIFEST = MANIFEST["vulnerabilities"]
 REMEDIATIONS_MANIFEST = MANIFEST["vulnerability_remediations"]
 

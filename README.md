@@ -143,7 +143,7 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 
 | Source | Resources |
 |---|---|
-| `crowdstrike` | `hosts`, `vulnerabilities`, `vulnerability_remediations`, `zero_trust_assessment`, `zero_trust_assessment_os_signals`, `zero_trust_assessment_sensor_signals` |
+| `crowdstrike` | `hosts`, `host_groups`, `vulnerabilities`, `vulnerability_remediations`, `zero_trust_assessment`, `zero_trust_assessment_os_signals`, `zero_trust_assessment_sensor_signals` |
 | `okta` | `users`, `devices`, `device_users` |
 | `workspaceone` | `computers` |
 | `upguard` | `vendors`, `domains`, `breached_identities`, `organisation`, `vendor_risks` |
