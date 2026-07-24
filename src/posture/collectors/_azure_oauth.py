@@ -65,10 +65,13 @@ def fetch_azure_ad_token(
 def graph_get_json(
     session: requests.Session, url: str, params: dict[str, Any] | None
 ) -> dict[str, Any]:
-    """GET a single Graph resource, translating 429/401/403 into the
-    retry-driving signals the base class's ``_request_with_retry`` catches."""
+    """GET a single Graph resource, translating 429/401/403/503 into the
+    retry-driving signals the base class's ``_request_with_retry`` catches.
+    503 is Graph's throttling/service-unavailable status — Microsoft's own
+    guidance is to retry it the same way as 429, honouring ``Retry-After``
+    when present."""
     response = session.get(url, params=params, timeout=60)
-    if response.status_code == 429:
+    if response.status_code in (429, 503):
         retry_after = response.headers.get("Retry-After")
         raise RateLimitedSignal(retry_after=float(retry_after) if retry_after else None)
     if response.status_code in (401, 403):
