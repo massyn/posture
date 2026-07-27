@@ -56,6 +56,7 @@ MANIFEST: dict[str, dict[str, Any]] = _load_manifest(_DEFAULT_SCHEMA_PATH)
 
 class SalesforceCollector(Collector):
     env_prefix = "SALESFORCE"
+    display_name = "Salesforce"
     manifest = MANIFEST
     required_config_keys = ("username", "password", "token")
 

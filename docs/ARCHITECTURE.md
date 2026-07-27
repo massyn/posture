@@ -253,6 +253,32 @@ why something is built the way it is, not how to configure or call it.
   `_query_device_ids`, with no separate query-then-entities round trip (unlike
   `hosts` and `zero_trust_assessment`, which query device ids first and batch-fetch
   entities against them).
+- **Crowdstrike CSPM** — Falcon Cloud Security (Horizon), a distinct product
+  surface from Falcon endpoint protection with its own OAuth2 client/scopes,
+  hence a separate collector (`env_prefix = "CROWDSTRIKE_CSPM"`) rather than
+  extending `crowdstrike.py`. Auth and cloud-region discovery (`X-Cs-Region`)
+  mirror `crowdstrike.py` exactly — flagged as a `# CANDIDATE` for promotion
+  to `base.py` rather than promoted now, per the anti-overfitting rule.
+  `iom` and `cloud_asset_inventory` follow the same
+  query-ids-then-fetch-entities shape as Falcon's `hosts`/`zero_trust_assessment`
+  (`iom`'s entities endpoint caps at 100 ids per request, unlike Falcon's,
+  so its query-page size is capped to match via `_IOM_PAGE_LIMIT`). The
+  originally planned `ioa` resource was dropped and replaced with
+  `cloud_risks`: CrowdStrike deprecated the standalone cloud
+  `/detects/*/ioa/*` endpoints, and the current API reference has no
+  confirmed direct successor for per-detection cloud IOA data —
+  `cloud_risks` (`/cloud-security-risks/combined/cloud-risks/v1`, a single
+  paginated combined-entities call, no separate query step) is the closest
+  current equivalent, covering both misconfiguration and attack-path risk
+  findings. Verified during initial live testing: the OAuth2 token endpoint
+  returns `201 Created` on success, not `200` — the auth status check in
+  both `crowdstrike.py` and `crowdstrike_cspm.py` accounts for this.
+  **Caveat:** `MANIFEST` column paths were built from CrowdStrike's public
+  Falcon Cloud Security API reference, not a live schema introspection —
+  same caveat as `wiz.py`, `appomni.py`, `snyk.py`, `cloudflare.py`,
+  `dnsimple.py`, `phriendly_phishing.py`, and `vanta.py`. Verify field
+  names/nesting against a real tenant's response before relying on this
+  collector.
 - **Jamf** — only the fields the accelerator explicitly renamed are ported for
   `computers_inventory`, `computers_inventory_detail`, and `mobile_devices`. The
   reference implementation passes the rest of each response through via generic

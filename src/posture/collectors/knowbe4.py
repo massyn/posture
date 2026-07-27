@@ -141,6 +141,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class Knowbe4Collector(Collector):
     env_prefix = "KNOWBE4"
+    display_name = "KnowBe4"
     manifest = MANIFEST
     required_config_keys = ("token",)
 

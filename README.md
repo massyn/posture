@@ -144,6 +144,7 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | Source | Resources |
 |---|---|
 | `crowdstrike` | `hosts`, `host_groups`, `vulnerabilities`, `vulnerability_remediations`, `zero_trust_assessment`, `zero_trust_assessment_os_signals`, `zero_trust_assessment_sensor_signals` |
+| `crowdstrike_cspm` | `iom`, `cloud_risks`, `cloud_asset_inventory` |
 | `okta` | `users`, `devices`, `device_users` |
 | `workspaceone` | `computers` |
 | `upguard` | `vendors`, `domains`, `breached_identities`, `organisation`, `vendor_risks` |
@@ -172,6 +173,17 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 |---|---|
 | `client_id` | `CROWDSTRIKE_CLIENT_ID` |
 | `client_secret` | `CROWDSTRIKE_CLIENT_SECRET` |
+
+### Crowdstrike CSPM configuration
+
+Falcon Cloud Security (CSPM/Horizon) is a separate OAuth2 client from Falcon
+endpoint protection — issue a dedicated API client with CSPM scopes in the
+Falcon console.
+
+| Constructor key | Env var |
+|---|---|
+| `client_id` | `CROWDSTRIKE_CSPM_CLIENT_ID` |
+| `client_secret` | `CROWDSTRIKE_CSPM_CLIENT_SECRET` |
 
 ### Okta configuration
 

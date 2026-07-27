@@ -225,6 +225,7 @@ _DETAIL_RESOURCE_SOURCES = {
 
 class IntuneCollector(Collector):
     env_prefix = "INTUNE"
+    display_name = "Microsoft Intune"
     manifest = MANIFEST
     required_config_keys = ("tenant_id", "client_id", "client_secret")
 

@@ -66,6 +66,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class TenableioCollector(Collector):
     env_prefix = "TENABLEIO"
+    display_name = "Tenable.io"
     manifest = MANIFEST
     required_config_keys = ("access_key", "secret_key")
 

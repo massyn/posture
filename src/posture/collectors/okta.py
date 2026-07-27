@@ -121,6 +121,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class OktaCollector(Collector):
     env_prefix = "OKTA"
+    display_name = "Okta"
     manifest = MANIFEST
     required_config_keys = ("domain", "token")
 

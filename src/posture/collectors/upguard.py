@@ -14,7 +14,7 @@ exhausted). ``/risks/vendors`` (``vendor_risks``) is not paginated at all —
 one call per vendor returns that vendor's full risk list.
 
 Resources: ``vendors``, ``domains``, ``breached_identities``, ``organisation``,
-``vendor_risks``.
+``vendor_risks``, ``questionnaire_risks``.
 """
 
 from __future__ import annotations
@@ -148,11 +148,36 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "requested_primary_hostname": ("_requested_primary_hostname", "str"),
         },
     },
+    "questionnaire_risks": {
+        # Unlike vendor_risks (automated scan surface, one unpaginated call
+        # per vendor), this is risks raised by *questionnaire* answers —
+        # linked to a vendor_id and questionnaire_id, so it's a genuine
+        # bulk/paginated listing endpoint (real page_token/next_page_token),
+        # queried org-wide in one fan-out-free pass.
+        "endpoint": "/risks/vendors/questionnaires/v2",
+        "columns": {
+            "risk_id": ("riskId", "str"),
+            "vendor_id": ("vendorId", "int"),
+            "questionnaire_id": ("questionnaireId", "int"),
+            "risk_name": ("riskName", "str"),
+            "risk_category": ("riskCategory", "str"),
+            "risk_severity": ("riskSeverity", "str"),
+            "risk_text": ("riskText", "str"),
+            "risk_explanation": ("riskExplanation", "str"),
+            "risk_why": ("riskWhy", "str"),
+            "in_remediation": ("inRemediation", "bool"),
+            "is_shared_questionnaire": ("isSharedQuestionnaire", "bool"),
+            "created_at": ("createdAt", "datetime"),
+            "controls": ("controls", "json"),
+            "risk_waivers": ("riskWaivers", "json"),
+        },
+    },
 }
 
 
 class UpGuardCollector(Collector):
     env_prefix = "UPGUARD"
+    display_name = "UpGuard"
     manifest = MANIFEST
     required_config_keys = ("api_key",)
 
@@ -424,6 +449,7 @@ class UpGuardCollector(Collector):
                 "domains": "domains",
                 "breached_identities": "breached_identities",
                 "vendor_risks": "risks",
+                "questionnaire_risks": "risks",
             }.get(resource)
             if response_key:
                 return payload.get(response_key, []) or []

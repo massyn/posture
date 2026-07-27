@@ -137,6 +137,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class JamfCollector(Collector):
     env_prefix = "JAMF"
+    display_name = "Jamf"
     manifest = MANIFEST
     required_config_keys = ("url", "client_id", "client_secret")
 

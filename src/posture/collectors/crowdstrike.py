@@ -169,6 +169,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class CrowdstrikeCollector(Collector):
     env_prefix = "CROWDSTRIKE"
+    display_name = "CrowdStrike"
     manifest = MANIFEST
     required_config_keys = ("client_id", "client_secret")
 
@@ -193,7 +194,7 @@ class CrowdstrikeCollector(Collector):
                 source="crowdstrike",
                 hint="check CROWDSTRIKE_CLIENT_ID / CROWDSTRIKE_CLIENT_SECRET",
             )
-        if response.status_code != 200:
+        if response.status_code not in (200, 201):
             logger.warning(
                 "unexpected status code",
                 extra={"source": "crowdstrike", "status_code": response.status_code},

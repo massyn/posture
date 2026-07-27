@@ -70,6 +70,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class WorkspaceOneCollector(Collector):
     env_prefix = "WORKSPACEONE"
+    display_name = "Workspace ONE"
     manifest = MANIFEST
     # token_url is deliberately not a required key: it's resolved with a
     # default below (accelerator parity), not fail-fast like the rest.

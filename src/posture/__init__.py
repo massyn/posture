@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=False))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 __all__ = [
     "CCM",
@@ -52,6 +52,7 @@ def _register_sources() -> None:
     from posture.collectors.azure_entra import AzureEntraCollector
     from posture.collectors.cloudflare import CloudflareCollector
     from posture.collectors.crowdstrike import CrowdstrikeCollector
+    from posture.collectors.crowdstrike_cspm import CrowdstrikeCspmCollector
     from posture.collectors.dnsimple import DnsimpleCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
@@ -75,6 +76,7 @@ def _register_sources() -> None:
     _SOURCES["azure_entra"] = AzureEntraCollector
     _SOURCES["cloudflare"] = CloudflareCollector
     _SOURCES["crowdstrike"] = CrowdstrikeCollector
+    _SOURCES["crowdstrike_cspm"] = CrowdstrikeCspmCollector
     _SOURCES["dnsimple"] = DnsimpleCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector

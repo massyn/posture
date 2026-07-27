@@ -6,7 +6,8 @@
         "Status__c": "str",
         "Type__c": "str",
         "Serial_Number__c": "str",
-        "Model__c": "str"
+        "Model__c": "str",
+        "Active__c": "bool"
     },
     "krow__location__c": {
         "Id": "str",
@@ -31,6 +32,7 @@
     },
     "krow__team__c": {
         "Id": "str",
-        "Name": "str"
+        "Name": "str",
+        "Active__c": "bool"
     }
 }

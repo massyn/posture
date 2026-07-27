@@ -168,6 +168,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class QualysCollector(Collector):
     env_prefix = "QUALYS"
+    display_name = "Qualys"
     manifest = MANIFEST
     required_config_keys = ("username", "password", "base_url")
 

@@ -83,6 +83,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
 
 class AzureEntraCollector(Collector):
     env_prefix = "AZURE"
+    display_name = "EntraID"
     manifest = MANIFEST
     required_config_keys = ("tenant_id", "client_id", "client_secret")
 

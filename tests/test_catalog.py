@@ -9,6 +9,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "azure_entra",
         "cloudflare",
         "crowdstrike",
+        "crowdstrike_cspm",
         "dnsimple",
         "intune",
         "jamf",
