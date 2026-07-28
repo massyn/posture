@@ -129,14 +129,14 @@ for source, info in catalog().items():
         try:
             df = ccm.collect(resource)
         except PostureError as exc:
-            print(f"{source}.{resource}: FAILED — {exc}")
+            print(f"❌ {source}.{resource}: FAILED — {exc}")
             status = "partial"
             continue
 
         output_path = output_dir / f"{source}_{resource}.json"
         write_records_json(df, output_path)
         records += len(df)
-        print(f"Wrote {len(df)} {source}.{resource} to {output_path}")
+        print(f"✅ Wrote {len(df)} {source}.{resource} to {output_path}")
         print(ccm.report(resource))
 
     summary.append(

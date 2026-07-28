@@ -128,6 +128,10 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "office_location": ("officeLocation", "str"),
             "preferred_language": ("preferredLanguage", "str"),
             "job_title": ("jobTitle", "str"),
+            "account_enabled": ("accountEnabled", "bool"),
+            "created_date_time": ("createdDateTime", "datetime"),
+            "department": ("department", "str"),
+            "company_name": ("companyName", "str"),
         },
     },
     "device_configurations": {
@@ -258,6 +262,14 @@ class IntuneCollector(Collector):
             url = _GRAPH_BASE_URL + _ENDPOINTS[resource]
             params: dict[str, Any] = {"$top": _PAGE_SIZE}
             select_fields = kwargs.get("select")
+            if resource == "users" and not select_fields:
+                # accountEnabled, createdDateTime, department and companyName
+                # aren't in Graph's default /users field set — without an
+                # explicit $select they come back missing, not null. Request
+                # every manifest column's source field so they're populated.
+                select_fields = sorted(
+                    {source for source, _ in MANIFEST["users"]["columns"].values()}
+                )
             if select_fields:
                 params["$select"] = ",".join(select_fields)
             records, next_link = odata_get_page(self._session, url, params)
