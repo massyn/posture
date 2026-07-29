@@ -27,7 +27,7 @@ def test_hosts_page_normal() -> None:
     assert bool(df.loc[0, "reduced_functionality_mode"]) is False
     assert bool(df.loc[1, "reduced_functionality_mode"]) is True
     assert df.loc[0, "host_status"] == "normal"
-    assert df["last_seen"].dtype == "datetime64[ns, UTC]"
+    assert df["last_seen"].dtype == "datetime64[us, UTC]"
     assert df.loc[0, "last_seen"] == pd.Timestamp("2026-07-01T12:34:56Z")
 
 
@@ -109,7 +109,7 @@ def test_host_groups_page() -> None:
     assert df.loc[0, "id"] == "hg-1"
     assert df.loc[0, "name"] == "Production servers"
     assert df.loc[0, "group_type"] == "dynamic"
-    assert df["created_at"].dtype == "datetime64[ns, UTC]"
+    assert df["created_at"].dtype == "datetime64[us, UTC]"
     assert df.loc[0, "created_at"] == pd.Timestamp("2026-01-01T00:00:00Z")
     assert pd.isna(df.loc[1, "description"])  # absent in fixture
 

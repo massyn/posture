@@ -30,7 +30,7 @@ def test_hosts_page() -> None:
     assert df.loc[0, "tags"] == (
         '[{"TAG_ID": "1", "NAME": "Production"}, {"TAG_ID": "2", "NAME": "Windows"}]'
     )
-    assert df["last_boot"].dtype == "datetime64[ns, UTC]"
+    assert df["last_boot"].dtype == "datetime64[us, UTC]"
 
     # host2 has no AGENT_INFO element at all
     assert pd.isna(df.loc[1, "agent_version"])

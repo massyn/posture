@@ -21,7 +21,7 @@ def test_machines_page() -> None:
     assert len(df) == 2
     assert df.loc[0, "machine_id"] == "machine-1"
     assert bool(df.loc[0, "is_aad_joined"]) is True
-    assert df["last_seen"].dtype == "datetime64[ns, UTC]"
+    assert df["last_seen"].dtype == "datetime64[us, UTC]"
 
 
 def test_vulnerabilities_page() -> None:

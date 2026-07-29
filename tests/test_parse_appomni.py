@@ -29,7 +29,7 @@ def test_monitored_services_page() -> None:
     assert len(df) == 2
     assert df.loc[0, "name"] == "Salesforce Prod"
     assert df.loc[0, "app_type"] == "salesforce"
-    assert df["created"].dtype == "datetime64[ns, UTC]"
+    assert df["created"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "instance_url"])  # absent in fixture
 
 

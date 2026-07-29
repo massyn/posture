@@ -23,7 +23,7 @@ def test_controls_page() -> None:
     assert len(df) == 2
     assert df.loc[0, "name"] == "Access control policy"
     assert df.loc[0, "question"] == "Does the company have an access control policy?"
-    assert df["created_at"].dtype == "datetime64[ns, UTC]"
+    assert df["created_at"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[0, "deleted_at"])  # not deleted
     assert not pd.isna(df.loc[1, "deleted_at"])
 
@@ -49,4 +49,4 @@ def test_vulnerabilities_page() -> None:
     assert len(df) == 1
     assert df.loc[0, "severity"] == "high"
     assert df.loc[0, "cve"] == "CVE-2024-0001"
-    assert df["detected_at"].dtype == "datetime64[ns, UTC]"
+    assert df["detected_at"].dtype == "datetime64[us, UTC]"

@@ -27,7 +27,7 @@ def test_computers_inventory_page() -> None:
     assert len(df) == 2
     assert df.loc[0, "computer_id"] == "1"
     assert df.loc[0, "os_version"] == "14.5"
-    assert df["last_inventory_update_timestamp"].dtype == "datetime64[ns, UTC]"
+    assert df["last_inventory_update_timestamp"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "last_inventory_update_timestamp"])  # absent in fixture
     assert pd.isna(df.loc[1, "os_version"])  # absent nested operatingSystem
 

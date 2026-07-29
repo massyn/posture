@@ -29,7 +29,7 @@ def test_vulnerabilities_page() -> None:
     assert df.loc[0, "severity"] == "High"
     assert df.loc[0, "severity_id"] == 3
     assert df.loc[0, "repository_name"] == "Primary Repo"
-    assert df["first_seen"].dtype == "datetime64[ns, UTC]"
+    assert df["first_seen"].dtype == "datetime64[us, UTC]"
     assert df.loc[0, "cvss3_base_score"] == 8.1
     assert pd.isna(df.loc[1, "cvss3_base_score"])  # absent in fixture
 
@@ -41,7 +41,7 @@ def test_hosts_page() -> None:
     assert df.loc[0, "ip_address"] == "10.0.0.5"
     assert df.loc[0, "repository_name"] == "Primary Repo"
     assert df.loc[1, "net_bios"] == "HOST2"
-    assert df["last_seen"].dtype == "datetime64[ns, UTC]"
+    assert df["last_seen"].dtype == "datetime64[us, UTC]"
 
 
 def test_assets_page() -> None:

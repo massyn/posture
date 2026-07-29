@@ -26,7 +26,7 @@ def test_vendors_page() -> None:
     assert df.loc[0, "website_security_score"] == 90
     assert bool(df.loc[0, "monitored"]) is True
     assert bool(df.loc[1, "monitored"]) is False
-    assert df["last_assessed"].dtype == "datetime64[ns, UTC]"
+    assert df["last_assessed"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "last_assessed"])  # absent in fixture
 
 

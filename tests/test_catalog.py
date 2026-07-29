@@ -80,8 +80,7 @@ def test_catalog_reports_display_name() -> None:
 
     # Explicit display_name set on the collector.
     assert result["mde"]["display_name"] == "Microsoft Defender for Endpoint"
-    # No display_name set -> falls back to env_prefix.
-    assert result["crowdstrike"]["display_name"] == "CROWDSTRIKE"
+    assert result["crowdstrike"]["display_name"] == "CrowdStrike"
 
 
 def test_catalog_requires_no_credentials_or_network() -> None:

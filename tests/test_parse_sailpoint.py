@@ -28,7 +28,7 @@ def test_identities_page() -> None:
     assert df.loc[0, "identity_profile_id"] == "ip-1"
     assert df.loc[0, "manager_name"] == "Bob Jones"
     assert bool(df.loc[0, "is_manager"]) is True
-    assert df["created"].dtype == "datetime64[ns, UTC]"
+    assert df["created"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "identity_profile_id"])  # absent in fixture
 
 

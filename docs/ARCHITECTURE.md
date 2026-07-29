@@ -128,7 +128,9 @@ tests/
 ## Datetime policy
 
 - ONE parse function handles all datetime parsing. Output is always tz-aware UTC
-  (`datetime64[ns, UTC]`) — never naive. Localisation is the consumer's problem.
+  (`datetime64[us, UTC]`) — never naive. Localisation is the consumer's problem.
+  Microsecond precision matches Arrow/Parquet/BigQuery/Snowflake defaults, avoiding
+  unsafe-cast failures downstream on values with no genuine sub-microsecond precision.
 - Cascade: epoch by magnitude (10 digits = s, 13 = ms, 16 = µs) → ISO 8601 family →
   explicit `format` hint from the manifest for stragglers. Naked timestamps assumed UTC.
 - Unparseable → `NaT` + a warning carrying resource, column, sample value, count.

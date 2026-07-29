@@ -23,6 +23,6 @@ def test_domains_page() -> None:
     assert df.loc[0, "state"] == "registered"
     assert bool(df.loc[0, "auto_renew"]) is True
     assert df.loc[0, "registrant_id"] == "2715"
-    assert df["expires_at"].dtype == "datetime64[ns, UTC]"
+    assert df["expires_at"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "registrant_id"])  # hosted-only domain, no registrant
     assert pd.isna(df.loc[1, "expires_at"])  # not registered through DNSimple

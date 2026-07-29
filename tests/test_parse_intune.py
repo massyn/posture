@@ -42,7 +42,7 @@ def test_device_configurations_page() -> None:
     assert df.loc[0, "configuration_id"] == "cfg-1"
     assert json.loads(df.loc[0, "role_scope_tag_ids"]) == ["0"]
     assert json.loads(df.loc[0, "settings_json"]) == [{"key": "value"}]
-    assert df["created_date_time"].dtype == "datetime64[ns, UTC]"
+    assert df["created_date_time"].dtype == "datetime64[us, UTC]"
 
 
 def test_attack_simulations_page_drops_odata_etag() -> None:
@@ -77,5 +77,5 @@ def test_attack_simulation_users_page() -> None:
             "eventDateTime": "2026-01-01T01:01:01.01Z",
         }
     ]
-    assert df["compromised_date_time"].dtype == "datetime64[ns, UTC]"
+    assert df["compromised_date_time"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "compromised_date_time"])  # absent in fixture

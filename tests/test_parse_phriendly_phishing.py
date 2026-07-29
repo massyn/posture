@@ -23,7 +23,7 @@ def test_trainings_page() -> None:
     assert df.loc[0, "email"] == "alice@example.com"
     assert df.loc[0, "status"] == "completed"
     assert df.loc[0, "score"] == 92.5
-    assert df["completed_date"].dtype == "datetime64[ns, UTC]"
+    assert df["completed_date"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "completed_date"])  # not yet completed
     assert pd.isna(df.loc[1, "score"])
 
@@ -33,7 +33,7 @@ def test_clicks_page() -> None:
 
     assert len(df) == 2
     assert df.loc[0, "campaign_name"] == "Q1 Invoice Scam"
-    assert df["clicked_date"].dtype == "datetime64[ns, UTC]"
+    assert df["clicked_date"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[0, "reported_date"])
     assert pd.isna(df.loc[1, "clicked_date"])  # reported instead of clicked
     assert df.loc[1, "reported_date"] is not pd.NaT

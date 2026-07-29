@@ -24,5 +24,5 @@ def test_computers_page() -> None:
     assert df.loc[0, "uuid"] == "uuid-101"
     assert bool(df.loc[0, "is_supervised"]) is True
     assert bool(df.loc[1, "is_supervised"]) is False
-    assert df["last_seen"].dtype == "datetime64[ns, UTC]"
+    assert df["last_seen"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "last_seen"])  # absent in fixture

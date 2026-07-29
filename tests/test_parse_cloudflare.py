@@ -26,7 +26,7 @@ def test_zones_page() -> None:
     assert bool(df.loc[0, "paused"]) is False
     assert df.loc[0, "account_id"] == "acct-1"
     assert df.loc[0, "plan_name"] == "Free Website"
-    assert df["created_on"].dtype == "datetime64[ns, UTC]"
+    assert df["created_on"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "account_id"])  # no account relationship on this zone
 
 

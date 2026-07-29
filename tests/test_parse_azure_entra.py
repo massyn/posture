@@ -26,7 +26,7 @@ def test_users_page() -> None:
     assert bool(df.loc[0, "account_enabled"]) is True
     assert bool(df.loc[1, "account_enabled"]) is False
     assert json.loads(df.loc[0, "business_phones"]) == ["555-0101"]
-    assert df["created_date_time"].dtype == "datetime64[ns, UTC]"
+    assert df["created_date_time"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "created_date_time"])  # absent in fixture
 
 
@@ -38,7 +38,7 @@ def test_signins_page() -> None:
         "alice@example.com",
         "bob@example.com",
     ]
-    assert df["created_date_time"].dtype == "datetime64[ns, UTC]"
+    assert df["created_date_time"].dtype == "datetime64[us, UTC]"
 
 
 def test_audit_logs_page() -> None:

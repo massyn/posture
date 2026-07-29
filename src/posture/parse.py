@@ -61,7 +61,7 @@ def parse(
 
     for name, spec in columns.items():
         if spec[1] == "datetime":
-            df[name] = pd.to_datetime(df[name], utc=True).astype("datetime64[ns, UTC]")
+            df[name] = pd.to_datetime(df[name], utc=True).astype("datetime64[us, UTC]")
     return df
 
 

@@ -24,7 +24,7 @@ def test_assets_page() -> None:
     assert df.loc[0, "hostname"] == "host1.example.com"
     assert df.loc[0, "mac_address"] == "00:11:22:33:44:55"
     assert bool(df.loc[0, "has_agent"]) is True
-    assert df["first_seen"].dtype == "datetime64[ns, UTC]"
+    assert df["first_seen"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "first_seen"])
     assert pd.isna(df.loc[1, "hostname"])
 

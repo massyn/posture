@@ -58,9 +58,8 @@ _MACHINE_VULN_PAGE_SIZE = 50_000
 
 # MDE returns this .NET DateTime.MinValue sentinel for datetime fields that
 # have never been set (e.g. quickScanTime on a device never AV-scanned).
-# pandas' datetime64[ns] can't represent year 1, so it must be scrubbed to
-# None here before parse() casts it — otherwise pd.to_datetime raises
-# "Out of bounds nanosecond timestamp".
+# Scrubbed to None here before parse() casts it, so it comes through as a
+# proper null rather than a meaningless year-1 timestamp.
 _EPOCH_PLACEHOLDER_PREFIX = "0001-01-01"
 
 

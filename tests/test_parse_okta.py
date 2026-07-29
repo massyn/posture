@@ -24,7 +24,7 @@ def test_users_page() -> None:
     assert df.loc[0, "profile_login"] == "alice@example.com"
     assert df.loc[0, "profile_department"] == "Engineering"
     assert df.loc[0, "type_id"] == "type-1"
-    assert df["created"].dtype == "datetime64[ns, UTC]"
+    assert df["created"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "activated"])  # absent in fixture
 
 
@@ -47,4 +47,4 @@ def test_device_users_page() -> None:
     assert df.loc[0, "device_id"] == "device-1"  # injected _device_id
     assert df.loc[0, "user_id"] == "user-1"
     assert df.loc[0, "user_profile_login"] == "alice@example.com"
-    assert df["user_created"].dtype == "datetime64[ns, UTC]"
+    assert df["user_created"].dtype == "datetime64[us, UTC]"

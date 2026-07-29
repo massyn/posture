@@ -29,7 +29,7 @@ def test_training_enrollments_page() -> None:
     assert df.loc[0, "user_id"] == 501
     assert df.loc[0, "user_email"] == "alice@example.com"
     assert df.loc[0, "status"] == "Passed"
-    assert df["enrollment_date"].dtype == "datetime64[ns, UTC]"
+    assert df["enrollment_date"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "start_date"])  # null in fixture
     assert pd.isna(df.loc[1, "completion_date"])
 
@@ -41,7 +41,7 @@ def test_psts_page() -> None:
     assert df.loc[0, "pst_id"] == 301
     assert df.loc[0, "phish_prone_percentage"] == 12.5
     assert df.loc[0, "clicked_count"] == 12
-    assert df["started_at"].dtype == "datetime64[ns, UTC]"
+    assert df["started_at"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "started_at"])  # null in fixture
     assert pd.isna(df.loc[1, "phish_prone_percentage"])
 
@@ -57,6 +57,6 @@ def test_pst_recipients_page() -> None:
     assert df.loc[0, "pst_id"] == 301
     assert df.loc[0, "user_email"] == "alice@example.com"
     assert df.loc[0, "template_name"] == "Invoice Phish Q1"
-    assert df["clicked_at"].dtype == "datetime64[ns, UTC]"
+    assert df["clicked_at"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "clicked_at"])  # bob didn't click
     assert df.loc[1, "reported_at"] is not pd.NaT  # bob reported it
