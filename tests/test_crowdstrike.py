@@ -1,7 +1,9 @@
+import pytest
 import requests
 import responses
 
 from posture import CCM
+from posture.exceptions import IncompleteCollection
 
 
 @responses.activate
@@ -58,6 +60,63 @@ def test_transient_connection_error_is_retried(monkeypatch) -> None:
 
     assert len(df) == 0
     assert ccm.report("hosts")["retries"] == 1
+
+
+@responses.activate
+def test_transient_404_is_retried(monkeypatch) -> None:
+    monkeypatch.setattr("posture.collectors.crowdstrike.time.sleep", lambda _s: None)
+
+    responses.add(
+        responses.POST,
+        "https://api.crowdstrike.com/oauth2/token",
+        json={"access_token": "tok", "expires_in": 1800},
+        headers={"X-Cs-Region": "us-1"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/devices/queries/devices/v1",
+        json={"error": "not found"},
+        status=404,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/devices/queries/devices/v1",
+        json={"resources": [], "meta": {"pagination": {"total": 0, "offset": 0}}},
+        status=200,
+    )
+
+    ccm = CCM("crowdstrike", {"client_id": "id", "client_secret": "secret"})
+    df = ccm.collect("hosts")
+
+    assert len(df) == 0
+
+
+@responses.activate
+def test_persistent_404_still_fails_collection(monkeypatch) -> None:
+    monkeypatch.setattr("posture.collectors.crowdstrike.time.sleep", lambda _s: None)
+
+    responses.add(
+        responses.POST,
+        "https://api.crowdstrike.com/oauth2/token",
+        json={"access_token": "tok", "expires_in": 1800},
+        headers={"X-Cs-Region": "us-1"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/devices/queries/devices/v1",
+        json={"error": "not found"},
+        status=404,
+    )
+
+    ccm = CCM("crowdstrike", {"client_id": "id", "client_secret": "secret"})
+    with pytest.raises(IncompleteCollection):
+        ccm.collect("hosts")
+
+    # 1 initial attempt + 2 retries = 3 calls to the devices query endpoint,
+    # plus the token call.
+    assert len(responses.calls) == 4
 
 
 @responses.activate

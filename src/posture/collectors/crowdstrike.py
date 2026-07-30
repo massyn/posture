@@ -12,6 +12,7 @@ Resources: ``hosts``, ``host_groups``, ``vulnerabilities`` (+ derived
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -29,6 +30,15 @@ _HOST_GROUPS_COMBINED_PATH = "/devices/combined/host-groups/v1"
 _PAGE_LIMIT = 500
 _VULN_PAGE_LIMIT = 400
 _DEFAULT_VULN_FILTER = "cve.id:!['']+last_seen_within:'5'+status:['open','reopen']"
+
+# Crowdstrike's API occasionally returns a 404 for a request that is
+# perfectly valid (observed across devices/entities, zero-trust-assessment,
+# and spotlight/vulnerabilities) — a transient backend blip, not "this
+# resource doesn't exist". A couple of short retries absorbs that without
+# violating the all-or-nothing collection contract: if it's still 404 after
+# retrying, it propagates and fails the collection like any other error.
+_NOT_FOUND_MAX_RETRIES = 2
+_NOT_FOUND_RETRY_WAIT_SECONDS = 2.0
 
 # Cloud region -> API base URL. Discovered dynamically from the X-Cs-Region
 # header on the token response, not guessed or configured up front.
@@ -208,6 +218,23 @@ class CrowdstrikeCollector(Collector):
         token = response.json()["access_token"]
         self._session.headers["Authorization"] = f"Bearer {token}"
 
+    def _request_tolerating_404(self, method: Any, url: str, **kwargs: Any) -> Any:
+        attempt = 0
+        while True:
+            response = method(url, **kwargs)
+            if response.status_code != 404 or attempt >= _NOT_FOUND_MAX_RETRIES:
+                return response
+            attempt += 1
+            logger.warning(
+                "unexpected 404, retrying",
+                extra={
+                    "source": "crowdstrike",
+                    "url": url,
+                    "attempt": attempt,
+                },
+            )
+            time.sleep(_NOT_FOUND_RETRY_WAIT_SECONDS)
+
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
@@ -228,7 +255,8 @@ class CrowdstrikeCollector(Collector):
         if not device_ids:
             return [], None
 
-        entities_response = self._session.post(
+        entities_response = self._request_tolerating_404(
+            self._session.post,
             self._base_url + _DEVICES_ENTITIES_PATH,
             json={"ids": device_ids},
             timeout=30,
@@ -246,8 +274,11 @@ class CrowdstrikeCollector(Collector):
         if cursor is not None:
             params["offset"] = cursor
 
-        response = self._session.get(
-            self._base_url + _HOST_GROUPS_COMBINED_PATH, params=params, timeout=30
+        response = self._request_tolerating_404(
+            self._session.get,
+            self._base_url + _HOST_GROUPS_COMBINED_PATH,
+            params=params,
+            timeout=30,
         )
         self._raise_for_transient_errors(response)
         body = response.json()
@@ -273,8 +304,11 @@ class CrowdstrikeCollector(Collector):
         if cursor:
             params["after"] = cursor
 
-        response = self._session.get(
-            self._base_url + _SPOTLIGHT_VULNERABILITIES_PATH, params=params, timeout=30
+        response = self._request_tolerating_404(
+            self._session.get,
+            self._base_url + _SPOTLIGHT_VULNERABILITIES_PATH,
+            params=params,
+            timeout=30,
         )
         self._raise_for_transient_errors(response)
         body = response.json()
@@ -295,7 +329,8 @@ class CrowdstrikeCollector(Collector):
         if not device_ids:
             return [], None
 
-        assessment_response = self._session.get(
+        assessment_response = self._request_tolerating_404(
+            self._session.get,
             self._base_url + _ZTA_ASSESSMENT_PATH,
             params={"ids": device_ids},
             timeout=30,
@@ -313,8 +348,11 @@ class CrowdstrikeCollector(Collector):
         if cursor is not None:
             params["offset"] = cursor
 
-        response = self._session.get(
-            self._base_url + _DEVICES_QUERY_PATH, params=params, timeout=30
+        response = self._request_tolerating_404(
+            self._session.get,
+            self._base_url + _DEVICES_QUERY_PATH,
+            params=params,
+            timeout=30,
         )
         self._raise_for_transient_errors(response)
         body = response.json()
