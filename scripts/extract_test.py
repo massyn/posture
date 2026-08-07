@@ -126,6 +126,7 @@ for source, info in catalog().items():
     status = "ok"
 
     for resource in info["resources"]:
+        print(f"⏳ {source}.{resource}: starting collection...")
         try:
             df = ccm.collect(resource)
         except PostureError as exc:
@@ -136,8 +137,16 @@ for source, info in catalog().items():
         output_path = output_dir / f"{source}_{resource}.json"
         write_records_json(df, output_path)
         records += len(df)
-        print(f"✅ Wrote {len(df)} {source}.{resource} to {output_path}")
-        print(ccm.report(resource))
+
+        rep = ccm.report(resource)
+        icon = "\U0001f7e1" if rep["coercion_warnings"] else "✅"
+        print(
+            f"{icon} {source}.{resource}: completed with {len(df)} records"
+            f" — wrote to {output_path}"
+        )
+        if rep["coercion_warnings"]:
+            print(f"   warnings: {rep['coercion_warnings']}")
+        print(f"   {rep}")
 
     summary.append(
         {

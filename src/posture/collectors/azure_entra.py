@@ -42,19 +42,92 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "surname": ("surname", "str"),
             "user_principal_name": ("userPrincipalName", "str"),
             "mail": ("mail", "str"),
+            "mail_nickname": ("mailNickname", "str"),
             "job_title": ("jobTitle", "str"),
+            "company_name": ("companyName", "str"),
             "department": ("department", "str"),
+            "employee_id": ("employeeId", "str"),
+            "employee_type": ("employeeType", "str"),
+            "employee_hire_date": ("employeeHireDate", "datetime"),
+            "employee_org_data": ("employeeOrgData", "json"),
             "mobile_phone": ("mobilePhone", "str"),
+            "fax_number": ("faxNumber", "str"),
             "business_phones": ("businessPhones", "json"),
             "office_location": ("officeLocation", "str"),
+            "street_address": ("streetAddress", "str"),
+            "city": ("city", "str"),
+            "state": ("state", "str"),
+            "country": ("country", "str"),
+            "postal_code": ("postalCode", "str"),
+            "usage_location": ("usageLocation", "str"),
             "preferred_language": ("preferredLanguage", "str"),
+            "preferred_data_location": ("preferredDataLocation", "str"),
             "account_enabled": ("accountEnabled", "bool"),
             "user_type": ("userType", "str"),
+            "creation_type": ("creationType", "str"),
+            "external_user_state": ("externalUserState", "str"),
+            "external_user_state_change_date_time": (
+                "externalUserStateChangeDateTime",
+                "datetime",
+            ),
+            "age_group": ("ageGroup", "str"),
+            "consent_provided_for_minor": ("consentProvidedForMinor", "str"),
+            "legal_age_group_classification": (
+                "legalAgeGroupClassification",
+                "str",
+            ),
+            "is_resource_account": ("isResourceAccount", "bool"),
+            "is_management_restricted": ("isManagementRestricted", "bool"),
+            "show_in_address_list": ("showInAddressList", "bool"),
             "created_date_time": ("createdDateTime", "datetime"),
             "last_password_change_date_time": (
                 "lastPasswordChangeDateTime",
                 "datetime",
             ),
+            "sign_in_sessions_valid_from_date_time": (
+                "signInSessionsValidFromDateTime",
+                "datetime",
+            ),
+            "password_policies": ("passwordPolicies", "str"),
+            "password_profile": ("passwordProfile", "json"),
+            "identities": ("identities", "json"),
+            "other_mails": ("otherMails", "json"),
+            "im_addresses": ("imAddresses", "json"),
+            "proxy_addresses": ("proxyAddresses", "json"),
+            "authorization_info": ("authorizationInfo", "json"),
+            "custom_security_attributes": ("customSecurityAttributes", "json"),
+            "assigned_licenses": ("assignedLicenses", "json"),
+            "assigned_plans": ("assignedPlans", "json"),
+            "license_assignment_states": ("licenseAssignmentStates", "json"),
+            "on_premises_sync_enabled": ("onPremisesSyncEnabled", "bool"),
+            "on_premises_last_sync_date_time": (
+                "onPremisesLastSyncDateTime",
+                "datetime",
+            ),
+            "on_premises_immutable_id": ("onPremisesImmutableId", "str"),
+            "on_premises_distinguished_name": (
+                "onPremisesDistinguishedName",
+                "str",
+            ),
+            "on_premises_domain_name": ("onPremisesDomainName", "str"),
+            "on_premises_sam_account_name": ("onPremisesSamAccountName", "str"),
+            "on_premises_security_identifier": (
+                "onPremisesSecurityIdentifier",
+                "str",
+            ),
+            "on_premises_user_principal_name": (
+                "onPremisesUserPrincipalName",
+                "str",
+            ),
+            "on_premises_extension_attributes": (
+                "onPremisesExtensionAttributes",
+                "json",
+            ),
+            "on_premises_provisioning_errors": (
+                "onPremisesProvisioningErrors",
+                "json",
+            ),
+            "security_identifier": ("securityIdentifier", "str"),
         },
     },
     "signins": {
@@ -115,6 +188,15 @@ class AzureEntraCollector(Collector):
             params["$filter"] = f"createdDateTime ge {cutoff}"
         else:
             select_fields = kwargs.get("select")
+            if resource == "users" and not select_fields:
+                # accountEnabled, createdDateTime, department, userType and
+                # lastPasswordChangeDateTime aren't in Graph's default /users
+                # field set — without an explicit $select they come back
+                # missing, not null. Request every manifest column's source
+                # field so they're populated.
+                select_fields = sorted(
+                    {source for source, _ in MANIFEST["users"]["columns"].values()}
+                )
             if select_fields:
                 params["$select"] = ",".join(select_fields)
 

@@ -27,10 +27,10 @@ from posture.exceptions import (
 logging.getLogger("posture").addHandler(logging.NullHandler())
 
 logger = logging.getLogger("posture")
-load_dotenv(find_dotenv(usecwd=False))
+load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.8.2"
+__version__ = "0.8.3"
 
 __all__ = [
     "CCM",
