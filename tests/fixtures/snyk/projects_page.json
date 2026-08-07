@@ -12,7 +12,16 @@
                 "target_reference": "main",
                 "business_criticality": ["high"],
                 "environment": ["backend"],
-                "lifecycle": ["production"]
+                "lifecycle": ["production"],
+                "tags": [{"key": "team", "value": "platform"}]
+            },
+            "relationships": {
+                "target": {
+                    "data": {
+                        "id": "target-1",
+                        "type": "target"
+                    }
+                }
             },
             "_org_id": "org-1"
         },

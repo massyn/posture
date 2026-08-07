@@ -23,7 +23,11 @@ internally unless an ``org_ids`` kwarg is given. ``_org_id`` is injected
 client-side into every member/project/issue record (see
 ``_fetch_all_for_org``).
 
-Resources: ``organizations``, ``members``, ``projects``, ``issues``.
+``targets`` is per-organisation like ``members``/``projects``/``issues``: Snyk
+has no "all orgs" targets endpoint, so it's fanned out the same way, with
+``_org_id`` injected client-side per record.
+
+Resources: ``organizations``, ``members``, ``projects``, ``issues``, ``targets``.
 
 **Caveat:** ``MANIFEST`` column paths below were built from Snyk's public
 API reference and a prior in-house extraction script, not a live schema
@@ -53,6 +57,7 @@ _ORGANIZATIONS_PATH = "/rest/orgs"
 _MEMBERS_PATH = "/v1/org/{org_id}/members"
 _PROJECTS_PATH = "/rest/orgs/{org_id}/projects"
 _ISSUES_PATH = "/rest/orgs/{org_id}/issues"
+_TARGETS_PATH = "/rest/orgs/{org_id}/targets"
 
 MANIFEST: dict[str, dict[str, Any]] = {
     "organizations": {
@@ -97,6 +102,26 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "business_criticality": ("attributes.business_criticality", "json"),
             "environment": ("attributes.environment", "json"),
             "lifecycle": ("attributes.lifecycle", "json"),
+            "tags": ("attributes.tags", "json"),
+            "target_id": ("relationships.target.data.id", "str"),
+        },
+    },
+    "targets": {
+        # Not derived_from "organizations": each org's targets are their own
+        # paginated network call, fanned out across a thread pool. _org_id is
+        # injected client-side (see _fetch_all_for_org).
+        "endpoint": _TARGETS_PATH,
+        "columns": {
+            "org_id": ("_org_id", "str"),
+            "id": ("id", "str"),
+            "display_name": ("attributes.display_name", "str"),
+            "url": ("attributes.url", "str"),
+            "is_private": ("attributes.is_private", "bool"),
+            "created_at": ("attributes.created_at", "datetime"),
+            "integration_type": (
+                "relationships.integration.data.attributes.integration_type",
+                "str",
+            ),
         },
     },
     "issues": {
@@ -205,9 +230,11 @@ class SnykCollector(Collector):
                 record["_org_id"] = org_id
             return records
 
-        path = {"projects": _PROJECTS_PATH, "issues": _ISSUES_PATH}[resource].format(
-            org_id=org_id
-        )
+        path = {
+            "projects": _PROJECTS_PATH,
+            "issues": _ISSUES_PATH,
+            "targets": _TARGETS_PATH,
+        }[resource].format(org_id=org_id)
         records: list[dict[str, Any]] = []
         next_path: str | None = path
         params: dict[str, Any] | None = {

@@ -160,7 +160,7 @@ print(f"Wrote {len(df)} hosts to {output_path}")
 | `wiz` | `cloud_security_issues`, `inventory`, `vulnerabilities` |
 | `sailpoint` | `identities`, `accounts`, `access_profiles`, `roles` |
 | `appomni` | `monitored_services`, `policies`, `open_policy_issues`, `posture_policies`, `unified_identities` |
-| `snyk` | `organizations`, `members`, `projects`, `issues` |
+| `snyk` | `organizations`, `members`, `projects`, `issues`, `targets` |
 | `cloudflare` | `zones`, `dns_records`, `cdn_protected_domains` |
 | `dnsimple` | `domains` |
 | `phriendly_phishing` | `trainings`, `clicks` |

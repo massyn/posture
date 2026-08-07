@@ -12,6 +12,7 @@ ORGANIZATIONS_MANIFEST = MANIFEST["organizations"]
 MEMBERS_MANIFEST = MANIFEST["members"]
 PROJECTS_MANIFEST = MANIFEST["projects"]
 ISSUES_MANIFEST = MANIFEST["issues"]
+TARGETS_MANIFEST = MANIFEST["targets"]
 
 
 def _load(name: str) -> list[dict]:
@@ -51,6 +52,9 @@ def test_projects_page() -> None:
     assert df.loc[0, "type"] == "npm"
     assert df["created"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "target_reference"])  # absent in fixture
+    assert df.loc[0, "tags"] == '[{"key": "team", "value": "platform"}]'
+    assert df.loc[0, "target_id"] == "target-1"
+    assert pd.isna(df.loc[1, "target_id"])  # no target relationship on this project
 
 
 def test_issues_page() -> None:
@@ -61,3 +65,15 @@ def test_issues_page() -> None:
     assert df.loc[0, "effective_severity_level"] == "high"
     assert bool(df.loc[1, "ignored"]) is True
     assert pd.isna(df.loc[1, "project_id"])  # no scan_item relationship on this issue
+
+
+def test_targets_page() -> None:
+    df = parse(_load("targets_page.json"), TARGETS_MANIFEST, resource="targets")
+
+    assert len(df) == 2
+    assert df.loc[0, "org_id"] == "org-1"
+    assert df.loc[0, "display_name"] == "acme/webapp"
+    assert df.loc[0, "url"] == "http://github.com/acme/webapp"
+    assert bool(df.loc[0, "is_private"]) is True
+    assert df.loc[0, "integration_type"] == "github"
+    assert pd.isna(df.loc[1, "integration_type"])  # no integration relationship

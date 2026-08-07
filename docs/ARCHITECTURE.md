@@ -438,13 +438,19 @@ why something is built the way it is, not how to configure or call it.
   the only real top-level paginated resource — REST v3's `links.next` is
   already a complete relative path, mirroring `appomni.py`'s DRF `next` URL
   but relative rather than absolute. Snyk has no "all orgs" endpoint for
-  members/projects/issues, so each fans out one call (`members`) or one
-  paginated loop (`projects`/`issues`) per org id across a thread pool —
+  members/projects/issues/targets, so each fans out one call (`members`) or
+  one paginated loop (`projects`/`issues`/`targets`) per org id across a
+  thread pool —
   the same per-item fan-out shape as `knowbe4.py`'s `pst_recipients` (fan
   out, then paginate internally per item), not `derived_from`, since each
-  org's members/projects/issues are their own network call rather than
-  data nested in the org list response. `_org_id` is injected client-side
-  into every member/project/issue record.
+  org's members/projects/issues/targets are their own network call rather
+  than data nested in the org list response. `_org_id` is injected
+  client-side into every member/project/issue/target record. `targets`
+  represents the underlying repo (GitHub/GitLab/etc.) a project scans —
+  `display_name`, `url`, `is_private`, and the source integration type; it
+  has no `tags` field of its own. Repo-level tags live on `projects`
+  (`attributes.tags`, a `{key, value}` array); `projects.target_id`
+  (`relationships.target.data.id`) is the join key back to `targets.id`.
   **Caveat:** `MANIFEST` column paths in `snyk.py` were built from Snyk's
   public API reference and a prior in-house extraction script, not a live
   schema introspection against a real tenant — same caveat as `wiz.py` and
