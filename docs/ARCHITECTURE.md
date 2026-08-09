@@ -175,6 +175,25 @@ over these is the dominant cost of the whole collection.
   promote the fan-out helper to `base.py` only once a second collector demonstrably
   needs the identical shape.
 
+### URL/endpoint config is normalized, never trusted raw
+
+Any collector whose config includes an operator-supplied base URL/endpoint
+(Tenable.sc's `endpoint`, Wiz's `api_endpoint`, SailPoint's `base_url`,
+DNSimple's `endpoint`) must declare that key in `url_config_keys` on the
+collector class. `Collector._resolve_config` (`base.py`) normalizes every
+key listed there through `_normalize_url`: a bare host
+(`host.example.com`) and a full URL (`https://host.example.com/`) both
+collapse to the same shape — explicit `https://`, no trailing slash.
+Operators shouldn't have to know which vendor's docs show the scheme and
+which don't, and the collector shouldn't guess at request time. A key
+resolved outside `required_config_keys` (e.g. DNSimple's `endpoint`, which
+has a default rather than being required) still needs normalizing
+explicitly via `self._normalize_url(...)` at the point it's set in
+`_resolve_config`, since the generic `url_config_keys` loop only runs over
+already-resolved `required_config_keys`. Because normalization always
+strips the trailing slash, path-joining call sites must supply their own
+separator (`f"{self._base_url}/{path}"`), not raw concatenation.
+
 ### Collector `__init__` overrides must forward `record_limit`
 
 `Collector.__init__` (`base.py`) takes `config` and a keyword-only `record_limit:

@@ -128,12 +128,13 @@ class SailpointCollector(Collector):
     display_name = "SailPoint Identity Security Cloud"
     manifest = MANIFEST
     required_config_keys = ("base_url", "client_id", "client_secret")
+    url_config_keys = ("base_url",)
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
-        self._base_url = self._config["base_url"].rstrip("/")
+        self._base_url = self._config["base_url"]
 
     def _authenticate(self) -> None:
         response = self._session.post(

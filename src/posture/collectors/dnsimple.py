@@ -63,6 +63,7 @@ class DnsimpleCollector(Collector):
     display_name = "DNSimple"
     manifest = MANIFEST
     required_config_keys = ("token",)
+    url_config_keys = ("endpoint",)
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
@@ -73,8 +74,10 @@ class DnsimpleCollector(Collector):
 
     def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
         resolved = super()._resolve_config(explicit)
-        resolved["endpoint"] = explicit.get(
-            "endpoint", os.environ.get("DNSIMPLE_ENDPOINT", _DEFAULT_BASE_URL)
+        resolved["endpoint"] = self._normalize_url(
+            explicit.get(
+                "endpoint", os.environ.get("DNSIMPLE_ENDPOINT", _DEFAULT_BASE_URL)
+            )
         )
         return resolved
 
@@ -82,7 +85,7 @@ class DnsimpleCollector(Collector):
         self._session.headers["Authorization"] = f"Bearer {self._config['token']}"
         self._session.headers["Accept"] = "application/json"
 
-        response = self._session.get(self._base_url + _WHOAMI_PATH, timeout=30)
+        response = self._session.get(f"{self._base_url}/{_WHOAMI_PATH}", timeout=30)
         if response.status_code == 401:
             raise AuthenticationError(
                 "DNSimple rejected the API token",
@@ -108,7 +111,9 @@ class DnsimpleCollector(Collector):
         params: dict[str, Any] = {"page": page, "per_page": _PAGE_SIZE}
         params.update(kwargs)
 
-        response = self._session.get(self._base_url + path, params=params, timeout=30)
+        response = self._session.get(
+            f"{self._base_url}/{path}", params=params, timeout=30
+        )
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             raise RateLimitedSignal(

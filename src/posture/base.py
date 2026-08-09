@@ -96,6 +96,14 @@ class Collector(ABC):
     #: Required config keys, resolved from constructor dict or env vars.
     required_config_keys: tuple[str, ...] = ()
 
+    #: Subset of required_config_keys holding a base URL/endpoint. Operators
+    #: routinely supply these with or without a scheme ("host.example.com"
+    #: vs "https://host.example.com") depending on the vendor's own docs —
+    #: normalized here so every collector accepts either and ends up with
+    #: exactly one shape (explicit https://, no trailing slash) rather than
+    #: each collector guessing at request time.
+    url_config_keys: tuple[str, ...] = ()
+
     def __init__(
         self,
         config: dict[str, Any] | None = None,
@@ -133,7 +141,23 @@ class Collector(ABC):
                     f"env var {env_var}"
                 )
             resolved[key] = value
+        for key in self.url_config_keys:
+            if key in resolved:
+                resolved[key] = self._normalize_url(resolved[key])
         return resolved
+
+    @staticmethod
+    def _normalize_url(value: str) -> str:
+        """Ensure a base URL/endpoint has an explicit scheme, no trailing slash.
+
+        Operators may supply a bare host ("host.example.com") or a full URL
+        ("https://host.example.com/") — both normalize to the same shape.
+        A scheme other than http/https (already explicit) is left alone.
+        """
+        value = value.strip()
+        if not value.startswith(("https://", "http://")):
+            value = f"https://{value}"
+        return value.rstrip("/")
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(config=<redacted>)"

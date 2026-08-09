@@ -214,6 +214,7 @@ class WizCollector(Collector):
     display_name = "Wiz"
     manifest = MANIFEST
     required_config_keys = ("client_id", "client_secret", "api_endpoint")
+    url_config_keys = ("api_endpoint",)
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
@@ -226,8 +227,9 @@ class WizCollector(Collector):
         resolved = super()._resolve_config(explicit)
         # token_url is optional: most tenants use the shared Auth0 endpoint,
         # only Cognito-provisioned tenants need to override it.
-        resolved["token_url"] = explicit.get(
-            "token_url", os.environ.get("WIZ_TOKEN_URL")
+        token_url = explicit.get("token_url", os.environ.get("WIZ_TOKEN_URL"))
+        resolved["token_url"] = (
+            self._normalize_url(token_url) if token_url else token_url
         )
         return resolved
 
@@ -275,14 +277,14 @@ class WizCollector(Collector):
         body = response.json()
 
         if body.get("errors"):
-            raise RuntimeError(
-                f"Wiz GraphQL errors for '{resource}': {body['errors']}"
-            )
+            raise RuntimeError(f"Wiz GraphQL errors for '{resource}': {body['errors']}")
 
         connection = body["data"][manifest["field"]]
         nodes = connection.get("nodes", [])
         page_info = connection.get("pageInfo", {})
-        next_cursor = page_info.get("endCursor") if page_info.get("hasNextPage") else None
+        next_cursor = (
+            page_info.get("endCursor") if page_info.get("hasNextPage") else None
+        )
         return nodes, next_cursor
 
     @staticmethod
