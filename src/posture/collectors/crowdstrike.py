@@ -73,6 +73,9 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "host_status": ("status", "str"),
             "system_manufacturer": ("system_manufacturer", "str"),
             "system_product_name": ("system_product_name", "str"),
+            "cloud_provider": ("service_provider", "str"),
+            "cloud_account_id": ("service_provider_account_id", "str"),
+            "cloud_instance_id": ("instance_id", "str"),
         },
     },
     "host_groups": {
