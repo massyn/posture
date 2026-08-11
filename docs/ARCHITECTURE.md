@@ -559,6 +559,34 @@ why something is built the way it is, not how to configure or call it.
   `phriendly_phishing.py`. Verify field names/nesting against a real
   tenant's response before relying on this collector.
 
+- **Crowdstrike Identity Protection (IDP)** — Falcon Identity Protection
+  (formerly Preempt), a distinct product surface from Falcon endpoint
+  protection and Falcon Cloud Security, hence a separate collector
+  (`env_prefix = "CROWDSTRIKE_IDENTITY"`) rather than extending
+  `crowdstrike.py`. Auth and cloud-region discovery (`X-Cs-Region`) mirror
+  `crowdstrike.py`/`crowdstrike_cspm.py` exactly — flagged as a
+  `# CANDIDATE` for promotion to `base.py` rather than promoted now, per
+  the anti-overfitting rule. `entities` (identity inventory/risk) is the
+  one resource with no REST query-then-entities pair — CrowdStrike exposes
+  Identity Protection's inventory only through a GraphQL endpoint
+  (`/identity-protection/combined/graphql/v1`, cursor-paginated via
+  `pageInfo.hasNextPage`/`endCursor`), the same GraphQL shape as `wiz.py`.
+  `entity_risk_factors` explodes the nested `riskFactors` list into its own
+  grain (`derived_from` `entities`), the same pattern as
+  `vulnerability_remediations` off `vulnerabilities`. `detections`
+  (identity-related alerts) instead uses the shared Falcon Alerts API v2
+  (`/alerts/queries/alerts/v2` + `/alerts/entities/alerts/v2`, filtered to
+  `product:'idp'` by default), the same query-ids-then-fetch-entities shape
+  as `crowdstrike.py`'s `hosts`, just batching `composite_ids` instead of
+  device ids.
+  **Caveat:** `MANIFEST` column paths and the GraphQL query in
+  `crowdstrike_identity.py` were built from CrowdStrike's public API
+  reference and third-party connector documentation, not a live schema
+  introspection against a real tenant — same caveat as `wiz.py`,
+  `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`,
+  `phriendly_phishing.py`, and `vanta.py`. Verify field names/nesting
+  against a real tenant's response before relying on this collector.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

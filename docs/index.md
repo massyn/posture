@@ -30,6 +30,12 @@
 - [cloud_risks](collectors/crowdstrike_cspm.md#cloud_risks)
 - [iom](collectors/crowdstrike_cspm.md#iom)
 
+## [Crowdstrike Falcon Identity Protection](collectors/crowdstrike_identity.md)
+
+- [detections](collectors/crowdstrike_identity.md#detections)
+- [entities](collectors/crowdstrike_identity.md#entities)
+- [entity_risk_factors](collectors/crowdstrike_identity.md#entity_risk_factors)
+
 ## [DNSimple](collectors/dnsimple.md)
 
 - [domains](collectors/dnsimple.md#domains)
