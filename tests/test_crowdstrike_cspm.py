@@ -134,3 +134,73 @@ def test_cloud_risks_and_cloud_asset_inventory_use_own_endpoints() -> None:
 
     assert cloud_risks_df.loc[0, "severity"] == "critical"
     assert assets_df.loc[0, "resource_type"] == "s3_bucket"
+
+    query_ids_call = next(
+        call
+        for call in responses.calls
+        if call.request.url.startswith(
+            "https://api.crowdstrike.com/cloud-security-assets/queries/resources/v1"
+        )
+    )
+    assert "limit=100" in query_ids_call.request.url
+
+
+@responses.activate
+def test_cloud_asset_inventory_paginates_with_after_token() -> None:
+    responses.add(
+        responses.POST,
+        "https://api.crowdstrike.com/oauth2/token",
+        json={"access_token": "tok", "expires_in": 1800},
+        headers={"X-Cs-Region": "us-1"},
+        status=201,
+    )
+    # Matches a live tenant's actual response shape: 'total' stays fixed
+    # across pages and the next-page cursor is a top-level 'meta.next'
+    # value, not nested under 'meta.pagination' — the offset/total path
+    # would loop on offset=0 forever (or stop after a page, depending on
+    # what's read), so pagination must follow 'meta.next'.
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/cloud-security-assets/queries/resources/v1",
+        json={
+            "resources": ["asset-1"],
+            "meta": {"pagination": {"limit": 100, "total": 2, "offset": 0}, "next": "cursor-2"},
+        },
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/cloud-security-assets/entities/resources/v1",
+        json={"resources": [{"id": "asset-1", "resource_type": "s3_bucket"}]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/cloud-security-assets/queries/resources/v1",
+        json={
+            "resources": ["asset-2"],
+            "meta": {"pagination": {"limit": 100, "total": 2}},
+        },
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.crowdstrike.com/cloud-security-assets/entities/resources/v1",
+        json={"resources": [{"id": "asset-2", "resource_type": "ec2_instance"}]},
+        status=200,
+    )
+
+    ccm = CCM("crowdstrike_cspm", {"client_id": "id", "client_secret": "secret"})
+    assets_df = ccm.collect("cloud_asset_inventory")
+
+    assert sorted(assets_df["id"]) == ["asset-1", "asset-2"]
+
+    query_ids_calls = [
+        call
+        for call in responses.calls
+        if call.request.url.startswith(
+            "https://api.crowdstrike.com/cloud-security-assets/queries/resources/v1"
+        )
+    ]
+    assert len(query_ids_calls) == 2
+    assert "after=cursor-2" in query_ids_calls[1].request.url

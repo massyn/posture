@@ -3,6 +3,7 @@ manifest, capped at 20 raw records each, with debug logging on.
 
     python scripts/extract_collector.py crowdstrike_cspm
     python scripts/extract_collector.py wiz
+    python scripts/extract_collector.py crowdstrike_cspm.vulnerabilities
 """
 
 import argparse
@@ -11,8 +12,12 @@ import logging
 from datetime import date, datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from posture import CCM
 from posture.exceptions import PostureError
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -22,8 +27,11 @@ logging.basicConfig(
 _RECORD_LIMIT = 20
 
 _args = argparse.ArgumentParser(description=__doc__)
-_args.add_argument("source", help="collector name, e.g. crowdstrike_cspm")
-source = _args.parse_args().source
+_args.add_argument(
+    "source", help="collector name, e.g. crowdstrike_cspm, or collector.table"
+)
+_source_arg = _args.parse_args().source
+source, _, _table_filter = _source_arg.partition(".")
 
 
 def _json_default(value: object) -> str:
@@ -48,7 +56,9 @@ output_dir.mkdir(exist_ok=True)
 
 ccm = CCM(source, record_limit=_RECORD_LIMIT)
 
-for resource in ccm.tables():
+resources = [_table_filter] if _table_filter else ccm.tables()
+
+for resource in resources:
     try:
         df = ccm.collect(resource)
     except PostureError as exc:

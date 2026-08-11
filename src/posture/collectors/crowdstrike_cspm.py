@@ -43,10 +43,13 @@ _ASSETS_QUERY_PATH = "/cloud-security-assets/queries/resources/v1"
 _ASSETS_ENTITIES_PATH = "/cloud-security-assets/entities/resources/v1"
 
 _PAGE_LIMIT = 500
-# The IOM entities endpoint accepts at most 100 ids per request, so the
-# query-ids page size must not exceed it — unlike Falcon's device/ZTA
-# entities endpoints, which take arbitrarily large id batches.
-_IOM_PAGE_LIMIT = 100
+# The IOM and cloud-asset-inventory entities endpoints accept at most 100 ids
+# per request, so the query-ids page size must not exceed it — unlike
+# Falcon's device/ZTA entities endpoints, which take arbitrarily large id
+# batches. A larger page size overflows the entities GET's query string
+# (hundreds of `ids=` params) and CrowdStrike's API gateway rejects it with
+# a 400 Bad Request.
+_ENTITIES_PAGE_LIMIT = 100
 
 # CANDIDATE: promote region-discovery (this table + the auth flow that reads
 # X-Cs-Region) to base.py — crowdstrike.py needs the identical shape, but
@@ -173,11 +176,16 @@ class CrowdstrikeCspmCollector(Collector):
                 _IOM_ENTITIES_PATH,
                 kwargs,
                 cursor,
-                query_limit=_IOM_PAGE_LIMIT,
+                query_limit=_ENTITIES_PAGE_LIMIT,
             )
         if resource == "cloud_asset_inventory":
             return self._fetch_entities_page(
-                _ASSETS_QUERY_PATH, _ASSETS_ENTITIES_PATH, kwargs, cursor
+                _ASSETS_QUERY_PATH,
+                _ASSETS_ENTITIES_PATH,
+                kwargs,
+                cursor,
+                query_limit=_ENTITIES_PAGE_LIMIT,
+                pagination_style="after",
             )
         if resource == "cloud_risks":
             return self._fetch_cloud_risks_page(kwargs, cursor)
@@ -191,8 +199,11 @@ class CrowdstrikeCspmCollector(Collector):
         cursor: Any,
         *,
         query_limit: int = _PAGE_LIMIT,
+        pagination_style: str = "offset",
     ) -> tuple[list[dict[str, Any]], Any]:
-        ids, next_cursor = self._query_ids(query_path, kwargs, cursor, query_limit)
+        ids, next_cursor = self._query_ids(
+            query_path, kwargs, cursor, query_limit, pagination_style=pagination_style
+        )
         if not ids:
             return [], None
 
@@ -231,12 +242,14 @@ class CrowdstrikeCspmCollector(Collector):
         kwargs: dict[str, Any],
         cursor: Any,
         query_limit: int = _PAGE_LIMIT,
+        *,
+        pagination_style: str = "offset",
     ) -> tuple[list[str], Any]:
         params: dict[str, Any] = {"limit": query_limit}
         if "filter" in kwargs:
             params["filter"] = kwargs["filter"]
         if cursor is not None:
-            params["offset"] = cursor
+            params[pagination_style] = cursor
 
         response = self._session.get(
             self._base_url + query_path, params=params, timeout=30
@@ -245,10 +258,23 @@ class CrowdstrikeCspmCollector(Collector):
         body = response.json()
 
         ids: list[str] = body.get("resources", [])
-        pagination = body.get("meta", {}).get("pagination", {})
-        total = pagination.get("total", 0)
-        offset = pagination.get("offset", 0)
-        next_cursor = offset if offset < total else None
+        meta = body.get("meta", {})
+        pagination = meta.get("pagination", {})
+
+        if pagination_style == "after":
+            # CrowdStrike caps `offset` pagination at <10,000 and documents
+            # `after` as the mechanism for walking a full result set, so
+            # this endpoint's `total`/`offset` fields aren't reliable past
+            # a small result set. The cursor for the next page is returned
+            # as a top-level `meta.next` value (confirmed against a live
+            # tenant) — it is not nested under `meta.pagination`.
+            next_cursor = meta.get("next") or None
+            if not ids:
+                next_cursor = None
+        else:
+            total = pagination.get("total", 0)
+            offset = pagination.get("offset", 0)
+            next_cursor = offset if offset < total else None
         return ids, next_cursor
 
     @staticmethod

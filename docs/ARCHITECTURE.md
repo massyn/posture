@@ -282,8 +282,8 @@ why something is built the way it is, not how to configure or call it.
   to `base.py` rather than promoted now, per the anti-overfitting rule.
   `iom` and `cloud_asset_inventory` follow the same
   query-ids-then-fetch-entities shape as Falcon's `hosts`/`zero_trust_assessment`
-  (`iom`'s entities endpoint caps at 100 ids per request, unlike Falcon's,
-  so its query-page size is capped to match via `_IOM_PAGE_LIMIT`). The
+  (both entities endpoints cap at 100 ids per request, unlike Falcon's,
+  so their query-page size is capped to match via `_ENTITIES_PAGE_LIMIT`). The
   originally planned `ioa` resource was dropped and replaced with
   `cloud_risks`: CrowdStrike deprecated the standalone cloud
   `/detects/*/ioa/*` endpoints, and the current API reference has no
