@@ -41,7 +41,7 @@ _BACKOFF_CAP_SECONDS = 60.0
 # the process forever. Backoff still caps at _BACKOFF_CAP_SECONDS per attempt.
 _MAX_RATE_LIMIT_RETRIES = 100
 
-_MAX_CONNECTION_RETRIES = 2
+_MAX_CONNECTION_RETRIES = 5
 _CONNECTION_RETRY_WAIT_SECONDS = 5.0
 
 # Collectors that fan out per-item network calls (e.g. one detail request per

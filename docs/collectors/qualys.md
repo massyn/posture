@@ -57,6 +57,8 @@ for table in ccm.tables():
 | `operating_system` | `str` |
 | `qg_host_id` | `str` |
 | `cloud_provider` | `str` |
+| `cloud_service` | `str` |
+| `cloud_resource_id` | `str` |
 | `last_boot` | `datetime` |
 | `last_vuln_scan_datetime` | `datetime` |
 | `last_vm_scanned_date` | `datetime` |

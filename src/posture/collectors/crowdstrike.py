@@ -28,8 +28,14 @@ _ZTA_ASSESSMENT_PATH = "/zero-trust-assessment/entities/assessments/v1"
 _HOST_GROUPS_COMBINED_PATH = "/devices/combined/host-groups/v1"
 
 _PAGE_LIMIT = 500
-_VULN_PAGE_LIMIT = 400
+_VULN_PAGE_LIMIT = 200
 _DEFAULT_VULN_FILTER = "cve.id:!['']+last_seen_within:'5'+status:['open','reopen']"
+
+# The vulnerabilities endpoint is facet-heavy (cve/host_info/remediation) and
+# has been observed read-timing-out under CrowdStrike-side load. A longer
+# read timeout than the collector default gives slow responses room to
+# complete instead of tripping the connection-retry path.
+_VULN_REQUEST_TIMEOUT = (10, 60)
 
 # Crowdstrike's API occasionally returns a 404 for a request that is
 # perfectly valid (observed across devices/entities, zero-trust-assessment,
@@ -311,7 +317,7 @@ class CrowdstrikeCollector(Collector):
             self._session.get,
             self._base_url + _SPOTLIGHT_VULNERABILITIES_PATH,
             params=params,
-            timeout=30,
+            timeout=_VULN_REQUEST_TIMEOUT,
         )
         self._raise_for_transient_errors(response)
         body = response.json()

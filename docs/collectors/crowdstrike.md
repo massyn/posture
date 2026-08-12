@@ -89,6 +89,9 @@ for table in ccm.tables():
 | `host_status` | `str` |
 | `system_manufacturer` | `str` |
 | `system_product_name` | `str` |
+| `cloud_provider` | `str` |
+| `cloud_account_id` | `str` |
+| `cloud_instance_id` | `str` |
 
 ### vulnerabilities
 
