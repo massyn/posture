@@ -51,10 +51,23 @@ _PAGE_SIZE = 1000  # comfortably under the documented $top max of 8,000
 _MIN_REQUEST_INTERVAL_SECONDS = 0.65
 
 # Server-side max for machine_vulnerabilities' pageSize param is 200,000.
-# Default kept well under that: 50k records/page at ~1KB/record (per MDE
-# docs) is ~50MB of JSON per response, a reasonable balance against memory/
-# retry cost of one giant page. Override via the 'page_size' kwarg if needed.
-_MACHINE_VULN_PAGE_SIZE = 50_000
+# Kept well under that. Lowered from an earlier 50k default: on Patch
+# Tuesday, CVE volume (and therefore per-device row count, since the grain
+# is DeviceId x SoftwareVendor x SoftwareName x SoftwareVersion x CveId)
+# spikes, so a 50k-record page both grows past the ~50MB/page memory
+# estimate the old default was sized against and takes long enough to
+# generate/transfer server-side that it started tripping the request
+# timeout. Smaller pages trade more requests (still well within the 30
+# calls/minute budget for this endpoint) for a bounded per-request size.
+# Override via the 'page_size' kwarg if needed.
+_MACHINE_VULN_PAGE_SIZE = 10_000
+
+# The default 60s request timeout (see _get) is sized for the small/medium
+# JSON responses from machines/vulnerabilities/deviceavinfo. Even at the
+# reduced page size above, a machine_vulnerabilities page can be several
+# times larger than those responses, so it gets a longer, dedicated timeout
+# rather than sharing the 60s ceiling.
+_MACHINE_VULN_TIMEOUT_SECONDS = 180
 
 # MDE returns this .NET DateTime.MinValue sentinel for datetime fields that
 # have never been set (e.g. quickScanTime on a device never AV-scanned).
@@ -271,11 +284,15 @@ class MdeCollector(Collector):
         # a complete, directly-callable URL, unlike the $skip-based pagination
         # used elsewhere in this collector.
         if cursor is not None:
-            response = self._get(cursor)
+            response = self._get(cursor, timeout=_MACHINE_VULN_TIMEOUT_SECONDS)
         else:
             page_size = kwargs.get("page_size", _MACHINE_VULN_PAGE_SIZE)
             url = _API_BASE_URL + _ENDPOINTS["machine_vulnerabilities"]
-            response = self._get(url, params={"pageSize": page_size})
+            response = self._get(
+                url,
+                params={"pageSize": page_size},
+                timeout=_MACHINE_VULN_TIMEOUT_SECONDS,
+            )
 
         payload = response.json()
         records = payload.get("value", [])
@@ -305,9 +322,11 @@ class MdeCollector(Collector):
                 time.sleep(wait)
             self._last_request_time = time.monotonic()
 
-    def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
+    def _get(
+        self, url: str, params: dict[str, Any] | None = None, timeout: int = 60
+    ) -> Any:
         self._pace_request()
-        response = self._session.get(url, params=params, timeout=60)
+        response = self._session.get(url, params=params, timeout=timeout)
         if response.status_code != 200:
             _log_error_to_file(url, params, response)  # TEMP-DEBUG: remove once MDE failure root cause is found
         if response.status_code == 429:

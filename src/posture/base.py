@@ -9,6 +9,7 @@ schema introspection — lives here so it is never reimplemented per vendor.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import random
@@ -16,11 +17,13 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import requests
 
+from posture._spill import SpillStore
 from posture.exceptions import (
     IncompleteCollection,
     RateLimitExhausted,
@@ -71,7 +74,11 @@ class _CollectionReport:
 
 @dataclass
 class _CacheEntry:
-    raw_records: list[dict[str, Any]]
+    # Raw records live on disk (see posture._spill), not in this dataclass —
+    # only the spill file's path is kept resident for the collector's
+    # lifetime; the records themselves are read back into memory only while
+    # actually being consumed.
+    path: Path
     report: _CollectionReport
 
 
@@ -116,6 +123,7 @@ class Collector(ABC):
         self._session.mount("https://", adapter)
         self._session.mount("http://", adapter)
         self._authenticated = False
+        self._spill = SpillStore()
         self._cache: dict[tuple[str, tuple], _CacheEntry] = {}
         self._reports: dict[str, _CollectionReport] = {}
         #: Caps raw records per resource, for a quick smoke test instead of a
@@ -190,9 +198,9 @@ class Collector(ABC):
         cache_key = (resource, tuple(sorted(kwargs.items())))
         cached = self._cache.get(cache_key)
         if cached is not None:
-            return cached.raw_records
+            return self._spill.read_records(cached.path)
 
-        raw_records, report = self._collect_raw(resource, kwargs)
+        path, report = self._collect_raw(resource, kwargs)
 
         # Two distinct relationships justify caching: "derived_from" (a
         # parse-time relationship — another resource's rows are exploded out
@@ -208,54 +216,72 @@ class Collector(ABC):
             m.get("derived_from") == resource or m.get("requires") == resource
             for m in self.manifest.values()
         )
+        raw_records = self._spill.read_records(path)
         if is_reused:
-            self._cache[cache_key] = _CacheEntry(raw_records, report)
+            # Kept on disk for later reuse rather than in memory: the path
+            # lives in self._cache for the collector's lifetime, but the
+            # records themselves are only ever materialized transiently, on
+            # each read. Cleaned up by flush_cache()/process exit.
+            self._cache[cache_key] = _CacheEntry(path, report)
+        else:
+            self._spill.delete(path)
         self._reports[resource] = report
         return raw_records
 
     def _collect_raw(
         self, resource: str, kwargs: dict[str, Any]
-    ) -> tuple[list[dict[str, Any]], _CollectionReport]:
+    ) -> tuple[Path, _CollectionReport]:
         self._ensure_authenticated()
 
         report = _CollectionReport(resource=resource)
         started = time.monotonic()
-        records: list[dict[str, Any]] = []
+        path = self._spill.new_path(resource)
+        count = 0
 
         try:
-            for page in self._paginate(resource, kwargs, report):
-                records.extend(page)
-                report.pages += 1
-                report.records = len(records)
-                logger.debug(
-                    "fetched page",
-                    extra={
-                        "source": self.env_prefix.lower(),
-                        "resource": resource,
-                        "page": report.pages,
-                        "records": report.records,
-                    },
-                )
-                if (
-                    self._record_limit is not None
-                    and len(records) >= self._record_limit
-                ):
-                    records = records[: self._record_limit]
-                    report.records = len(records)
-                    break
+            with path.open("w", encoding="utf-8") as fh:
+                for page in self._paginate(resource, kwargs, report):
+                    if self._record_limit is not None:
+                        remaining = self._record_limit - count
+                        if remaining <= 0:
+                            break
+                        if len(page) > remaining:
+                            page = page[:remaining]
+                    for record in page:
+                        fh.write(json.dumps(record))
+                        fh.write("\n")
+                    count += len(page)
+                    report.pages += 1
+                    report.records = count
+                    logger.debug(
+                        "fetched page",
+                        extra={
+                            "source": self.env_prefix.lower(),
+                            "resource": resource,
+                            "page": report.pages,
+                            "records": report.records,
+                        },
+                    )
+                    if (
+                        self._record_limit is not None
+                        and count >= self._record_limit
+                    ):
+                        break
         except IncompleteCollection:
+            self._spill.delete(path)
             raise
         except Exception as exc:  # noqa: BLE001 - convert to domain exception
+            self._spill.delete(path)
             raise IncompleteCollection(
-                f"Collection of '{resource}' failed after {len(records)} records: {exc}",
+                f"Collection of '{resource}' failed after {count} records: {exc}",
                 source=self.env_prefix.lower(),
                 resource=resource,
-                records_so_far=len(records),
+                records_so_far=count,
             ) from exc
 
         report.duration_seconds = time.monotonic() - started
         report.collected_at = datetime.now(timezone.utc)
-        return records, report
+        return path, report
 
     def _paginate(
         self, resource: str, kwargs: dict[str, Any], report: _CollectionReport
@@ -373,6 +399,8 @@ class Collector(ABC):
         return manifest
 
     def flush_cache(self) -> None:
+        for entry in self._cache.values():
+            self._spill.delete(entry.path)
         self._cache.clear()
 
 
