@@ -5,6 +5,7 @@
 - [monitored_services](collectors/appomni.md#monitored_services)
 - [open_policy_issues](collectors/appomni.md#open_policy_issues)
 - [policies](collectors/appomni.md#policies)
+- [policy_risk_summary](collectors/appomni.md#policy_risk_summary)
 - [posture_policies](collectors/appomni.md#posture_policies)
 - [unified_identities](collectors/appomni.md#unified_identities)
 

@@ -2,17 +2,23 @@
     "results": [
         {
             "id": "iss-1",
-            "policy": {"id": "pol-1", "name": "MFA Required"},
-            "severity": "high",
+            "policy_id": "pol-1",
+            "policy__name": "MFA Required",
+            "risk_score": "50",
             "status": "open",
-            "monitored_service": {"id": "svc-1", "name": "Salesforce Prod"},
+            "service_org_id": "svc-1",
+            "rule_id": "rule-1",
+            "rule__name": "MFA Not Enforced For All Users",
+            "rule__rule_posture_category": "authentication",
+            "rule__service_specific_category": "identity",
             "created": "2024-02-01T10:00:00.000Z",
-            "resolved": null
+            "closed_on": null
         },
         {
             "id": "iss-2",
-            "severity": "medium",
+            "risk_score": null,
             "status": "open",
+            "service_org_id": "svc-2",
             "created": "2024-02-10T11:00:00.000Z"
         }
     ],

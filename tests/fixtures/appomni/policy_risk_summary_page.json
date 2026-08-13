@@ -1,0 +1,38 @@
+[
+    {
+        "id": "pol-3",
+        "name": "CrowdStrike: Baseline Posture Settings",
+        "policy_type": "crowdstrike",
+        "monitored_services": ["svc-1"],
+        "active": true,
+        "open_issues_count": 92,
+        "last_completed_scan": "2026-08-12T20:34:44.171233Z",
+        "last_policy_assessment_status": "success",
+        "rule_type_counts": {
+            "config.crwd_windows_prevention_policy.all_sys_setting": {"rules": 56},
+            "config.crwd_mac_prevention_policy.all_sys_setting": {"rules": 23}
+        },
+        "risk_statistics": {
+            "risk_score": 75,
+            "risk_levels": [
+                {"name": "Informational", "risk_count": 0},
+                {"name": "Low", "risk_count": 1},
+                {"name": "Medium", "risk_count": 60},
+                {"name": "High", "risk_count": 31},
+                {"name": "Critical", "risk_count": 0}
+            ]
+        }
+    },
+    {
+        "id": "pol-4",
+        "name": "Duo: Baseline Posture Settings",
+        "policy_type": "duo",
+        "monitored_services": [],
+        "active": true,
+        "open_issues_count": 0,
+        "last_completed_scan": null,
+        "last_policy_assessment_status": null,
+        "rule_type_counts": {},
+        "risk_statistics": {}
+    }
+]
