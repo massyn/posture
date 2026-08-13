@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from posture.collectors.appomni import MANIFEST
+from posture.collectors.appomni import MANIFEST, AppOmniCollector
 from posture.parse import parse
 
 FIXTURES = Path(__file__).parent / "fixtures" / "appomni"
@@ -95,6 +95,25 @@ def test_policy_risk_summary_page() -> None:
     assert json.loads(df.loc[0, "monitored_service_ids"]) == ["svc-1"]
     assert df.loc[1, "total_rules_count"] == 0
     assert pd.isna(df.loc[1, "risk_score"])  # empty risk_statistics in fixture
+
+
+def test_fetch_policy_detail_stringifies_monitored_service_ids() -> None:
+    collector = AppOmniCollector({"access_token": "tok", "instance": "acme"})
+
+    class _FakeResponse:
+        def json(self) -> dict:
+            return {
+                "id": 143202,
+                "monitored_services": [549, 550],
+                "rule_type_counts": {},
+                "risk_statistics": {},
+            }
+
+    collector._get = lambda url, params=None: _FakeResponse()
+
+    record = collector._fetch_policy_detail(143202)
+
+    assert record["monitored_services"] == ["549", "550"]
 
 
 def test_unified_identities_page() -> None:

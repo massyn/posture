@@ -284,6 +284,15 @@ class AppOmniCollector(Collector):
         path = _POLICY_DETAIL_PATH.format(id=policy_id)
         record = self._get(self._base_url + path).json()
 
+        # Stringified to match monitored_services.id (a "str" column) — the
+        # raw API returns integers here, and the generic "json" coercion in
+        # parse.py does a bare json.dumps with no element coercion, so a
+        # left as-is int/str mismatch silently breaks any join against
+        # monitored_services on this column.
+        record["monitored_services"] = [
+            str(service_id) for service_id in record.get("monitored_services") or []
+        ]
+
         record["_total_rules_count"] = sum(
             counts.get("rules", 0)
             for counts in (record.get("rule_type_counts") or {}).values()
