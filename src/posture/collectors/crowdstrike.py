@@ -31,6 +31,12 @@ _PAGE_LIMIT = 500
 _VULN_PAGE_LIMIT = 200
 _DEFAULT_VULN_FILTER = "cve.id:!['']+last_seen_within:'5'+status:['open','reopen']"
 
+# Override via the "facet" kwarg to collect() if a caller wants a smaller
+# set (e.g. facet=["cve"] to drop the unused host_info facet and reduce
+# payload size, at the cost of vulnerability_remediations coming back empty
+# for that collection since it's derived from the "remediation" facet).
+_DEFAULT_VULN_FACETS = ["cve", "host_info", "remediation"]
+
 # The vulnerabilities endpoint is facet-heavy (cve/host_info/remediation) and
 # has been observed read-timing-out under CrowdStrike-side load. A longer
 # read timeout than the collector default gives slow responses room to
@@ -308,7 +314,7 @@ class CrowdstrikeCollector(Collector):
             ),
             "sort": "updated_timestamp|asc",
             "limit": _VULN_PAGE_LIMIT,
-            "facet": ["cve", "host_info", "remediation"],
+            "facet": kwargs.get("facet", _DEFAULT_VULN_FACETS),
         }
         if cursor:
             params["after"] = cursor

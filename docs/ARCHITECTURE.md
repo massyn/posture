@@ -12,6 +12,7 @@ ccm = CCM("crowdstrike", {"client_id": "xxx"})    # partial override, rest from 
 
 df = ccm.collect("hosts")                          # always a complete pandas DataFrame
 df = ccm.collect("vulnerabilities", filter="status:'open'")   # vendor-dialect kwargs
+df = ccm.collect("vulnerabilities", facet=["cve"])  # trim payload: CVE fields only, no remediation
 df = ccm.collect("vulnerability_remediations")     # derived resource — no second API call
 ccm.flush_cache()                                  # the only cache invalidation
 ```
