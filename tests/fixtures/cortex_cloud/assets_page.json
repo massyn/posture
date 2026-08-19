@@ -1,0 +1,69 @@
+[
+  {
+    "xdm": {
+      "asset": {
+        "id": "asset-1",
+        "strong_id": "arn:aws:ec2:ap-southeast-2:123456789012:instance/i-0abc123",
+        "name": "web-server-01",
+        "provider": "AWS",
+        "realm": "123456789012",
+        "type": {
+          "id": "AWS_EC2_INSTANCE",
+          "name": "AWS EC2 Instance",
+          "class": "Compute",
+          "category": "Virtual Machine",
+          "is_resource": true
+        },
+        "cloud": {
+          "region": "ap-southeast-2",
+          "account": {
+            "id": "123456789012",
+            "name": "prod-account"
+          }
+        },
+        "group_ids": [1, 2],
+        "tags": ["env:prod"],
+        "first_observed": 1700000000000,
+        "last_observed": 1787000000000,
+        "insights": {
+          "is_inactive": false,
+          "is_publicly_accessible": true,
+          "has_sensitive_data": false
+        },
+        "related_issues": {
+          "critical_issues": 2,
+          "issues_breakdown": {
+            "critical": 2,
+            "high": 1,
+            "medium": 0,
+            "low": 0
+          }
+        },
+        "related_cases": {
+          "critical_cases": 0,
+          "cases_breakdown": {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0
+          }
+        }
+      }
+    }
+  },
+  {
+    "xdm": {
+      "asset": {
+        "id": "asset-2",
+        "name": "readonly-role",
+        "provider": "AWS",
+        "type": {
+          "id": "AWS_IAM_ROLE",
+          "name": "AWS IAM Role",
+          "class": "Identity",
+          "category": "Role"
+        }
+      }
+    }
+  }
+]

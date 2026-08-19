@@ -79,7 +79,9 @@ def test_machine_vulnerabilities_single_page() -> None:
     responses.add(
         responses.GET,
         "https://api.security.microsoft.com/api/machines/SoftwareVulnerabilitiesByMachine",
-        json={"value": [{"id": "mv-1", "deviceId": "machine-1", "cveId": "CVE-2026-0001"}]},
+        json={
+            "value": [{"id": "mv-1", "deviceId": "machine-1", "cveId": "CVE-2026-0001"}]
+        },
         status=200,
     )
 
@@ -160,3 +162,37 @@ def test_machine_vulnerabilities_retries_on_rate_limit() -> None:
 
     assert len(df) == 1
     assert ccm.report("machine_vulnerabilities")["rate_limited_count"] == 1
+
+
+@responses.activate
+def test_vulnerabilities_retries_on_bad_gateway() -> None:
+    # nginx in front of MDE's API gateway has been observed returning a bare
+    # "502 Bad Gateway" (no JSON body) mid-pagination — this must be retried
+    # like a rate limit, not treated as a fatal HTTPError.
+    responses.add(
+        responses.POST,
+        "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
+        json={"access_token": "tok"},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/vulnerabilities",
+        body="<html><body>502 Bad Gateway</body></html>",
+        status=502,
+    )
+    responses.add(
+        responses.GET,
+        "https://api.security.microsoft.com/api/vulnerabilities",
+        json={"value": [{"id": "CVE-2026-0001"}]},
+        status=200,
+    )
+
+    ccm = CCM(
+        "mde", {"tenant_id": "tenant-1", "client_id": "id", "client_secret": "secret"}
+    )
+    with patch("posture.base.time.sleep"), patch("posture.collectors.mde.time.sleep"):
+        df = ccm.collect("vulnerabilities")
+
+    assert len(df) == 1
+    assert ccm.report("vulnerabilities")["rate_limited_count"] == 1

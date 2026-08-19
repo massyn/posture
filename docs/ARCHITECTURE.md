@@ -137,6 +137,10 @@ tests/
 - Unparseable → `NaT` + a warning carrying resource, column, sample value, count.
   Never raise mid-collection over a bad value; never pass strings through into a
   datetime column. Same coercion policy for bool and numerics.
+- Bool exception: `true`/`false`/`unknown` (case-insensitive) are all valid inputs.
+  Some vendors (e.g. MDE's `avIs*UpToDate` fields) report a genuine tri-state — the
+  device hasn't reported that status yet — not a malformed value. `"unknown"` coerces
+  to `None` silently, no warning; only values outside all three states warn.
 
 ## Performance: per-item fan-out
 
@@ -587,6 +591,72 @@ why something is built the way it is, not how to configure or call it.
   `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`,
   `phriendly_phishing.py`, and `vanta.py`. Verify field names/nesting
   against a real tenant's response before relying on this collector.
+
+- **Whistic** — raw `requests` against Whistic's Public API
+  (`https://public.whistic.com/api`), static token auth via the `api-key`
+  header — same "just set the header" shape as AppOmni/Snyk/UpGuard.
+  `endpoint` is optional config (not in `required_config_keys`, since it has
+  a default), normalized manually in `__init__` the same way `dnsimple.py`
+  handles its optional `endpoint` override. `vendors` (the catalog list)
+  and `vendor_details` (one `GET /vendors/{identifier}` fan-out per id,
+  same per-item fan-out shape as `appomni.py`'s `policy_risk_summary`) are
+  the only two resources — Whistic's write endpoints (vendor
+  create/update, vendor intake form submission) are out of scope, since
+  posture is a read-only collection library.
+  **Caveat — pagination inferred, not confirmed:** `GET /vendors` returns
+  a bare JSON array with no envelope, `next` link, or total count.
+  Whistic's own Python SDK (a separate project this collector was analysed
+  against, not vendored) assumes an older `_embedded`/`_links.next.href`
+  HATEOAS shape that the current public OpenAPI spec (fetched live from
+  `/docs/api-docs` — the SDK itself predates or doesn't match it) no
+  longer documents. The current spec's `cursor` query param is described
+  only as "begin with the vendor after the specified one," with no field
+  named as the cursor source; `_fetch_page` assumes the last returned
+  vendor's own `identifier` is a valid cursor value and stops once a page
+  comes back shorter than `page_size` — the same short-page heuristic
+  `knowbe4.py` used pre-cursor-migration. **Verify this actually
+  terminates against a live tenant before relying on this collector** —
+  same caveat tier as `wiz.py`/`appomni.py`/etc., but stronger, since the
+  pagination mechanism itself (not just field names) is unverified.
+  `MANIFEST` column paths for both resources come from the OpenAPI spec's
+  `VendorPreview`/`Vendor` schemas, not a live tenant response.
+
+- **Cortex Cloud** (Palo Alto) — raw `requests` against Cortex Cloud's
+  Public API (`https://api-<fqdn>/public_api/v1/...`), no vendor SDK.
+  Shares its API platform with Cortex XDR/XSIAM, hence the `x-xdr-*`
+  header names. Auth is a static API key + a separate numeric API Key ID
+  (`token`/`api_key_id` config, `Authorization`/`x-xdr-auth-id` headers —
+  "Standard" key mode; Cortex also documents an "Advanced" mode with a
+  per-request nonce/timestamp/sha256 hash, not implemented here since
+  Standard is what was verified against a live tenant). `endpoint` is
+  required config (the tenant's `api-<fqdn>` host), same no-cross-tenant-
+  discovery shape as `wiz.py`'s `api_endpoint`.
+  **Live-verified against a real tenant** (2026-08-19), including two
+  corrections to Cortex's own published docs: `assets`
+  (`POST /public_api/v1/assets`) caps at page size 1000, not the
+  documented 5000 (confirmed via a 400 at 1001); `issues`
+  (`POST /public_api/v1/issue/search`) caps at 100. The two endpoints'
+  response envelopes also use inconsistent key casing — `reply.data[]`/
+  `reply.metadata.total_count` for `assets` vs. `reply.DATA[]`/
+  `reply.TOTAL_COUNT` for `issues` — both handled explicitly in
+  `_fetch_page` rather than assumed identical.
+  Every record on both endpoints comes back with **literal flat keys
+  containing dots** (`{"xdm.asset.name": "..."}` is one key, not a nested
+  object) rather than genuinely nested JSON — `_nest_dotted_keys` reshapes
+  each record into a real nested dict at fetch time so `parse.py`'s
+  dotted-path column lookup works unchanged, the same "transform before
+  parse.py ever sees it" shape `qualys.py`/`tenablesc.py` use for XML.
+  `assets` is a unified multi-cloud/identity/code/image inventory
+  spanning dozens of asset types under one `xdm.asset.*` envelope;
+  `MANIFEST` only declares the core fields present on every type (id,
+  name, provider, type classification, cloud region/account, observed
+  timestamps, related-issues/cases rollups) — the many type-specific
+  extension namespaces sampled live (`xdm.identity.*`, `xdm.image.*`,
+  `xdm.code.*`, `xdm.software_package.*`, and more) are out of scope for
+  this initial cut. `issues` covers both misconfiguration and
+  vulnerability-style findings in one feed (Cortex's own terminology) —
+  there is no separate CVE-only endpoint in the surface explored here,
+  unlike Crowdstrike/Qualys's split `vulnerabilities` resource.
 
 ## Version bumps
 

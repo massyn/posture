@@ -22,6 +22,11 @@ _LITERAL_PREFIX = "$literal:"
 
 _TRUE_STRINGS = {"true", "1", "yes", "y"}
 _FALSE_STRINGS = {"false", "0", "no", "n"}
+# Some sources (e.g. MDE's avIs*UpToDate fields) report a tri-state value —
+# true/false/unknown — where "unknown" means the device hasn't reported that
+# status yet. That's a legitimate value, not a parse failure, so it's coerced
+# to None silently rather than logged as an unparseable-bool warning.
+_UNKNOWN_STRINGS = {"unknown"}
 
 
 def parse(
@@ -154,6 +159,8 @@ def _coerce_bool(value: Any, resource: str, column: str) -> bool | None:
             return True
         if lowered in _FALSE_STRINGS:
             return False
+        if lowered in _UNKNOWN_STRINGS:
+            return None
     logger.warning("Unparseable bool for %s.%s: sample=%r", resource, column, value)
     return None
 

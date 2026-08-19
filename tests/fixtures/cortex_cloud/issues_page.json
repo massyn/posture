@@ -1,0 +1,49 @@
+[
+  {
+    "id": 1001,
+    "external_id": "ext-1001",
+    "name": "AWS Credentials detected in code",
+    "description": "AWS credentials found hardcoded in a repository.",
+    "domain": "Posture",
+    "category": "DATA",
+    "severity": "HIGH",
+    "type": "Unclassified",
+    "detection": {
+      "method": "CAS_SECRET_SCANNER",
+      "rule_id": "APPSEC_SECRET_2"
+    },
+    "status": {
+      "progress": "New",
+      "resolution_reason": null,
+      "resolution_comment": ""
+    },
+    "observation_time": 1787000000000,
+    "_insert_time": 1786900000000,
+    "last_update_timestamp": 1787000100000,
+    "assigned_to": null,
+    "is_excluded": false,
+    "is_starred": true,
+    "is_excepted": false,
+    "remediation": "Rotate the exposed credentials.",
+    "impact": "Full account compromise is possible.",
+    "extended_description": null,
+    "tags": ["DOM:Posture"],
+    "asset_ids": ["asset-1"],
+    "asset_names": ["web-server-01"],
+    "asset_types": ["AWS EC2 Instance"],
+    "asset_providers": ["AWS"],
+    "asset_categories": ["Virtual Machine"],
+    "asset_classes": ["Compute"],
+    "asset_regions": ["ap-southeast-2"],
+    "asset_accounts": ["123456789012"],
+    "asset_group_ids": [1, 2],
+    "asset_group_names": ["Prod"],
+    "case_ids": [800]
+  },
+  {
+    "id": 1002,
+    "name": "Public S3 bucket",
+    "severity": "CRITICAL",
+    "category": "MISCONFIGURATION"
+  }
+]

@@ -2,8 +2,11 @@
 
 Raw ``requests`` against the KnowBe4 API v1 — no vendor SDK. Auth, retry
 (429/401/connection-error), and reporting come from the base Collector.
-Pagination is KnowBe4's plain ``page``/``per_page`` scheme: keep requesting
-the next page until a short page comes back.
+Pagination uses KnowBe4's ``cursor``/``per_page`` scheme (the ``page``
+parameter is deprecated from November 2026): the first request sends
+``cursor=0``; each response is a ``{"data": [...], "pagination":
+{"nextCursor": ...}}`` envelope, and pagination stops once ``nextCursor`` is
+``null``.
 
 ``pst_recipients`` fans out per PST (phishing security test) id across a
 thread pool — each PST's recipients are their own paginated endpoint, not
@@ -175,13 +178,14 @@ class Knowbe4Collector(Collector):
     def _fetch_list_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
-        page = cursor if cursor is not None else 1
+        page_cursor = cursor if cursor is not None else 0
         endpoint = self.manifest[resource]["endpoint"]
-        params: dict[str, Any] = {"page": page, "per_page": _PAGE_SIZE}
+        params: dict[str, Any] = {"cursor": page_cursor, "per_page": _PAGE_SIZE}
         params.update(kwargs)
 
-        records = self._get(endpoint, params).json()
-        next_cursor = page + 1 if len(records) == _PAGE_SIZE else None
+        body = self._get(endpoint, params).json()
+        records = body["data"]
+        next_cursor = body["pagination"]["nextCursor"]
         return records, next_cursor
 
     def _fetch_pst_recipients_page(
@@ -214,18 +218,17 @@ class Knowbe4Collector(Collector):
     def _fetch_all_recipients_for_pst(self, pst_id: Any) -> list[dict[str, Any]]:
         endpoint = _ENDPOINTS["pst_recipients"].format(id=pst_id)
         records: list[dict[str, Any]] = []
-        page = 1
+        cursor: Any = 0
         while True:
-            params = {"page": page, "per_page": _PAGE_SIZE}
-            page_records = self._get(endpoint, params).json()
-            if not page_records:
-                break
+            params = {"cursor": cursor, "per_page": _PAGE_SIZE}
+            body = self._get(endpoint, params).json()
+            page_records = body["data"]
             for record in page_records:
                 record["_pst_id"] = pst_id
             records.extend(page_records)
-            if len(page_records) < _PAGE_SIZE:
+            cursor = body["pagination"]["nextCursor"]
+            if cursor is None:
                 break
-            page += 1
         return records
 
     def _pace_request(self) -> None:

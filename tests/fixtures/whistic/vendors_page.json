@@ -1,0 +1,32 @@
+[
+  {
+    "identifier": "v1",
+    "url": "acme.example.com",
+    "name": "Acme Corp",
+    "service": "Cloud Storage",
+    "status": "ACTIVE",
+    "assessment_progress": "COMPLETE",
+    "questionnaire_progress": "COMPLETE",
+    "created_date": "2024-01-15T10:00:00Z",
+    "score": {
+      "overall_score": 82,
+      "rating": "AVERAGE"
+    },
+    "inherent_risk": {
+      "name": "High"
+    },
+    "residual_risk": {
+      "name": "Medium"
+    },
+    "criticality": {
+      "name": "Mission Critical"
+    }
+  },
+  {
+    "identifier": "v2",
+    "url": "beta.example.com",
+    "name": "Beta Inc",
+    "service": "Payroll",
+    "status": "PROSPECTIVE"
+  }
+]

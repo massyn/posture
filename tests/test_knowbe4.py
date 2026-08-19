@@ -5,12 +5,18 @@ import responses
 from posture import CCM
 
 
+def _envelope(data, next_cursor=None):
+    return {"data": data, "pagination": {"perPage": 500, "nextCursor": next_cursor}}
+
+
 @responses.activate
-def test_training_enrollments_pagination_stops_on_short_page() -> None:
+def test_training_enrollments_pagination_stops_when_cursor_is_null() -> None:
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/training/enrollments",
-        json=[{"enrollment_id": 1, "user": {"id": 1, "email": "a@example.com"}}],
+        json=_envelope(
+            [{"enrollment_id": 1, "user": {"id": 1, "email": "a@example.com"}}]
+        ),
         status=200,
     )
 
@@ -22,17 +28,20 @@ def test_training_enrollments_pagination_stops_on_short_page() -> None:
 
 
 @responses.activate
-def test_training_enrollments_follows_page_cursor() -> None:
+def test_training_enrollments_follows_next_cursor() -> None:
     def callback(request):
         params = dict(
             pair.split("=") for pair in request.url.split("?", 1)[1].split("&")
         )
-        page = params["page"]
-        if page == "1":
-            body = [{"enrollment_id": i, "user": {"id": i}} for i in range(500)]
+        cursor = params["cursor"]
+        if cursor == "0":
+            body = _envelope(
+                [{"enrollment_id": i, "user": {"id": i}} for i in range(500)],
+                next_cursor="500",
+            )
         else:
-            assert page == "2"
-            body = [{"enrollment_id": 999, "user": {"id": 999}}]
+            assert cursor == "500"
+            body = _envelope([{"enrollment_id": 999, "user": {"id": 999}}])
         return (200, {}, json.dumps(body))
 
     responses.add_callback(
@@ -54,7 +63,7 @@ def test_eu_region_routes_to_eu_base_url() -> None:
     responses.add(
         responses.GET,
         "https://eu.api.knowbe4.com/v1/training/enrollments",
-        json=[],
+        json=_envelope([]),
         status=200,
     )
 
@@ -65,11 +74,11 @@ def test_eu_region_routes_to_eu_base_url() -> None:
 
 
 @responses.activate
-def test_psts_pagination_stops_on_short_page() -> None:
+def test_psts_pagination_stops_when_cursor_is_null() -> None:
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/phishing/security_tests",
-        json=[{"pst_id": 301, "campaign_id": 201}],
+        json=_envelope([{"pst_id": 301, "campaign_id": 201}]),
         status=200,
     )
 
@@ -85,19 +94,19 @@ def test_pst_recipients_fans_out_per_pst_id() -> None:
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/phishing/security_tests",
-        json=[{"pst_id": 301}, {"pst_id": 302}],
+        json=_envelope([{"pst_id": 301}, {"pst_id": 302}]),
         status=200,
     )
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/phishing/security_tests/301/recipients",
-        json=[{"recipient_id": 1, "user": {"id": 501}}],
+        json=_envelope([{"recipient_id": 1, "user": {"id": 501}}]),
         status=200,
     )
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/phishing/security_tests/302/recipients",
-        json=[{"recipient_id": 2, "user": {"id": 502}}],
+        json=_envelope([{"recipient_id": 2, "user": {"id": 502}}]),
         status=200,
     )
 
@@ -113,7 +122,7 @@ def test_pst_recipients_paginates_within_a_single_pst() -> None:
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/phishing/security_tests",
-        json=[{"pst_id": 301}],
+        json=_envelope([{"pst_id": 301}]),
         status=200,
     )
 
@@ -121,12 +130,15 @@ def test_pst_recipients_paginates_within_a_single_pst() -> None:
         params = dict(
             pair.split("=") for pair in request.url.split("?", 1)[1].split("&")
         )
-        page = params["page"]
-        if page == "1":
-            body = [{"recipient_id": i, "user": {"id": i}} for i in range(500)]
+        cursor = params["cursor"]
+        if cursor == "0":
+            body = _envelope(
+                [{"recipient_id": i, "user": {"id": i}} for i in range(500)],
+                next_cursor="500",
+            )
         else:
-            assert page == "2"
-            body = [{"recipient_id": 999, "user": {"id": 999}}]
+            assert cursor == "500"
+            body = _envelope([{"recipient_id": 999, "user": {"id": 999}}])
         return (200, {}, json.dumps(body))
 
     responses.add_callback(
@@ -148,7 +160,7 @@ def test_pst_recipients_empty_when_no_psts() -> None:
     responses.add(
         responses.GET,
         "https://us.api.knowbe4.com/v1/phishing/security_tests",
-        json=[],
+        json=_envelope([]),
         status=200,
     )
 

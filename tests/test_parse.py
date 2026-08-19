@@ -178,3 +178,15 @@ def test_zta_sensor_signals_are_tagged_and_independent_of_os_signals() -> None:
     assert len(df) == 2
     assert list(df["type"]) == ["sensor_signals", "sensor_signals"]
     assert list(df["signal_id"]) == ["sig-2", "sig-3"]
+
+
+def test_bool_unknown_string_coerces_to_none_without_warning(caplog) -> None:
+    # Some sources (e.g. MDE's avIs*UpToDate fields) report a tri-state
+    # true/false/"Unknown" value. "Unknown" is a legitimate value, not a
+    # parse failure, so it must not trigger the unparseable-bool warning.
+    manifest = {"columns": {"flag": ("flag", "bool")}}
+    with caplog.at_level("WARNING", logger="posture.parse"):
+        df = parse([{"flag": "Unknown"}], manifest, resource="widgets")
+
+    assert pd.isna(df.loc[0, "flag"])
+    assert "Unparseable bool" not in caplog.text

@@ -30,7 +30,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.10.1"
+__version__ = "0.11.0"
 
 __all__ = [
     "CCM",
@@ -51,6 +51,7 @@ def _register_sources() -> None:
     from posture.collectors.appomni import AppOmniCollector
     from posture.collectors.azure_entra import AzureEntraCollector
     from posture.collectors.cloudflare import CloudflareCollector
+    from posture.collectors.cortex_cloud import CortexCloudCollector
     from posture.collectors.crowdstrike import CrowdstrikeCollector
     from posture.collectors.crowdstrike_cspm import CrowdstrikeCspmCollector
     from posture.collectors.crowdstrike_identity import CrowdstrikeIdentityCollector
@@ -70,12 +71,14 @@ def _register_sources() -> None:
     from posture.collectors.tenablesc import TenablescCollector
     from posture.collectors.upguard import UpGuardCollector
     from posture.collectors.vanta import VantaCollector
+    from posture.collectors.whistic import WhisticCollector
     from posture.collectors.wiz import WizCollector
     from posture.collectors.workspaceone import WorkspaceOneCollector
 
     _SOURCES["appomni"] = AppOmniCollector
     _SOURCES["azure_entra"] = AzureEntraCollector
     _SOURCES["cloudflare"] = CloudflareCollector
+    _SOURCES["cortex_cloud"] = CortexCloudCollector
     _SOURCES["crowdstrike"] = CrowdstrikeCollector
     _SOURCES["crowdstrike_cspm"] = CrowdstrikeCspmCollector
     _SOURCES["crowdstrike_identity"] = CrowdstrikeIdentityCollector
@@ -95,6 +98,7 @@ def _register_sources() -> None:
     _SOURCES["tenablesc"] = TenablescCollector
     _SOURCES["upguard"] = UpGuardCollector
     _SOURCES["vanta"] = VantaCollector
+    _SOURCES["whistic"] = WhisticCollector
     _SOURCES["wiz"] = WizCollector
     _SOURCES["workspaceone"] = WorkspaceOneCollector
 

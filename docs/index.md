@@ -87,6 +87,11 @@
 - [devices](collectors/okta.md#devices)
 - [users](collectors/okta.md#users)
 
+## [Palo Alto Cortex Cloud](collectors/cortex_cloud.md)
+
+- [assets](collectors/cortex_cloud.md#assets)
+- [issues](collectors/cortex_cloud.md#issues)
+
 ## [PhriendlyPhishing](collectors/phriendly_phishing.md)
 
 - [clicks](collectors/phriendly_phishing.md#clicks)
@@ -161,6 +166,11 @@
 - [vulnerabilities](collectors/vanta.md#vulnerabilities)
 - [vulnerability_remediations](collectors/vanta.md#vulnerability_remediations)
 - [vulnerable_assets](collectors/vanta.md#vulnerable_assets)
+
+## [Whistic](collectors/whistic.md)
+
+- [vendor_details](collectors/whistic.md#vendor_details)
+- [vendors](collectors/whistic.md#vendors)
 
 ## [Wiz](collectors/wiz.md)
 

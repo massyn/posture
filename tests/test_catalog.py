@@ -8,6 +8,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "appomni",
         "azure_entra",
         "cloudflare",
+        "cortex_cloud",
         "crowdstrike",
         "crowdstrike_cspm",
         "crowdstrike_identity",
@@ -27,6 +28,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "tenablesc",
         "upguard",
         "vanta",
+        "whistic",
         "wiz",
         "workspaceone",
     }
