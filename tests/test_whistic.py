@@ -30,7 +30,9 @@ def test_vendors_follows_next_link_cursor() -> None:
     def callback(request):
         params = parse_qs(urlparse(request.url).query)
         if "cursor" not in params:
-            vendors = [{"identifier": f"v{i}", "name": f"Vendor {i}"} for i in range(100)]
+            vendors = [
+                {"identifier": f"v{i}", "name": f"Vendor {i}"} for i in range(100)
+            ]
             body = {
                 "_links": {
                     "next": {
@@ -44,7 +46,9 @@ def test_vendors_follows_next_link_cursor() -> None:
             assert params["cursor"] == ["1700000000000,v99"]
             body = {
                 "_links": {},
-                "_embedded": {"vendors": [{"identifier": "v100", "name": "Last Vendor"}]},
+                "_embedded": {
+                    "vendors": [{"identifier": "v100", "name": "Last Vendor"}]
+                },
             }
         return (200, {}, json.dumps(body))
 

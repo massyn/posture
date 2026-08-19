@@ -79,9 +79,7 @@ def test_iom_batches_ids_from_query_then_entities() -> None:
         responses.GET,
         "https://api.crowdstrike.com/cloud-security-evaluations/entities/ioms/v1",
         json={
-            "resources": [
-                {"id": "iom-1", "cloud_provider": "aws", "severity": "high"}
-            ]
+            "resources": [{"id": "iom-1", "cloud_provider": "aws", "severity": "high"}]
         },
         status=200,
     )
@@ -164,7 +162,10 @@ def test_cloud_asset_inventory_paginates_with_after_token() -> None:
         "https://api.crowdstrike.com/cloud-security-assets/queries/resources/v1",
         json={
             "resources": ["asset-1"],
-            "meta": {"pagination": {"limit": 100, "total": 2, "offset": 0}, "next": "cursor-2"},
+            "meta": {
+                "pagination": {"limit": 100, "total": 2, "offset": 0},
+                "next": "cursor-2",
+            },
         },
         status=200,
     )

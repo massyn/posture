@@ -1,0 +1,73 @@
+{
+  "issues": [
+    {
+      "_org_id": "org-1",
+      "_project_id": "proj-1",
+      "id": "SNYK-RHEL8-LIBNGHTTP2-5958698",
+      "issueType": "vuln",
+      "pkgName": "libnghttp2",
+      "pkgVersions": ["1.33.0-3.el8_2.1"],
+      "issueData": {
+        "id": "SNYK-RHEL8-LIBNGHTTP2-5958698",
+        "title": "Resource Exhaustion",
+        "severity": "high",
+        "url": "https://snyk.io/vuln/SNYK-RHEL8-LIBNGHTTP2-5958698",
+        "description": "HTTP/2 resource exhaustion",
+        "identifiers": {
+          "CVE": ["CVE-2023-44487"],
+          "CWE": ["CWE-400"]
+        },
+        "exploitMaturity": "mature",
+        "publicationTime": "2023-10-11T08:24:03.907781Z",
+        "disclosureTime": "2023-10-10T00:00:00Z",
+        "CVSSv3": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "cvssScore": 7.5,
+        "nearestFixedInVersion": "0:1.33.0-5.el8_8",
+        "isMaliciousPackage": false
+      },
+      "isPatched": false,
+      "isIgnored": false,
+      "fixInfo": {
+        "isUpgradable": true,
+        "isPinnable": false,
+        "isPatchable": false,
+        "isFixable": true
+      },
+      "priorityScore": 829
+    },
+    {
+      "_org_id": "org-1",
+      "_project_id": "proj-1",
+      "id": "SNYK-JS-LODASH-1234567",
+      "issueType": "vuln",
+      "pkgName": "lodash",
+      "pkgVersions": ["4.17.15"],
+      "issueData": {
+        "id": "SNYK-JS-LODASH-1234567",
+        "title": "Prototype Pollution",
+        "severity": "medium",
+        "url": "https://snyk.io/vuln/SNYK-JS-LODASH-1234567",
+        "description": "Prototype pollution in lodash",
+        "identifiers": {
+          "CVE": [],
+          "CWE": ["CWE-1321"]
+        },
+        "exploitMaturity": "no known exploit",
+        "publicationTime": "2020-07-15T00:00:00Z",
+        "disclosureTime": "2020-07-10T00:00:00Z",
+        "cvssScore": 5.6,
+        "nearestFixedInVersion": "4.17.21",
+        "isMaliciousPackage": false
+      },
+      "isPatched": true,
+      "isIgnored": false,
+      "fixInfo": {
+        "isUpgradable": true,
+        "isPinnable": true,
+        "isPatchable": true,
+        "isFixable": true
+      },
+      "priorityScore": 412
+    }
+  ]
+}

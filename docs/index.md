@@ -47,6 +47,16 @@
 - [signins](collectors/azure_entra.md#signins)
 - [users](collectors/azure_entra.md#users)
 
+## [GitHub](collectors/github.md)
+
+- [branch_protection_rules](collectors/github.md#branch_protection_rules)
+- [branches](collectors/github.md#branches)
+- [code_scanning_alerts](collectors/github.md#code_scanning_alerts)
+- [dependabot_alerts](collectors/github.md#dependabot_alerts)
+- [members](collectors/github.md#members)
+- [organizations](collectors/github.md#organizations)
+- [repositories](collectors/github.md#repositories)
+
 ## [Jamf](collectors/jamf.md)
 
 - [buildings](collectors/jamf.md#buildings)
@@ -85,6 +95,10 @@
 
 - [device_users](collectors/okta.md#device_users)
 - [devices](collectors/okta.md#devices)
+- [group_members](collectors/okta.md#group_members)
+- [groups](collectors/okta.md#groups)
+- [user_factors](collectors/okta.md#user_factors)
+- [user_roles](collectors/okta.md#user_roles)
 - [users](collectors/okta.md#users)
 
 ## [Palo Alto Cortex Cloud](collectors/cortex_cloud.md)
@@ -126,6 +140,7 @@
 
 ## [Snyk](collectors/snyk.md)
 
+- [aggregated_issues](collectors/snyk.md#aggregated_issues)
 - [issues](collectors/snyk.md#issues)
 - [members](collectors/snyk.md#members)
 - [organizations](collectors/snyk.md#organizations)

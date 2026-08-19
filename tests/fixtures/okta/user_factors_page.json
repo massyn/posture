@@ -1,0 +1,29 @@
+[
+  {
+    "_user_id": "user-1",
+    "id": "factor-1",
+    "factorType": "push",
+    "provider": "OKTA",
+    "vendorName": "OKTA",
+    "status": "ACTIVE",
+    "created": "2021-01-01T00:00:00.000Z",
+    "lastUpdated": "2023-01-01T00:00:00.000Z",
+    "profile": {
+      "credentialId": "alice@example.com",
+      "deviceType": "SmartPhone_IPhone"
+    }
+  },
+  {
+    "_user_id": "user-1",
+    "id": "factor-2",
+    "factorType": "sms",
+    "provider": "OKTA",
+    "vendorName": "OKTA",
+    "status": "ACTIVE",
+    "created": "2021-02-01T00:00:00.000Z",
+    "lastUpdated": "2021-02-01T00:00:00.000Z",
+    "profile": {
+      "phoneNumber": "+1 XXX-XXX-1234"
+    }
+  }
+]

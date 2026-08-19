@@ -6,7 +6,8 @@ machinery the base class can't already generalise). Auth, retry, pagination,
 caching, and reporting all come from the base Collector; this module only
 knows Okta's endpoints and resource manifests.
 
-Resources: ``users``, ``devices``, ``device_users``. Audit ``logs`` were
+Resources: ``users``, ``devices``, ``device_users``, ``groups``,
+``group_members``, ``user_factors``, ``user_roles``. Audit ``logs`` were
 deliberately left out of scope.
 """
 
@@ -24,6 +25,10 @@ logger = logging.getLogger("posture.collectors.okta")
 _USERS_PATH = "/api/v1/users"
 _DEVICES_PATH = "/api/v1/devices"
 _DEVICE_USERS_PATH = "/api/v1/devices/{device_id}/users"
+_GROUPS_PATH = "/api/v1/groups"
+_GROUP_MEMBERS_PATH = "/api/v1/groups/{group_id}/users"
+_USER_FACTORS_PATH = "/api/v1/users/{user_id}/factors"
+_USER_ROLES_PATH = "/api/v1/users/{user_id}/roles"
 
 _PAGE_LIMIT = 200
 _LINK_NEXT_RE = re.compile(r'<([^>]+)>;\s*rel="next"')
@@ -101,8 +106,8 @@ MANIFEST: dict[str, dict[str, Any]] = {
         # separate per-device network call, not data nested inside a raw
         # device record, so it can't use record_path extraction. device_id
         # is injected into each raw record at fetch time (see
-        # _fetch_device_users_page) since it isn't present in the API
-        # response body itself.
+        # _fetch_scoped_page/_drain_scoped) since it isn't present in the
+        # API response body itself.
         "endpoint": _DEVICE_USERS_PATH,
         "columns": {
             "device_id": ("_device_id", "str"),
@@ -114,6 +119,74 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "user_displayname": ("user.displayName", "str"),
             "user_profile_login": ("user.profile.login", "str"),
             "user_created": ("user.created", "datetime"),
+        },
+    },
+    "groups": {
+        "endpoint": _GROUPS_PATH,
+        "columns": {
+            "id": ("id", "str"),
+            "type": ("type", "str"),
+            "created": ("created", "datetime"),
+            "last_updated": ("lastUpdated", "datetime"),
+            "last_membership_updated": ("lastMembershipUpdated", "datetime"),
+            "profile_name": ("profile.name", "str"),
+            "profile_description": ("profile.description", "str"),
+        },
+    },
+    "group_members": {
+        # Not derived_from "groups": Okta's group-members endpoint is a
+        # separate per-group network call returning member user objects,
+        # not data nested inside a raw group record. group_id is injected
+        # into each raw record at fetch time (see
+        # _fetch_scoped_page/_drain_scoped) since it isn't present in the
+        # API response body itself.
+        "endpoint": _GROUP_MEMBERS_PATH,
+        "columns": {
+            "group_id": ("_group_id", "str"),
+            "id": ("id", "str"),
+            "status": ("status", "str"),
+            "profile_login": ("profile.login", "str"),
+            "profile_email": ("profile.email", "str"),
+            "profile_first_name": ("profile.firstName", "str"),
+            "profile_last_name": ("profile.lastName", "str"),
+        },
+    },
+    "user_factors": {
+        # Not derived_from "users": Okta's factors endpoint is a separate
+        # per-user network call, not data nested inside a raw user record.
+        # user_id is injected into each raw record at fetch time (see
+        # _fetch_scoped_page/_drain_scoped) since it isn't present in the
+        # API response body itself.
+        "endpoint": _USER_FACTORS_PATH,
+        "columns": {
+            "user_id": ("_user_id", "str"),
+            "id": ("id", "str"),
+            "factor_type": ("factorType", "str"),
+            "provider": ("provider", "str"),
+            "vendor_name": ("vendorName", "str"),
+            "status": ("status", "str"),
+            "created": ("created", "datetime"),
+            "last_updated": ("lastUpdated", "datetime"),
+            "profile_phone_number": ("profile.phoneNumber", "str"),
+            "profile_credential_id": ("profile.credentialId", "str"),
+            "profile_authenticator_name": ("profile.authenticatorName", "str"),
+            "profile_platform": ("profile.platform", "str"),
+        },
+    },
+    "user_roles": {
+        # Not derived_from "users": per-user network call, same shape as
+        # user_factors. user_id is injected client-side (see
+        # _fetch_scoped_page/_drain_scoped).
+        "endpoint": _USER_ROLES_PATH,
+        "columns": {
+            "user_id": ("_user_id", "str"),
+            "id": ("id", "str"),
+            "label": ("label", "str"),
+            "type": ("type", "str"),
+            "status": ("status", "str"),
+            "assignment_type": ("assignmentType", "str"),
+            "created": ("created", "datetime"),
+            "last_updated": ("lastUpdated", "datetime"),
         },
     },
 }
@@ -144,7 +217,23 @@ class OktaCollector(Collector):
         if resource == "devices":
             return self._fetch_list_page(_DEVICES_PATH, kwargs, cursor)
         if resource == "device_users":
-            return self._fetch_device_users_page(kwargs, cursor)
+            return self._fetch_scoped_page(
+                _DEVICES_PATH, _DEVICE_USERS_PATH, "device_id", kwargs, cursor
+            )
+        if resource == "groups":
+            return self._fetch_list_page(_GROUPS_PATH, kwargs, cursor)
+        if resource == "group_members":
+            return self._fetch_scoped_page(
+                _GROUPS_PATH, _GROUP_MEMBERS_PATH, "group_id", kwargs, cursor
+            )
+        if resource == "user_factors":
+            return self._fetch_scoped_page(
+                _USERS_PATH, _USER_FACTORS_PATH, "user_id", kwargs, cursor
+            )
+        if resource == "user_roles":
+            return self._fetch_scoped_page(
+                _USERS_PATH, _USER_ROLES_PATH, "user_id", kwargs, cursor
+            )
         raise ValueError(f"Unsupported resource '{resource}'")
 
     def _fetch_list_page(
@@ -163,31 +252,38 @@ class OktaCollector(Collector):
         next_url = self._next_link(response)
         return records, next_url
 
-    def _fetch_device_users_page(
-        self, kwargs: dict[str, Any], cursor: Any
+    def _fetch_scoped_page(
+        self,
+        parent_path: str,
+        child_path_template: str,
+        id_field: str,
+        kwargs: dict[str, Any],
+        cursor: Any,
     ) -> tuple[list[dict[str, Any]], Any]:
-        devices, next_devices_cursor = self._fetch_list_page(
-            _DEVICES_PATH, kwargs, cursor
+        parents, next_parents_cursor = self._fetch_list_page(
+            parent_path, kwargs, cursor
         )
 
         records: list[dict[str, Any]] = []
-        for device in devices:
-            device_id = device.get("id")
-            if not device_id:
+        for parent in parents:
+            parent_id = parent.get("id")
+            if not parent_id:
                 continue
-            records.extend(self._drain_device_users(device_id))
+            records.extend(self._drain_scoped(child_path_template, id_field, parent_id))
 
-        return records, next_devices_cursor
+        return records, next_parents_cursor
 
-    def _drain_device_users(self, device_id: str) -> list[dict[str, Any]]:
+    def _drain_scoped(
+        self, path_template: str, id_field: str, parent_id: str
+    ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
-        url = self._base_url + _DEVICE_USERS_PATH.format(device_id=device_id)
+        url = self._base_url + path_template.format(**{id_field: parent_id})
         while url:
             response = self._get(url)
             body = response.json()
             if isinstance(body, list):
                 for record in body:
-                    record["_device_id"] = device_id
+                    record[f"_{id_field}"] = parent_id
                     records.append(record)
             url = self._next_link(response)
         return records

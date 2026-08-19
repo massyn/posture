@@ -1,0 +1,18 @@
+[
+  {
+    "_org": "acme-corp",
+    "id": 201,
+    "login": "alice",
+    "type": "User",
+    "site_admin": false,
+    "html_url": "https://github.com/alice"
+  },
+  {
+    "_org": "acme-corp",
+    "id": 202,
+    "login": "bob",
+    "type": "User",
+    "site_admin": true,
+    "html_url": "https://github.com/bob"
+  }
+]

@@ -13,6 +13,7 @@ MEMBERS_MANIFEST = MANIFEST["members"]
 PROJECTS_MANIFEST = MANIFEST["projects"]
 ISSUES_MANIFEST = MANIFEST["issues"]
 TARGETS_MANIFEST = MANIFEST["targets"]
+AGGREGATED_ISSUES_MANIFEST = MANIFEST["aggregated_issues"]
 
 
 def _load(name: str) -> list[dict]:
@@ -77,3 +78,21 @@ def test_targets_page() -> None:
     assert bool(df.loc[0, "is_private"]) is True
     assert df.loc[0, "integration_type"] == "github"
     assert pd.isna(df.loc[1, "integration_type"])  # no integration relationship
+
+
+def test_aggregated_issues_page() -> None:
+    payload = json.loads((FIXTURES / "aggregated_issues_page.json").read_text())
+    df = parse(
+        payload["issues"], AGGREGATED_ISSUES_MANIFEST, resource="aggregated_issues"
+    )
+
+    assert len(df) == 2
+    assert df.loc[0, "org_id"] == "org-1"
+    assert df.loc[0, "project_id"] == "proj-1"
+    assert df.loc[0, "severity"] == "high"
+    assert df.loc[0, "exploit_maturity"] == "mature"
+    assert df.loc[0, "cvss_score"] == 7.5
+    assert df.loc[0, "cve_ids"] == '["CVE-2023-44487"]'
+    assert bool(df.loc[0, "is_fixable"]) is True
+    assert bool(df.loc[1, "is_patched"]) is True
+    assert pd.isna(df.loc[1, "cvss_v3_vector"])  # absent in fixture

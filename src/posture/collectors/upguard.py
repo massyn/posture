@@ -225,7 +225,9 @@ class UpGuardCollector(Collector):
         response = self._get(self._base_url + endpoint, params=params)
         payload = response.json()
         records = self._extract_records(resource, payload)
-        next_cursor = payload.get("next_page_token") if isinstance(payload, dict) else None
+        next_cursor = (
+            payload.get("next_page_token") if isinstance(payload, dict) else None
+        )
         return records, next_cursor or None
 
     def _fetch_vendor_risks_page(
@@ -378,8 +380,7 @@ class UpGuardCollector(Collector):
                     )
                     return [], True
                 wait = min(
-                    exc.retry_after
-                    or _BACKOFF_BASE_SECONDS * (2**rate_limit_attempt),
+                    exc.retry_after or _BACKOFF_BASE_SECONDS * (2**rate_limit_attempt),
                     _BACKOFF_CAP_SECONDS,
                 )
                 logger.debug(

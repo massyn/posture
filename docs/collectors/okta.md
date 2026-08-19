@@ -17,6 +17,10 @@ from posture import CCM
 ccm = CCM("okta")  # credentials from OKTA_DOMAIN, OKTA_TOKEN
 df = ccm.collect("device_users")
 df = ccm.collect("devices")
+df = ccm.collect("group_members")
+df = ccm.collect("groups")
+df = ccm.collect("user_factors")
+df = ccm.collect("user_roles")
 df = ccm.collect("users")
 ```
 
@@ -41,6 +45,10 @@ for table in ccm.tables():
 
 - [device_users](#device_users)
 - [devices](#devices)
+- [group_members](#group_members)
+- [groups](#groups)
+- [user_factors](#user_factors)
+- [user_roles](#user_roles)
 - [users](#users)
 
 ### device_users
@@ -86,6 +94,60 @@ for table in ccm.tables():
 | `resourcedisplayname_sensitive` | `bool` |
 | `resourceid` | `str` |
 | `resourcealternateid` | `str` |
+
+### group_members
+
+| Column | Type |
+| --- | --- |
+| `group_id` | `str` |
+| `id` | `str` |
+| `status` | `str` |
+| `profile_login` | `str` |
+| `profile_email` | `str` |
+| `profile_first_name` | `str` |
+| `profile_last_name` | `str` |
+
+### groups
+
+| Column | Type |
+| --- | --- |
+| `id` | `str` |
+| `type` | `str` |
+| `created` | `datetime` |
+| `last_updated` | `datetime` |
+| `last_membership_updated` | `datetime` |
+| `profile_name` | `str` |
+| `profile_description` | `str` |
+
+### user_factors
+
+| Column | Type |
+| --- | --- |
+| `user_id` | `str` |
+| `id` | `str` |
+| `factor_type` | `str` |
+| `provider` | `str` |
+| `vendor_name` | `str` |
+| `status` | `str` |
+| `created` | `datetime` |
+| `last_updated` | `datetime` |
+| `profile_phone_number` | `str` |
+| `profile_credential_id` | `str` |
+| `profile_authenticator_name` | `str` |
+| `profile_platform` | `str` |
+
+### user_roles
+
+| Column | Type |
+| --- | --- |
+| `user_id` | `str` |
+| `id` | `str` |
+| `label` | `str` |
+| `type` | `str` |
+| `status` | `str` |
+| `assignment_type` | `str` |
+| `created` | `datetime` |
+| `last_updated` | `datetime` |
 
 ### users
 

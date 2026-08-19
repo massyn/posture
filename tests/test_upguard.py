@@ -24,7 +24,9 @@ def test_vendors_pagination_stops_when_no_next_page_token() -> None:
 @responses.activate
 def test_vendors_follows_next_page_token_cursor() -> None:
     def vendors_callback(request):
-        params = dict(pair.split("=") for pair in request.url.split("?", 1)[1].split("&"))
+        params = dict(
+            pair.split("=") for pair in request.url.split("?", 1)[1].split("&")
+        )
         if "page_token" not in params:
             body = {
                 "vendors": [{"id": "vendor-1", "primary_hostname": "acme.example.com"}],
@@ -32,7 +34,9 @@ def test_vendors_follows_next_page_token_cursor() -> None:
             }
         else:
             assert params["page_token"] == "cursor-2"
-            body = {"vendors": [{"id": "vendor-2", "primary_hostname": "beta.example.com"}]}
+            body = {
+                "vendors": [{"id": "vendor-2", "primary_hostname": "beta.example.com"}]
+            }
         return (200, {}, json.dumps(body))
 
     responses.add_callback(

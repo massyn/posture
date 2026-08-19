@@ -14,6 +14,7 @@
 from posture import CCM
 
 ccm = CCM("snyk")  # credentials from SNYK_TOKEN
+df = ccm.collect("aggregated_issues")
 df = ccm.collect("issues")
 df = ccm.collect("members")
 df = ccm.collect("organizations")
@@ -40,11 +41,43 @@ for table in ccm.tables():
 
 ## Tables
 
+- [aggregated_issues](#aggregated_issues)
 - [issues](#issues)
 - [members](#members)
 - [organizations](#organizations)
 - [projects](#projects)
 - [targets](#targets)
+
+### aggregated_issues
+
+| Column | Type |
+| --- | --- |
+| `org_id` | `str` |
+| `project_id` | `str` |
+| `id` | `str` |
+| `issue_type` | `str` |
+| `pkg_name` | `str` |
+| `pkg_versions` | `json` |
+| `title` | `str` |
+| `severity` | `str` |
+| `url` | `str` |
+| `description` | `str` |
+| `cve_ids` | `json` |
+| `cwe_ids` | `json` |
+| `exploit_maturity` | `str` |
+| `cvss_v3_vector` | `str` |
+| `cvss_score` | `float` |
+| `publication_time` | `datetime` |
+| `disclosure_time` | `datetime` |
+| `nearest_fixed_in_version` | `str` |
+| `is_malicious_package` | `bool` |
+| `is_patched` | `bool` |
+| `is_ignored` | `bool` |
+| `is_upgradable` | `bool` |
+| `is_pinnable` | `bool` |
+| `is_patchable` | `bool` |
+| `is_fixable` | `bool` |
+| `priority_score` | `int` |
 
 ### issues
 

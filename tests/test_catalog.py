@@ -13,6 +13,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "crowdstrike_cspm",
         "crowdstrike_identity",
         "dnsimple",
+        "github",
         "intune",
         "jamf",
         "knowbe4",

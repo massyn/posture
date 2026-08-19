@@ -138,7 +138,10 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "rule_id": ("rule_id", "str"),
             "rule_name": ("rule__name", "str"),
             "rule_posture_category": ("rule__rule_posture_category", "str"),
-            "rule_service_specific_category": ("rule__service_specific_category", "str"),
+            "rule_service_specific_category": (
+                "rule__service_specific_category",
+                "str",
+            ),
             "detected_at": ("created", "datetime"),
             "resolved_at": ("closed_on", "datetime"),
         },
@@ -314,8 +317,7 @@ class AppOmniCollector(Collector):
         if self._service_org_names is None:
             response = self._get(self._base_url + _MONITORED_SERVICES_PATH)
             self._service_org_names = {
-                service["id"]: service.get("name")
-                for service in response.json()
+                service["id"]: service.get("name") for service in response.json()
             }
         return self._service_org_names
 

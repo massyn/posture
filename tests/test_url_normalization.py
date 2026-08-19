@@ -24,9 +24,7 @@ from posture.collectors.wiz import WizCollector
     ],
 )
 def test_sailpoint_base_url_normalized(given, expected):
-    c = SailpointCollector(
-        {"base_url": given, "client_id": "x", "client_secret": "y"}
-    )
+    c = SailpointCollector({"base_url": given, "client_id": "x", "client_secret": "y"})
     assert c._config["base_url"] == expected
 
 
@@ -38,9 +36,7 @@ def test_sailpoint_base_url_normalized(given, expected):
     ],
 )
 def test_tenablesc_endpoint_normalized(given, expected):
-    c = TenablescCollector(
-        {"endpoint": given, "access_key": "x", "secret_key": "y"}
-    )
+    c = TenablescCollector({"endpoint": given, "access_key": "x", "secret_key": "y"})
     assert c._config["endpoint"] == expected
 
 
@@ -52,9 +48,7 @@ def test_tenablesc_endpoint_normalized(given, expected):
     ],
 )
 def test_wiz_api_endpoint_normalized(given, expected):
-    c = WizCollector(
-        {"client_id": "x", "client_secret": "y", "api_endpoint": given}
-    )
+    c = WizCollector({"client_id": "x", "client_secret": "y", "api_endpoint": given})
     assert c._config["api_endpoint"] == expected
 
 

@@ -1,0 +1,52 @@
+[
+  {
+    "_org": "acme-corp",
+    "_repo": "webapp",
+    "number": 1,
+    "state": "open",
+    "rule": {
+      "id": "py/sql-injection",
+      "severity": "error",
+      "security_severity_level": "critical",
+      "description": "SQL injection"
+    },
+    "tool": {"name": "CodeQL", "version": "2.16.0"},
+    "most_recent_instance": {
+      "location": {"path": "app/db.py", "start_line": 10, "end_line": 12},
+      "message": {"text": "Unsanitized input used in SQL query"}
+    },
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-02T00:00:00Z",
+    "fixed_at": null,
+    "dismissed_at": null,
+    "dismissed_by": null,
+    "dismissed_reason": null,
+    "dismissed_comment": null,
+    "html_url": "https://github.com/acme-corp/webapp/security/code-scanning/1"
+  },
+  {
+    "_org": "acme-corp",
+    "_repo": "webapp",
+    "number": 2,
+    "state": "dismissed",
+    "rule": {
+      "id": "js/xss",
+      "severity": "warning",
+      "security_severity_level": "medium",
+      "description": "Cross-site scripting"
+    },
+    "tool": {"name": "CodeQL", "version": "2.16.0"},
+    "most_recent_instance": {
+      "location": {"path": "app/views.js", "start_line": 5, "end_line": 5},
+      "message": {"text": "Unescaped output"}
+    },
+    "created_at": "2023-12-01T00:00:00Z",
+    "updated_at": "2023-12-05T00:00:00Z",
+    "fixed_at": null,
+    "dismissed_at": "2023-12-05T00:00:00Z",
+    "dismissed_by": {"login": "alice"},
+    "dismissed_reason": "false positive",
+    "dismissed_comment": "not exploitable",
+    "html_url": "https://github.com/acme-corp/webapp/security/code-scanning/2"
+  }
+]

@@ -83,9 +83,7 @@ def test_policy_risk_summary_page() -> None:
             record[f"_risk_{name.lower()}_count"] = risk_levels.get(name, 0)
         record["_risk_score"] = (record.get("risk_statistics") or {}).get("risk_score")
 
-    df = parse(
-        records, POLICY_RISK_SUMMARY_MANIFEST, resource="policy_risk_summary"
-    )
+    df = parse(records, POLICY_RISK_SUMMARY_MANIFEST, resource="policy_risk_summary")
 
     assert len(df) == 2
     assert df.loc[0, "open_issues_count"] == 92

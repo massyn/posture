@@ -1,0 +1,16 @@
+[
+  {
+    "_org": "acme-corp",
+    "_repo": "webapp",
+    "name": "main",
+    "protected": true,
+    "commit": {"sha": "abc123"}
+  },
+  {
+    "_org": "acme-corp",
+    "_repo": "webapp",
+    "name": "dev",
+    "protected": false,
+    "commit": {"sha": "def456"}
+  }
+]

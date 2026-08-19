@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "login": "acme-corp",
+    "description": "Acme Corp org",
+    "url": "https://api.github.com/orgs/acme-corp"
+  },
+  {
+    "id": 2,
+    "login": "acme-labs",
+    "description": null,
+    "url": "https://api.github.com/orgs/acme-labs"
+  }
+]

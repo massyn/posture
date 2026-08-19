@@ -1,0 +1,12 @@
+[
+  {
+    "_user_id": "user-1",
+    "id": "role-1",
+    "label": "Organization Administrator",
+    "type": "ORG_ADMIN",
+    "status": "ACTIVE",
+    "assignmentType": "USER",
+    "created": "2021-01-01T00:00:00.000Z",
+    "lastUpdated": "2021-01-01T00:00:00.000Z"
+  }
+]

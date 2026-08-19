@@ -1,0 +1,13 @@
+[
+  {
+    "_group_id": "group-1",
+    "id": "user-1",
+    "status": "ACTIVE",
+    "profile": {
+      "login": "alice@example.com",
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Anderson"
+    }
+  }
+]

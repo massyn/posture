@@ -156,7 +156,10 @@ class CrowdstrikeCspmCollector(Collector):
         if response.status_code not in (200, 201):
             logger.warning(
                 "unexpected status code",
-                extra={"source": "crowdstrike_cspm", "status_code": response.status_code},
+                extra={
+                    "source": "crowdstrike_cspm",
+                    "status_code": response.status_code,
+                },
             )
         response.raise_for_status()
 
@@ -289,6 +292,9 @@ class CrowdstrikeCspmCollector(Collector):
         if response.status_code != 200:
             logger.warning(
                 "unexpected status code",
-                extra={"source": "crowdstrike_cspm", "status_code": response.status_code},
+                extra={
+                    "source": "crowdstrike_cspm",
+                    "status_code": response.status_code,
+                },
             )
         response.raise_for_status()

@@ -328,7 +328,9 @@ class MdeCollector(Collector):
         self._pace_request()
         response = self._session.get(url, params=params, timeout=timeout)
         if response.status_code != 200:
-            _log_error_to_file(url, params, response)  # TEMP-DEBUG: remove once MDE failure root cause is found
+            _log_error_to_file(
+                url, params, response
+            )  # TEMP-DEBUG: remove once MDE failure root cause is found
         if response.status_code in (429, 502, 503, 504):
             # 502/503/504 are transient gateway/service-unavailable errors from
             # the nginx layer in front of Microsoft's API (e.g. a bare "502 Bad

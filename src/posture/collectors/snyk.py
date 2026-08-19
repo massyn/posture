@@ -27,7 +27,17 @@ client-side into every member/project/issue record (see
 has no "all orgs" targets endpoint, so it's fanned out the same way, with
 ``_org_id`` injected client-side per record.
 
-Resources: ``organizations``, ``members``, ``projects``, ``issues``, ``targets``.
+``aggregated_issues`` is per-project (``org_id``, ``project_id`` pairs from
+``projects``): a v1, ``POST``, unpaginated call to
+``/v1/org/{org_id}/project/{project_id}/aggregated-issues``, fanned out the
+same way as ``members``/``projects``/``issues``/``targets``. Unlike REST v3
+``issues``, this v1 endpoint is vuln-specific but carries materially deeper
+data — CVSS vector/score, exploit maturity, fix/patch/upgrade availability,
+priority score — so it's additive to ``issues`` rather than a replacement.
+``_org_id``/``_project_id`` are injected client-side per record.
+
+Resources: ``organizations``, ``members``, ``projects``, ``issues``,
+``targets``, ``aggregated_issues``.
 
 **Caveat:** ``MANIFEST`` column paths below were built from Snyk's public
 API reference and a prior in-house extraction script, not a live schema
@@ -58,6 +68,7 @@ _MEMBERS_PATH = "/v1/org/{org_id}/members"
 _PROJECTS_PATH = "/rest/orgs/{org_id}/projects"
 _ISSUES_PATH = "/rest/orgs/{org_id}/issues"
 _TARGETS_PATH = "/rest/orgs/{org_id}/targets"
+_AGGREGATED_ISSUES_PATH = "/v1/org/{org_id}/project/{project_id}/aggregated-issues"
 
 MANIFEST: dict[str, dict[str, Any]] = {
     "organizations": {
@@ -145,6 +156,45 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "project_id": ("relationships.scan_item.data.id", "str"),
         },
     },
+    "aggregated_issues": {
+        # Not derived_from "projects": each project's aggregated issues are
+        # their own (POST, v1, unpaginated) network call, fanned out across
+        # a thread pool over every (org_id, project_id) pair from
+        # "projects". _org_id/_project_id are injected client-side (see
+        # _fetch_aggregated_issues_for_project).
+        "endpoint": _AGGREGATED_ISSUES_PATH,
+        "columns": {
+            "org_id": ("_org_id", "str"),
+            "project_id": ("_project_id", "str"),
+            "id": ("id", "str"),
+            "issue_type": ("issueType", "str"),
+            "pkg_name": ("pkgName", "str"),
+            "pkg_versions": ("pkgVersions", "json"),
+            "title": ("issueData.title", "str"),
+            "severity": ("issueData.severity", "str"),
+            "url": ("issueData.url", "str"),
+            "description": ("issueData.description", "str"),
+            "cve_ids": ("issueData.identifiers.CVE", "json"),
+            "cwe_ids": ("issueData.identifiers.CWE", "json"),
+            "exploit_maturity": ("issueData.exploitMaturity", "str"),
+            "cvss_v3_vector": ("issueData.CVSSv3", "str"),
+            "cvss_score": ("issueData.cvssScore", "float"),
+            "publication_time": ("issueData.publicationTime", "datetime"),
+            "disclosure_time": ("issueData.disclosureTime", "datetime"),
+            "nearest_fixed_in_version": (
+                "issueData.nearestFixedInVersion",
+                "str",
+            ),
+            "is_malicious_package": ("issueData.isMaliciousPackage", "bool"),
+            "is_patched": ("isPatched", "bool"),
+            "is_ignored": ("isIgnored", "bool"),
+            "is_upgradable": ("fixInfo.isUpgradable", "bool"),
+            "is_pinnable": ("fixInfo.isPinnable", "bool"),
+            "is_patchable": ("fixInfo.isPatchable", "bool"),
+            "is_fixable": ("fixInfo.isFixable", "bool"),
+            "priority_score": ("priorityScore", "int"),
+        },
+    },
 }
 
 
@@ -173,6 +223,8 @@ class SnykCollector(Collector):
     ) -> tuple[list[dict[str, Any]], Any]:
         if resource == "organizations":
             return self._fetch_organizations_page(kwargs, cursor)
+        if resource == "aggregated_issues":
+            return self._fetch_project_fanout_page(kwargs, cursor)
         return self._fetch_org_fanout_page(resource, kwargs, cursor)
 
     def _fetch_organizations_page(
@@ -252,8 +304,63 @@ class SnykCollector(Collector):
             params = None  # next_path already carries its own query string
         return records
 
+    def _fetch_project_fanout_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
+        if cursor is not None:
+            return [], None  # entire fan-out already completed on first call
+
+        projects = kwargs.get("projects")
+        if projects is None:
+            raw_projects = self._get_raw("projects", {})
+            projects = [
+                (project["_org_id"], project["id"])
+                for project in raw_projects
+                if project.get("_org_id") is not None and project.get("id") is not None
+            ]
+        if not projects:
+            return [], None
+
+        max_workers = kwargs.get("max_workers", _DEFAULT_ORG_FANOUT_MAX_WORKERS)
+        workers = max(1, min(max_workers, len(projects)))
+
+        all_records: list[dict[str, Any]] = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(
+                    self._fetch_aggregated_issues_for_project, org_id, project_id
+                ): (org_id, project_id)
+                for org_id, project_id in projects
+            }
+            for future in concurrent.futures.as_completed(futures):
+                all_records.extend(future.result())
+
+        return all_records, None
+
+    def _fetch_aggregated_issues_for_project(
+        self, org_id: str, project_id: str
+    ) -> list[dict[str, Any]]:
+        response = self._post(
+            self._base_url
+            + _AGGREGATED_ISSUES_PATH.format(org_id=org_id, project_id=project_id),
+            json={"includeDescription": True, "includeIntroducedThrough": True},
+        )
+        records = response.json().get("issues", []) or []
+        for record in records:
+            record["_org_id"] = org_id
+            record["_project_id"] = project_id
+        return records
+
     def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
         response = self._session.get(url, params=params, timeout=30)
+        return self._check_response(response)
+
+    def _post(self, url: str, json: dict[str, Any]) -> Any:
+        response = self._session.post(url, json=json, timeout=30)
+        return self._check_response(response)
+
+    @staticmethod
+    def _check_response(response: Any) -> Any:
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             raise RateLimitedSignal(

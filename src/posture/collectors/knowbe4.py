@@ -242,7 +242,10 @@ class Knowbe4Collector(Collector):
             elapsed = now - self._last_request_time
             wait = _MIN_REQUEST_INTERVAL_SECONDS - elapsed
 
-            while self._request_times and now - self._request_times[0] > _RATE_WINDOW_SECONDS:
+            while (
+                self._request_times
+                and now - self._request_times[0] > _RATE_WINDOW_SECONDS
+            ):
                 self._request_times.popleft()
             if len(self._request_times) >= _MAX_REQUESTS_PER_MINUTE:
                 wait = max(wait, _RATE_WINDOW_SECONDS - (now - self._request_times[0]))

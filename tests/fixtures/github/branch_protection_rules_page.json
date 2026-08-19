@@ -1,0 +1,22 @@
+[
+  {
+    "_org": "acme-corp",
+    "_repo": "webapp",
+    "_branch": "main",
+    "type": "pull_request",
+    "ruleset_id": 1,
+    "ruleset_source_type": "Organization",
+    "ruleset_source": "acme-corp",
+    "parameters": {"required_approving_review_count": 2}
+  },
+  {
+    "_org": "acme-corp",
+    "_repo": "webapp",
+    "_branch": "main",
+    "type": "deletion",
+    "ruleset_id": 1,
+    "ruleset_source_type": "Organization",
+    "ruleset_source": "acme-corp",
+    "parameters": {}
+  }
+]
