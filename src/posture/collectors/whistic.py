@@ -5,18 +5,14 @@ Raw ``requests`` against Whistic's Public API (``/api/v3/...`` under
 the ``api-key`` header (same "just set the header" shape as AppOmni/Snyk/
 UpGuard, no OAuth flow).
 
-Pagination is cursor-based: ``GET /vendors`` takes ``cursor``/``page_size``
-query params and returns a bare JSON array (no envelope, no ``next`` link,
-no total count). The OpenAPI spec describes ``cursor`` as "begin with the
-vendor that comes after the specified one" without naming what value to
-pass — the only id-shaped field on a returned vendor is its own
-``identifier``, so ``_fetch_page`` threads the last record's ``identifier``
-through as the next cursor and stops once a page comes back shorter than
-``page_size`` (the same short-page heuristic ``knowbe4.py`` used before its
-own cursor migration). **Not verified against a live tenant** — same caveat
-as ``wiz.py``/``appomni.py``/etc., but doubly so here since the cursor
-semantics themselves are inferred rather than confirmed; verify pagination
-actually terminates before relying on this collector at scale.
+Pagination is cursor-based and HAL-wrapped: ``GET /vendors`` takes
+``cursor``/``page_size`` query params and returns
+``{"_links": {..., "next": {"href": ...}}, "_embedded": {"vendors": [...]}}``
+— confirmed against a live tenant. The ``cursor`` value is opaque (a
+``created_date_millis,identifier`` composite in practice) and is read
+verbatim from ``_links.next.href``'s ``cursor`` query param rather than
+reconstructed; pagination stops once a page's ``_links`` has no ``next``
+key, which is the API's own end-of-results signal.
 
 ``vendor_details`` fans out one ``GET /vendors/{identifier}`` per id across
 a thread pool, ids read from ``vendors`` internally unless a ``vendor_ids``
@@ -25,8 +21,19 @@ kwarg is given — the same per-item fan-out shape as ``appomni.py``'s
 summary fields; contract/financial/contact/risk detail only exists on the
 single-object endpoint (``Vendor``).
 
-Resources: ``vendors``, ``vendor_details``. Whistic's write endpoints
-(``vendors.update``/``.new``, vendor intake form submission) are
+``assessments`` (``GET /assessments``, HAL-wrapped like ``vendors``) tracks
+per-vendor due-diligence cycles: status/start/updated dates, one row per
+assessment. Its pagination is a *different* shape from ``vendors`` —
+``page_num``-based rather than cursor-based, and ``_links.next`` is present
+unconditionally (confirmed live: it still appears on a page that comes back
+empty), so unlike ``vendors`` the stop condition here is an empty page, not
+absence of a ``next`` link. The whole ``_links.next.href`` is threaded
+through as the cursor verbatim rather than reassembled, since its query
+params (``last_modified``, ``sort_direction``, ``page_num``) aren't worth
+reproducing by hand.
+
+Resources: ``vendors``, ``vendor_details``, ``assessments``. Whistic's write
+endpoints (``vendors.update``/``.new``, vendor intake form submission) are
 intentionally out of scope — posture is a read-only collection library.
 """
 
@@ -35,6 +42,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -43,6 +51,7 @@ logger = logging.getLogger("posture.collectors.whistic")
 _DEFAULT_ENDPOINT = "https://public.whistic.com/api"
 _VENDORS_PATH = "/vendors"
 _VENDOR_DETAIL_PATH = "/vendors/{identifier}"
+_ASSESSMENTS_PATH = "/assessments"
 
 _MAX_PAGE_SIZE = 100
 _VENDOR_DETAILS_MAX_WORKERS = 10
@@ -116,6 +125,16 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "custom_attributes": ("custom_attributes", "json"),
         },
     },
+    "assessments": {
+        "endpoint": _ASSESSMENTS_PATH,
+        "columns": {
+            "identifier": ("identifier", "str"),
+            "vendor_identifier": ("vendor_identifier", "str"),
+            "status": ("status", "str"),
+            "start_date": ("start_date", "datetime"),
+            "updated_date": ("updated_date", "datetime"),
+        },
+    },
 }
 
 
@@ -142,6 +161,8 @@ class WhisticCollector(Collector):
     ) -> tuple[list[dict[str, Any]], Any]:
         if resource == "vendor_details":
             return self._fetch_vendor_details(kwargs, cursor)
+        if resource == "assessments":
+            return self._fetch_assessments_page(kwargs, cursor)
         return self._fetch_vendors_page(kwargs, cursor)
 
     def _fetch_vendors_page(
@@ -153,9 +174,32 @@ class WhisticCollector(Collector):
             params["cursor"] = cursor
         params.update({k: v for k, v in kwargs.items() if k != "page_size"})
 
-        records = self._get(self._base_url + _VENDORS_PATH, params).json()
-        next_cursor = records[-1]["identifier"] if len(records) == page_size else None
+        envelope = self._get(self._base_url + _VENDORS_PATH, params).json()
+        records = envelope.get("_embedded", {}).get("vendors", [])
+
+        next_href = envelope.get("_links", {}).get("next", {}).get("href")
+        next_cursor = None
+        if next_href:
+            next_cursor = parse_qs(urlparse(next_href).query)["cursor"][0]
         return records, next_cursor
+
+    def _fetch_assessments_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
+        if cursor is None:
+            page_size = kwargs.get("page_size", _MAX_PAGE_SIZE)
+            params: dict[str, Any] = {"page_size": page_size}
+            params.update({k: v for k, v in kwargs.items() if k != "page_size"})
+            envelope = self._get(self._base_url + _ASSESSMENTS_PATH, params).json()
+        else:
+            envelope = self._get(cursor).json()  # cursor is the full next href
+
+        records = envelope.get("_embedded", {}).get("assessments", [])
+        if not records:
+            return [], None
+
+        next_href = envelope.get("_links", {}).get("next", {}).get("href")
+        return records, next_href
 
     def _fetch_vendor_details(
         self, kwargs: dict[str, Any], cursor: Any

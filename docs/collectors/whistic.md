@@ -14,6 +14,7 @@
 from posture import CCM
 
 ccm = CCM("whistic")  # credentials from WHISTIC_TOKEN
+df = ccm.collect("assessments")
 df = ccm.collect("vendor_details")
 df = ccm.collect("vendors")
 ```
@@ -37,8 +38,19 @@ for table in ccm.tables():
 
 ## Tables
 
+- [assessments](#assessments)
 - [vendor_details](#vendor_details)
 - [vendors](#vendors)
+
+### assessments
+
+| Column | Type |
+| --- | --- |
+| `identifier` | `str` |
+| `vendor_identifier` | `str` |
+| `status` | `str` |
+| `start_date` | `datetime` |
+| `updated_date` | `datetime` |
 
 ### vendor_details
 

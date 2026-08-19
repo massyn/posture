@@ -169,6 +169,7 @@
 
 ## [Whistic](collectors/whistic.md)
 
+- [assessments](collectors/whistic.md#assessments)
 - [vendor_details](collectors/whistic.md#vendor_details)
 - [vendors](collectors/whistic.md#vendors)
 
