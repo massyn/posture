@@ -24,8 +24,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
-_RECORD_LIMIT = 20
-
 _args = argparse.ArgumentParser(description=__doc__)
 _args.add_argument(
     "source", help="collector name, e.g. crowdstrike_cspm, or collector.table"
@@ -54,11 +52,9 @@ def write_records_json(df, path: Path) -> None:
 output_dir = Path("output")
 output_dir.mkdir(exist_ok=True)
 
-ccm = CCM(source, record_limit=_RECORD_LIMIT)
+ccm = CCM(source)
 
-resources = [_table_filter] if _table_filter else ccm.tables()
-
-for resource in resources:
+for resource in ccm.tables():
     try:
         df = ccm.collect(resource)
     except PostureError as exc:

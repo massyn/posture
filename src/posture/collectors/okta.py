@@ -13,7 +13,9 @@ deliberately left out of scope.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
+import random
 import re
 import time
 from typing import Any
@@ -21,6 +23,22 @@ from typing import Any
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
 logger = logging.getLogger("posture.collectors.okta")
+
+# Scoped resources (device_users, group_members, user_factors, user_roles)
+# fan out one network call per parent record. A handful of workers in
+# parallel meaningfully cuts wall time without hammering Okta's per-endpoint
+# rate limit into constant 429s. Kept low (vs. e.g. intune's 10) because
+# Okta's limits are comparatively tight and a 429 is expected routinely
+# under fan-out, not an edge case.
+_MAX_FANOUT_WORKERS = 5
+
+# A 429 on one parent's drain is handled locally (backoff + retry just that
+# parent) rather than propagating and forcing base.py to retry the entire
+# page — with up to 200 parents per page, discarding every sibling's
+# already-fetched results over one rate-limited parent would be wasteful.
+_MAX_DRAIN_RATE_LIMIT_RETRIES = 20
+_DRAIN_BACKOFF_BASE_SECONDS = 1.0
+_DRAIN_BACKOFF_CAP_SECONDS = 60.0
 
 _USERS_PATH = "/api/v1/users"
 _DEVICES_PATH = "/api/v1/devices"
@@ -264,12 +282,29 @@ class OktaCollector(Collector):
             parent_path, kwargs, cursor
         )
 
+        parent_ids = [pid for p in parents if (pid := p.get("id"))]
         records: list[dict[str, Any]] = []
-        for parent in parents:
-            parent_id = parent.get("id")
-            if not parent_id:
-                continue
-            records.extend(self._drain_scoped(child_path_template, id_field, parent_id))
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=_MAX_FANOUT_WORKERS
+        ) as executor:
+            futures = {
+                executor.submit(
+                    self._drain_scoped, child_path_template, id_field, parent_id
+                ): parent_id
+                for parent_id in parent_ids
+            }
+            try:
+                for future in concurrent.futures.as_completed(futures):
+                    records.extend(future.result())
+            except BaseException:
+                # A worker hit something other than a 429 (already retried
+                # locally by _drain_scoped) — e.g. UnauthorizedSignal or a
+                # connection error. Cancel unstarted futures so a dead
+                # token/connection doesn't get retried against the whole
+                # remaining queue before base.py's retry/reauth handler runs.
+                for pending in futures:
+                    pending.cancel()
+                raise
 
         return records, next_parents_cursor
 
@@ -278,8 +313,24 @@ class OktaCollector(Collector):
     ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         url = self._base_url + path_template.format(**{id_field: parent_id})
+        rate_limit_attempt = 0
         while url:
-            response = self._get(url)
+            try:
+                response = self._get(url)
+            except RateLimitedSignal as exc:
+                rate_limit_attempt += 1
+                if rate_limit_attempt > _MAX_DRAIN_RATE_LIMIT_RETRIES:
+                    raise
+                wait = min(
+                    exc.retry_after
+                    or _DRAIN_BACKOFF_BASE_SECONDS * (2**rate_limit_attempt),
+                    _DRAIN_BACKOFF_CAP_SECONDS,
+                )
+                # Jitter (+/-25%) so the fan-out's other workers, which likely
+                # hit the same rate limit bucket around the same time, don't
+                # all wake up and retry in lockstep.
+                time.sleep(wait * random.uniform(0.75, 1.25))
+                continue
             body = response.json()
             if isinstance(body, list):
                 for record in body:
