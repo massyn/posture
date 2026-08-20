@@ -15,6 +15,9 @@ df = ccm.collect("vulnerabilities", filter="status:'open'")   # vendor-dialect k
 df = ccm.collect("vulnerabilities", facet=["cve"])  # trim payload: CVE fields only, no remediation
 df = ccm.collect("vulnerability_remediations")     # derived resource — no second API call
 ccm.flush_cache()                                  # the only cache invalidation
+
+for df in ccm.collect_page("machine_vulnerabilities"):  # one DataFrame per API page
+    ...                                                  # bounded memory for large resources
 ```
 
 This document is the canonical reference for the library's design: the collect/parse
@@ -57,26 +60,29 @@ tests/
 2. **Config resolution:** explicit constructor dict beats env vars, per key. Validate
    config at construction (fail fast, name the env var checked); authenticate lazily on
    first call. `__repr__` redacts secrets (Databricks notebooks auto-repr).
-3. **`collect()` returns a complete pandas df, always.** Pagination is internal and
-   invisible. All-or-nothing: if the pull dies mid-pagination after retries, raise
-   `IncompleteCollection` and return nothing. Partial data does not exist in this
-   library's vocabulary — a partial snapshot presented as complete is a compliance lie.
-4. **Memory ceiling is one node's RAM, deliberately.** Documented in README as a design
-   choice. Collectors are generators internally so a `stream()` API could be added later —
-   but do NOT build stream() now.
-5. **kwargs = vendor query dialect** (FQL for Crowdstrike). Always optional — bare
+3. **`collect()` returns a complete pandas df, always; `collect_page()` returns one df
+   per API page, for resources too large to hold in memory at once.** Pagination is
+   internal and invisible to `collect()`; `collect_page()` is the one place it's exposed,
+   deliberately, as `for df in ccm.collect_page(resource)`. Both share the same
+   all-or-nothing guarantee: if the pull dies mid-pagination after retries, raise
+   `IncompleteCollection` — `collect()` returns nothing, and `collect_page()`'s generator
+   raises out of the loop the caller is iterating, before any page is treated as final.
+   Partial data does not exist in this library's vocabulary — a partial snapshot presented
+   as complete is a compliance lie. `collect()` is a thin wrapper: `pd.concat(list(
+   collect_page(...)))`.
+4. **kwargs = vendor query dialect** (FQL for Crowdstrike). Always optional — bare
    `collect(resource)` must work. Unknown kwargs raise. Never invent a unified
    cross-vendor filter language. Default filters live in the resource definition.
    Where a collector merges kwargs onto its own default params for the same endpoint,
    kwargs must win — an operator overriding a built-in default is expected, not an edge case.
-6. **Credentials never travel through kwargs.** Constructor = "who am I";
+5. **Credentials never travel through kwargs.** Constructor = "who am I";
    kwargs = "what data do I want".
-7. **Snapshot semantics.** Full pull, point in time. No incremental sync, ever.
-8. **Token refresh mid-run is a base-class concern.** Crowdstrike OAuth tokens live
+6. **Snapshot semantics.** Full pull, point in time. No incremental sync, ever.
+7. **Token refresh mid-run is a base-class concern.** Crowdstrike OAuth tokens live
    ~30 min; pulls can run hours. Re-auth on 401 / proactive refresh inside the pagination
    loop, at the request level. Retry at request level only — never restart a stream
    that has already yielded.
-9. **Transient connection errors are retried, not fatal.** `ConnectionError`,
+8. **Transient connection errors are retried, not fatal.** `ConnectionError`,
    `Timeout`, and `ChunkedEncodingError` get up to 2 retries with a fixed 5s wait,
    at the request level, in the base class — a network blip must not kill an
    otherwise-healthy collection. Retries exhausted → the underlying exception
@@ -84,11 +90,14 @@ tests/
    This budget is fixed and shared by every collector — if a specific endpoint's
    response is simply slow (a large unpaginated payload, for example), the fix is a
    longer per-request timeout for that endpoint, not a bigger retry budget.
-10. **Session cache:** raw records cached post-collect pre-parse, keyed by
-    (resource, frozen kwargs). Retained for instance lifetime IFF the resource has derived
-    resources declared; otherwise dropped when parse returns. NO TTL. No cache config.
-    `flush_cache()` is the only invalidation. Memory-only — never a disk cache.
-11. **Raw `requests` for Crowdstrike — no FalconPy.** Rule: vendor SDKs only when the API
+9. **Session cache:** a resource's raw records are cached only when another resource's
+   manifest declares `derived_from` or `requires` it — everything else streams straight
+   from fetch through `parse()`, page by page, and is never cached or held as a whole.
+   A cached resource is disk-backed (see `posture/_spill.py`), keyed by
+   (resource, frozen kwargs), and replayed back in bounded batches — never as one
+   in-memory list, however large the resource. Retained for instance lifetime; NO TTL,
+   no cache config. `flush_cache()` is the only invalidation.
+10. **Raw `requests` for Crowdstrike — no FalconPy.** Rule: vendor SDKs only when the API
     has bespoke machinery the base class can't generalise (pyTenable's export jobs
     qualify, later, as an extra). Crowdstrike is generic REST — that pattern is the
     base class's job.
@@ -260,9 +269,10 @@ the signature above rather than the older `def __init__(self, config: dict[str, 
   as optional extras. `.env` loading is part and parcel of the library, not optional:
   `posture` calls `load_dotenv()` unconditionally at import time. It never overrides
   variables already set in the environment.
-- **Out of scope for v1 — do not build:** Store/storage backends, `stream()`, TTLs or
-  cache configuration, incremental sync, alert delivery, per-collector pip packages,
-  unified filter languages.
+- **Out of scope for v1 — do not build:** Store/storage backends, TTLs or cache
+  configuration, incremental sync, alert delivery, per-collector pip packages,
+  unified filter languages. (`collect_page()` — see locked decision #3 — shipped;
+  it's the deferred `stream()` mentioned in earlier versions of this doc.)
 - Production-ready code only. No placeholder code, no speculative syntax, no TODO-stubs
   that would break at runtime.
 - Python 3.10+. Type hints throughout. pytest. Keep it simple — this library is five

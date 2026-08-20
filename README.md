@@ -44,6 +44,23 @@ ccm.flush_cache()                                  # the only cache invalidation
 `collect()` always returns a complete `pandas.DataFrame` for the requested resource, or
 raises — there is no such thing as a partial snapshot in this library.
 
+### Paginated retrieval, for large resources
+
+For a resource too large to comfortably hold in memory as one DataFrame (e.g. MDE's
+`machine_vulnerabilities`), use `collect_page()` instead — it yields one DataFrame per
+underlying API page, so peak memory is bounded to a single page rather than the whole
+resource:
+
+```python
+for df in ccm.collect_page("machine_vulnerabilities"):
+    df.to_sql("machine_vulnerabilities", con, if_exists="append", index=False)
+```
+
+`collect()` is a thin wrapper over `collect_page()` — it just concatenates every page
+into one DataFrame — so both share the same all-or-nothing guarantee: if collection
+fails partway through, an exception propagates and no partial data is left for the
+caller to mistake for a complete snapshot.
+
 ### Discovering what's available
 
 ```python

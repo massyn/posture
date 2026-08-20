@@ -1,18 +1,21 @@
-"""Disk-backed spill for raw records, so a Collector never has to hold every
-page of a resource in memory simultaneously during a long pagination run —
-the actual memory-exhaustion pattern seen on MDE's machine_vulnerabilities
-during Patch Tuesday CVE spikes (many large pages, retries prolonging the
-fetch phase, all held in one growing in-memory list at once).
+"""Disk-backed spill for raw records reused across resources, so a Collector
+never has to hold a whole resource in memory just because a second resource
+(via manifest 'derived_from'/'requires') needs its raw records again later.
+
+Plain, non-reused resources no longer spill to disk at all: Collector.
+collect_page() streams each fetched page straight through parse() and
+discards it, so peak memory is one page, not one resource. Disk spill now
+exists only for the reuse case — the fetch phase of that reused resource
+still writes each page to disk as it goes, and its records are replayed back
+in bounded batches (read_pages), never as a single in-memory list.
 
 One SpillStore per Collector instance, backed by one unique temp directory
 per instance (tempfile.mkdtemp() guarantees this — no fixed path, so a new
 run can never see a previous run's, or another instance's, files). Nothing
 written through it is retained longer than necessary:
 
-- Transient reads (a resource nobody else needs) delete their file the
-  moment they've been read back.
-- Cached reads (a resource reused via manifest 'derived_from'/'requires')
-  persist until Collector.flush_cache() deletes them, or the run ends.
+- Cached resources (reused via manifest 'derived_from'/'requires') persist
+  until Collector.flush_cache() deletes them, or the run ends.
 - The whole directory is removed at process exit (atexit) as a backstop,
   and a sweep on the next Collector's construction removes any directory
   left behind by a run that never reached its own cleanup (e.g. killed by
@@ -31,12 +34,18 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 logger = logging.getLogger("posture.spill")
 
 _DIR_PREFIX = "posture-spill-"
 _ORPHAN_MAX_AGE_SECONDS = 24 * 60 * 60
+
+# Batch size for replaying a cached resource's records back off disk. Bounds
+# memory the same way collect_page() bounds it for a fresh fetch — a cached
+# derived_from/requires parent is replayed in chunks of this size rather than
+# as one list, regardless of how many original API pages it was written in.
+_REPLAY_BATCH_SIZE = 10_000
 
 
 def _sweep_orphans() -> None:
@@ -65,13 +74,19 @@ class SpillStore:
         return self._dir / f"{uuid.uuid4().hex}-{key}.jsonl"
 
     @staticmethod
-    def read_records(path: Path) -> list[dict[str, Any]]:
-        records: list[dict[str, Any]] = []
+    def read_pages(path: Path) -> Iterator[list[dict[str, Any]]]:
+        """Replay a spilled resource back in bounded batches, never as one list."""
+        batch: list[dict[str, Any]] = []
         with path.open("r", encoding="utf-8") as fh:
             for line in fh:
-                if line.strip():
-                    records.append(json.loads(line))
-        return records
+                if not line.strip():
+                    continue
+                batch.append(json.loads(line))
+                if len(batch) >= _REPLAY_BATCH_SIZE:
+                    yield batch
+                    batch = []
+        if batch:
+            yield batch
 
     @staticmethod
     def delete(path: Path) -> None:

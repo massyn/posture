@@ -27,6 +27,11 @@ _FALSE_STRINGS = {"false", "0", "no", "n"}
 # status yet. That's a legitimate value, not a parse failure, so it's coerced
 # to None silently rather than logged as an unparseable-bool warning.
 _UNKNOWN_STRINGS = {"unknown"}
+# Some sources use a zero/epoch date as a "never happened" sentinel (e.g.
+# Intune's lastSyncDateTime for a device that has never synced). Those are
+# legitimately out of pandas' Timestamp range, not a data-quality problem, so
+# they're coerced to NaT silently rather than logged as an out-of-range warning.
+_SENTINEL_DATETIMES = {"0001-01-01T00:00:00Z", "1601-01-01T00:00:00Z"}
 
 
 def parse(
@@ -182,9 +187,10 @@ def _coerce_datetime(
         <= parsed
         <= pd.Timestamp.max.tz_localize("UTC")
     ):
-        logger.warning(
-            "Out-of-range datetime for %s.%s: sample=%r", resource, column, value
-        )
+        if str(value) not in _SENTINEL_DATETIMES:
+            logger.warning(
+                "Out-of-range datetime for %s.%s: sample=%r", resource, column, value
+            )
         return pd.NaT
 
     if parsed is None:

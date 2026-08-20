@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pandas as pd
 import requests
@@ -173,9 +173,33 @@ class Collector(ABC):
     def collect(self, resource: str, **kwargs: Any) -> pd.DataFrame:
         """Return a complete DataFrame for ``resource``, always.
 
-        All-or-nothing: if collection dies mid-pagination after retries are
-        exhausted, raises IncompleteCollection rather than returning a
-        partial snapshot.
+        A thin wrapper over collect_page(): runs the full pagination and
+        concatenates every page's DataFrame. All-or-nothing: if collection
+        dies mid-pagination after retries are exhausted, collect_page raises
+        IncompleteCollection before this returns anything — no partial
+        snapshot is ever handed back.
+
+        For a resource too large to hold comfortably in memory as a single
+        DataFrame, use collect_page() directly and process one page at a time.
+        """
+        pages = list(self.collect_page(resource, **kwargs))
+        if not pages:
+            manifest = self.schema(resource)
+            df = pd.DataFrame(columns=list(manifest["columns"].keys()))
+            df["_collected_at"] = pd.Timestamp(datetime.now(timezone.utc))
+            return df
+        return pd.concat(pages, ignore_index=True)
+
+    def collect_page(self, resource: str, **kwargs: Any) -> Iterator[pd.DataFrame]:
+        """Yield one parsed DataFrame per underlying API page for ``resource``.
+
+        Bounds peak memory to a single page rather than the whole resource —
+        pages are parsed and yielded as they're fetched, never accumulated.
+        All-or-nothing still holds: if collection fails mid-pagination, the
+        exception raised here (IncompleteCollection) propagates out of the
+        loop the caller is iterating, same as any other generator failure —
+        it's the caller's job to treat a raised exception as "nothing valid
+        was produced", exactly as collect() does by wrapping this in list().
         """
         manifest = self.manifest.get(resource)
         if manifest is None:
@@ -187,101 +211,123 @@ class Collector(ABC):
 
         derived_from = manifest.get("derived_from")
         source_resource = derived_from if derived_from is not None else resource
-        raw_records = self._get_raw(source_resource, kwargs)
+        for raw_page in self._iter_raw_pages(source_resource, kwargs):
+            df = parse(raw_page, manifest, resource=resource)
+            df["_collected_at"] = pd.Timestamp(datetime.now(timezone.utc))
+            yield df
         self._reports[resource] = self._reports[source_resource]
 
-        df = parse(raw_records, manifest, resource=resource)
-        df["_collected_at"] = pd.Timestamp(datetime.now(timezone.utc))
-        return df
-
     def _get_raw(self, resource: str, kwargs: dict[str, Any]) -> list[dict[str, Any]]:
+        """Materialize a resource's raw records as one list.
+
+        For internal collector use only (a collector's own fan-out logic
+        needing another resource's ids/records again, e.g. an org list
+        driving per-org detail calls via manifest 'requires') — never for the
+        main collect path, which stays page-bounded via collect_page(). Only
+        safe for resources small enough to hold in memory at once; the
+        resources this is called on today (org/zone/vendor lists, etc.) are.
+        """
+        raw_records: list[dict[str, Any]] = []
+        for page in self._iter_raw_pages(resource, kwargs):
+            raw_records.extend(page)
+        return raw_records
+
+    def _iter_raw_pages(
+        self, resource: str, kwargs: dict[str, Any]
+    ) -> Iterator[list[dict[str, Any]]]:
         cache_key = (resource, tuple(sorted(kwargs.items())))
         cached = self._cache.get(cache_key)
         if cached is not None:
-            return self._spill.read_records(cached.path)
+            yield from self._spill.read_pages(cached.path)
+            return
 
-        path, report = self._collect_raw(resource, kwargs)
-
-        # Two distinct relationships justify caching: "derived_from" (a
-        # parse-time relationship — another resource's rows are exploded out
-        # of this one's raw records, e.g. vulnerability_remediations out of
-        # vulnerabilities) and "requires" (a collect-time relationship — a
+        # Two distinct relationships justify caching to disk: "derived_from"
+        # (a parse-time relationship — another resource's rows are exploded
+        # out of this one's raw records, e.g. vulnerability_remediations out
+        # of vulnerabilities) and "requires" (a collect-time relationship — a
         # collector needs this resource's raw records again internally, e.g.
         # MDE's machine_vulnerabilities re-reading machines' ids for its
         # fan-out). Neither implies the other: a "requires" consumer fetches
         # its own records over the network rather than exploding this
         # resource's raw records, so it must not be parsed via derived_from's
-        # record_path/$parent. machinery.
+        # record_path/$parent machinery. A resource nobody reuses is never
+        # written to disk at all — it streams straight from fetch to parse.
         is_reused = any(
             m.get("derived_from") == resource or m.get("requires") == resource
             for m in self.manifest.values()
         )
-        raw_records = self._spill.read_records(path)
-        if is_reused:
-            # Kept on disk for later reuse rather than in memory: the path
-            # lives in self._cache for the collector's lifetime, but the
-            # records themselves are only ever materialized transiently, on
-            # each read. Cleaned up by flush_cache()/process exit.
-            self._cache[cache_key] = _CacheEntry(path, report)
-        else:
-            self._spill.delete(path)
-        self._reports[resource] = report
-        return raw_records
-
-    def _collect_raw(
-        self, resource: str, kwargs: dict[str, Any]
-    ) -> tuple[Path, _CollectionReport]:
         self._ensure_authenticated()
 
         report = _CollectionReport(resource=resource)
         started = time.monotonic()
-        path = self._spill.new_path(resource)
         count = 0
-
+        path = self._spill.new_path(resource) if is_reused else None
+        fh = path.open("w", encoding="utf-8") if path is not None else None
+        # next(paginator) is wrapped in try/except so only fetch/pagination
+        # failures become IncompleteCollection; `yield page` below is
+        # deliberately outside that try — an exception a consumer raises
+        # while processing a yielded page (e.g. a parse() error downstream)
+        # resumes *here* at the yield point, and must propagate as itself,
+        # not get relabelled as a failed collection.
+        paginator = self._paginate(resource, kwargs, report)
         try:
-            with path.open("w", encoding="utf-8") as fh:
-                for page in self._paginate(resource, kwargs, report):
-                    if self._record_limit is not None:
-                        remaining = self._record_limit - count
-                        if remaining <= 0:
-                            break
-                        if len(page) > remaining:
-                            page = page[:remaining]
+            while True:
+                try:
+                    page = next(paginator)
+                except StopIteration:
+                    break
+                except IncompleteCollection:
+                    raise
+                except Exception as exc:  # noqa: BLE001 - convert to domain exception
+                    raise IncompleteCollection(
+                        f"Collection of '{resource}' failed after {count} records: {exc}",
+                        source=self.env_prefix.lower(),
+                        resource=resource,
+                        records_so_far=count,
+                    ) from exc
+
+                if self._record_limit is not None:
+                    remaining = self._record_limit - count
+                    if remaining <= 0:
+                        break
+                    if len(page) > remaining:
+                        page = page[:remaining]
+                if fh is not None:
                     for record in page:
                         fh.write(json.dumps(record))
                         fh.write("\n")
-                    count += len(page)
-                    report.pages += 1
-                    report.records = count
-                    logger.debug(
-                        "fetched page",
-                        extra={
-                            "source": self.env_prefix.lower(),
-                            "resource": resource,
-                            "page": report.pages,
-                            "records": report.records,
-                        },
-                    )
-                    if (
-                        self._record_limit is not None
-                        and count >= self._record_limit
-                    ):
-                        break
-        except IncompleteCollection:
-            self._spill.delete(path)
+                count += len(page)
+                report.pages += 1
+                report.records = count
+                logger.debug(
+                    "fetched page",
+                    extra={
+                        "source": self.env_prefix.lower(),
+                        "resource": resource,
+                        "page": report.pages,
+                        "records": report.records,
+                    },
+                )
+                yield page
+                if self._record_limit is not None and count >= self._record_limit:
+                    break
+        except Exception:
+            if path is not None:
+                self._spill.delete(path)
             raise
-        except Exception as exc:  # noqa: BLE001 - convert to domain exception
-            self._spill.delete(path)
-            raise IncompleteCollection(
-                f"Collection of '{resource}' failed after {count} records: {exc}",
-                source=self.env_prefix.lower(),
-                resource=resource,
-                records_so_far=count,
-            ) from exc
+        finally:
+            if fh is not None:
+                fh.close()
 
         report.duration_seconds = time.monotonic() - started
         report.collected_at = datetime.now(timezone.utc)
-        return path, report
+        self._reports[resource] = report
+        if path is not None:
+            # Kept on disk for later reuse rather than in memory: the path
+            # lives in self._cache for the collector's lifetime, but the
+            # records themselves are only ever materialized transiently, in
+            # replay batches. Cleaned up by flush_cache()/process exit.
+            self._cache[cache_key] = _CacheEntry(path, report)
 
     def _paginate(
         self, resource: str, kwargs: dict[str, Any], report: _CollectionReport
