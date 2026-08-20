@@ -256,7 +256,7 @@ class Collector(ABC):
             m.get("derived_from") == resource or m.get("requires") == resource
             for m in self.manifest.values()
         )
-        self._ensure_authenticated()
+        self._ensure_authenticated_with_retry(resource)
 
         report = _CollectionReport(resource=resource)
         started = time.monotonic()
@@ -400,6 +400,33 @@ class Collector(ABC):
             self._authenticate()
             self._authenticated = True
             logger.debug("authenticated", extra={"source": self.env_prefix.lower()})
+
+    def _ensure_authenticated_with_retry(self, resource: str) -> None:
+        """Like ``_ensure_authenticated``, but retries transient connection
+        errors/timeouts (e.g. a slow token endpoint) the same way fetch
+        requests do. Deliberately outside ``_request_with_retry``'s try/except
+        so that a permanent auth failure (e.g. AuthenticationError on bad
+        credentials) still propagates raw rather than being relabelled as
+        IncompleteCollection."""
+        connection_attempt = 0
+        while True:
+            try:
+                self._ensure_authenticated()
+                return
+            except _TRANSIENT_CONNECTION_ERRORS as exc:
+                connection_attempt += 1
+                if connection_attempt > _MAX_CONNECTION_RETRIES:
+                    raise
+                logger.warning(
+                    "transient connection error during authentication, retrying",
+                    extra={
+                        "source": self.env_prefix.lower(),
+                        "resource": resource,
+                        "attempt": connection_attempt,
+                        "error": str(exc),
+                    },
+                )
+                time.sleep(_CONNECTION_RETRY_WAIT_SECONDS)
 
     @abstractmethod
     def _authenticate(self) -> None:
