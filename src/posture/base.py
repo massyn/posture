@@ -16,7 +16,7 @@ import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -53,6 +53,11 @@ _CONNECTION_RETRY_WAIT_SECONDS = 5.0
 # Must stay >= the largest fan-out worker count across collectors (MDE's
 # machine_vulnerabilities defaults to 25 workers).
 _HTTP_POOL_MAXSIZE = 32
+
+# Refresh a token this many seconds before it actually expires, so a request
+# already in flight doesn't race the token dying mid-call.
+_TOKEN_REFRESH_MARGIN_SECONDS = 300
+
 _TRANSIENT_CONNECTION_ERRORS = (
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
@@ -123,6 +128,12 @@ class Collector(ABC):
         self._session.mount("https://", adapter)
         self._session.mount("http://", adapter)
         self._authenticated = False
+        #: When set by a concrete collector's _authenticate() (e.g. Azure AD
+        #: collectors, which know their token's expires_in), enables proactive
+        #: refresh in _ensure_authenticated() ahead of expiry. Optional: a
+        #: collector that never sets it just keeps the existing
+        #: authenticate-once-per-run behaviour.
+        self._token_expires_at: datetime | None = None
         self._spill = SpillStore()
         self._cache: dict[tuple[str, tuple], _CacheEntry] = {}
         self._reports: dict[str, _CollectionReport] = {}
@@ -351,6 +362,7 @@ class Collector(ABC):
         connection_attempt = 0
         while True:
             try:
+                self._ensure_authenticated_with_retry(resource)
                 return self._fetch_page(resource, kwargs, cursor)
             except RateLimitedSignal as exc:
                 report.rate_limited_count += 1
@@ -378,7 +390,7 @@ class Collector(ABC):
                     raise
                 report.retries += 1
                 self._authenticated = False
-                self._ensure_authenticated()
+                self._ensure_authenticated_with_retry(resource)
             except _TRANSIENT_CONNECTION_ERRORS as exc:
                 connection_attempt += 1
                 if connection_attempt > _MAX_CONNECTION_RETRIES:
@@ -396,7 +408,13 @@ class Collector(ABC):
                 time.sleep(_CONNECTION_RETRY_WAIT_SECONDS)
 
     def _ensure_authenticated(self) -> None:
-        if not self._authenticated:
+        near_expiry = (
+            self._token_expires_at is not None
+            and datetime.now(timezone.utc)
+            >= self._token_expires_at
+            - timedelta(seconds=_TOKEN_REFRESH_MARGIN_SECONDS)
+        )
+        if not self._authenticated or near_expiry:
             self._authenticate()
             self._authenticated = True
             logger.debug("authenticated", extra={"source": self.env_prefix.lower()})

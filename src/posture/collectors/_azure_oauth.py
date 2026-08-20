@@ -17,7 +17,7 @@ using it.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 
 import requests
 
@@ -25,6 +25,15 @@ from posture.base import RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.azure_oauth")
+
+
+class AzureAdToken(NamedTuple):
+    access_token: str
+    #: Token lifetime in seconds, as reported by Azure AD. Tenant-configurable
+    #: and undocumented to us (Conditional Access sign-in-frequency/token
+    #: lifetime policies can shorten it without notice) — callers should treat
+    #: this as authoritative rather than assuming a fixed default.
+    expires_in: int
 
 
 def fetch_azure_ad_token(
@@ -35,7 +44,7 @@ def fetch_azure_ad_token(
     client_secret: str,
     scope: str,
     source: str,
-) -> str:
+) -> AzureAdToken:
     response = session.post(
         f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
         data={
@@ -59,7 +68,8 @@ def fetch_azure_ad_token(
             extra={"source": source.lower(), "status_code": response.status_code},
         )
     response.raise_for_status()
-    return response.json()["access_token"]
+    body = response.json()
+    return AzureAdToken(access_token=body["access_token"], expires_in=int(body["expires_in"]))
 
 
 def graph_get_json(

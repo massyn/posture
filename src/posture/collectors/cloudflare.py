@@ -149,8 +149,7 @@ class CloudflareCollector(Collector):
         page = cursor if cursor is not None else 1
         params: dict[str, Any] = {"page": page, "per_page": _PAGE_SIZE}
         params.update(kwargs)
-        response = self._get(_BASE_URL + _ZONES_PATH, params=params)
-        payload = response.json()
+        payload = self._get_json(_BASE_URL + _ZONES_PATH, params=params)
 
         records = payload.get("result", []) or []
         result_info = payload.get("result_info") or {}
@@ -195,8 +194,7 @@ class CloudflareCollector(Collector):
             params = dict(base_params)
             params["page"] = page
             params["per_page"] = _PAGE_SIZE
-            response = self._get(_BASE_URL + path, params=params)
-            payload = response.json()
+            payload = self._get_json(_BASE_URL + path, params=params)
 
             page_records = payload.get("result", []) or []
             for record in page_records:
@@ -228,3 +226,24 @@ class CloudflareCollector(Collector):
             )
         response.raise_for_status()
         return response
+
+    def _get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """GET and parse the Cloudflare v4 envelope, treating ``success: false``
+        as a failure.
+
+        Cloudflare returns HTTP 200 even for logical failures (bad token
+        scope, invalid params, etc.) — the outcome lives in the JSON body's
+        ``success``/``errors`` fields, with ``result`` coming back ``null``.
+        Without this check such a failure looks identical to "zero records",
+        so the collector silently reports an empty resource instead of
+        surfacing the error.
+        """
+        payload = self._get(url, params=params).json()
+        if payload.get("success") is False:
+            errors = payload.get("errors") or []
+            detail = "; ".join(
+                str(err.get("message", err)) if isinstance(err, dict) else str(err)
+                for err in errors
+            ) or "no error detail returned"
+            raise RuntimeError(f"Cloudflare API request failed: {detail}")
+        return payload

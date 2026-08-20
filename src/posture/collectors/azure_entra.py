@@ -169,7 +169,10 @@ class AzureEntraCollector(Collector):
             scope="https://graph.microsoft.com/.default",
             source="Azure Entra",
         )
-        self._session.headers["Authorization"] = f"Bearer {token}"
+        self._session.headers["Authorization"] = f"Bearer {token.access_token}"
+        self._token_expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=token.expires_in
+        )
 
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any

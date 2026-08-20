@@ -11,7 +11,7 @@ def test_machines_pagination() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -43,7 +43,7 @@ def test_vulnerabilities_follows_skip_based_pagination_across_full_pages() -> No
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
 
@@ -73,7 +73,7 @@ def test_machine_vulnerabilities_single_page() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -100,7 +100,7 @@ def test_machine_vulnerabilities_follows_odata_next_link() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     next_link = (
@@ -138,7 +138,7 @@ def test_machine_vulnerabilities_retries_on_rate_limit() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -172,7 +172,7 @@ def test_vulnerabilities_retries_on_bad_gateway() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(

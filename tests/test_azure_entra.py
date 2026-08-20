@@ -8,7 +8,7 @@ def test_users_follows_odata_next_link() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -42,7 +42,7 @@ def test_signins_applies_days_filter() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -68,7 +68,7 @@ def test_audit_logs_collects() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(

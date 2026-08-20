@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta, timezone
+
 import responses
 
 from posture import CCM
+from posture.collectors.intune import IntuneCollector
 
 
 @responses.activate
@@ -8,7 +11,7 @@ def test_managed_devices_follows_odata_next_link() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -42,7 +45,7 @@ def test_managed_device_detail_batches_ids_from_managed_devices() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -91,7 +94,7 @@ def test_attack_simulation_users_drains_pagination_per_simulation() -> None:
     responses.add(
         responses.POST,
         "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
-        json={"access_token": "tok"},
+        json={"access_token": "tok", "expires_in": 3600},
         status=200,
     )
     responses.add(
@@ -125,3 +128,26 @@ def test_attack_simulation_users_drains_pagination_per_simulation() -> None:
     assert len(df) == 2
     assert list(df["user_id"]) == ["user-1", "user-2"]
     assert list(df["simulation_id"]) == ["sim-1", "sim-1"]
+
+
+@responses.activate
+def test_ensure_authenticated_refreshes_near_expiry_token() -> None:
+    responses.add(
+        responses.POST,
+        "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
+        json={"access_token": "tok", "expires_in": 3600},
+        status=200,
+    )
+
+    collector = IntuneCollector(
+        {"tenant_id": "tenant-1", "client_id": "id", "client_secret": "secret"}
+    )
+    collector._authenticated = True
+    collector._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=60)
+
+    collector._ensure_authenticated()
+
+    assert len(responses.calls) == 1
+    assert collector._token_expires_at > datetime.now(timezone.utc) + timedelta(
+        seconds=3000
+    )

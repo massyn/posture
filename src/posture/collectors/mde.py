@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -263,7 +264,10 @@ class MdeCollector(Collector):
             scope="https://api.securitycenter.windows.com/.default",
             source="MDE",
         )
-        self._session.headers["Authorization"] = f"Bearer {token}"
+        self._session.headers["Authorization"] = f"Bearer {token.access_token}"
+        self._token_expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=token.expires_in
+        )
 
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any

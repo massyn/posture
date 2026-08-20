@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import requests
@@ -141,12 +142,20 @@ MANIFEST: dict[str, dict[str, Any]] = {
     "managed_device_detail": {
         # Not derived_from "managed_devices": each device's detail is its own
         # network call by id, not data nested inside the list record.
+        # requires="managed_devices" so the id list is served from the
+        # on-disk cache instead of re-collecting the full resource from
+        # the network a second time.
         "endpoint": _ENDPOINTS["managed_device_detail"],
         "columns": _DEVICE_DETAIL_COLUMNS,
+        "requires": "managed_devices",
     },
     "device_configuration_detail": {
+        # requires="device_configurations" so the id list is served from
+        # the on-disk cache instead of re-collecting the full resource from
+        # the network a second time.
         "endpoint": _ENDPOINTS["device_configuration_detail"],
         "columns": _CONFIGURATION_COLUMNS,
+        "requires": "device_configurations",
     },
     "device_compliance_policies": {
         "endpoint": _ENDPOINTS["device_compliance_policies"],
@@ -203,7 +212,11 @@ MANIFEST: dict[str, dict[str, Any]] = {
         # objects (click/report timestamps, training progress) — kept as
         # json blobs rather than exploded into further derived resources,
         # consistent with how device_configurations treats nested lists.
+        # requires="attack_simulations" so the id list is served from the
+        # on-disk cache instead of re-collecting the full resource from
+        # the network a second time.
         "endpoint": _ENDPOINTS["attack_simulation_users"],
+        "requires": "attack_simulations",
         "columns": {
             "simulation_id": ("_simulation_id", "str"),
             "user_id": ("simulationUser.userId", "str"),
@@ -242,7 +255,10 @@ class IntuneCollector(Collector):
             scope="https://graph.microsoft.com/.default",
             source="Intune",
         )
-        self._session.headers["Authorization"] = f"Bearer {token}"
+        self._session.headers["Authorization"] = f"Bearer {token.access_token}"
+        self._token_expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=token.expires_in
+        )
 
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
