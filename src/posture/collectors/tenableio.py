@@ -68,7 +68,7 @@ class TenableioCollector(Collector):
     env_prefix = "TENABLEIO"
     display_name = "Tenable.io"
     manifest = MANIFEST
-    required_config_keys = ("access_key", "secret_key")
+    config_keys = {"access_key": True, "secret_key": True}
 
     def _authenticate(self) -> None:
         try:

@@ -158,7 +158,7 @@ class AzureEntraCollector(Collector):
     env_prefix = "AZURE"
     display_name = "EntraID"
     manifest = MANIFEST
-    required_config_keys = ("tenant_id", "client_id", "client_secret")
+    config_keys = {"tenant_id": True, "client_id": True, "client_secret": True}
 
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(

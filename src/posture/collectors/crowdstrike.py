@@ -196,7 +196,7 @@ class CrowdstrikeCollector(Collector):
     env_prefix = "CROWDSTRIKE"
     display_name = "CrowdStrike"
     manifest = MANIFEST
-    required_config_keys = ("client_id", "client_secret")
+    config_keys = {"client_id": True, "client_secret": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

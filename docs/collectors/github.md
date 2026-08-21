@@ -8,6 +8,12 @@
 | --- | --- |
 | `token` | `GITHUB_TOKEN` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `endpoint` | `GITHUB_ENDPOINT` |
+
 ## Example
 
 ```python

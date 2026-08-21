@@ -11,7 +11,6 @@ Resources: ``computers``.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -72,20 +71,19 @@ class WorkspaceOneCollector(Collector):
     env_prefix = "WORKSPACEONE"
     display_name = "Workspace ONE"
     manifest = MANIFEST
-    # token_url is deliberately not a required key: it's resolved with a
-    # default below (accelerator parity), not fail-fast like the rest.
-    required_config_keys = ("client_id", "client_secret", "api_server")
+    config_keys = {
+        "client_id": True,
+        "client_secret": True,
+        "api_server": True,
+        "token_url": False,
+    }
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
         self._base_url = ""
-        self._token_url = (
-            (config or {}).get("token_url")
-            or os.environ.get("WORKSPACEONE_TOKEN_URL")
-            or _DEFAULT_TOKEN_URL
-        )
+        self._token_url = self._config.get("token_url") or _DEFAULT_TOKEN_URL
 
     def _authenticate(self) -> None:
         response = self._session.post(

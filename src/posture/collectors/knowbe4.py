@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
-import os
 import threading
 import time
 from collections import deque
@@ -146,17 +145,13 @@ class Knowbe4Collector(Collector):
     env_prefix = "KNOWBE4"
     display_name = "KnowBe4"
     manifest = MANIFEST
-    required_config_keys = ("token",)
+    config_keys = {"token": True, "region": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
-        region = (
-            (config or {}).get("region")
-            or os.environ.get("KNOWBE4_REGION")
-            or _DEFAULT_REGION
-        )
+        region = self._config.get("region") or _DEFAULT_REGION
         self._base_url = _REGION_BASE_URLS.get(
             region, _REGION_BASE_URLS[_DEFAULT_REGION]
         )

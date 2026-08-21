@@ -172,7 +172,7 @@ class QualysCollector(Collector):
     env_prefix = "QUALYS"
     display_name = "Qualys"
     manifest = MANIFEST
-    required_config_keys = ("username", "password", "base_url")
+    config_keys = {"username": True, "password": True, "base_url": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

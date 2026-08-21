@@ -182,7 +182,7 @@ class TenablescCollector(Collector):
     env_prefix = "TENABLESC"
     display_name = "Tenable.sc"
     manifest = MANIFEST
-    required_config_keys = ("endpoint", "access_key", "secret_key")
+    config_keys = {"endpoint": True, "access_key": True, "secret_key": True}
     url_config_keys = ("endpoint",)
 
     def __init__(

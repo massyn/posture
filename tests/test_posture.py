@@ -2,4 +2,4 @@ import posture
 
 
 def test_version() -> None:
-    assert posture.__version__ == "0.13.3"
+    assert posture.__version__ == "0.14.0"

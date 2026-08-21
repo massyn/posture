@@ -105,10 +105,18 @@ class Collector(ABC):
     #: resource name -> manifest dict (see parse.py for manifest shape).
     manifest: dict[str, dict[str, Any]] = {}
 
-    #: Required config keys, resolved from constructor dict or env vars.
-    required_config_keys: tuple[str, ...] = ()
+    #: Every config key the collector accepts, mapped to whether it's
+    #: required. Each is resolved from the constructor dict, else the env
+    #: var f"{env_prefix}_{key.upper()}", else (for a key mapped to False)
+    #: left unset — collection still succeeds and the collector's own
+    #: __init__ applies its default. A required key missing everywhere
+    #: raises ValueError. This is also catalog()'s only source for
+    #: documenting a collector's config surface, so a key resolved via a
+    #: raw os.environ.get(...) instead of being listed here is invisible to
+    #: catalog() and the generated docs — don't do that.
+    config_keys: dict[str, bool] = {}
 
-    #: Subset of required_config_keys holding a base URL/endpoint. Operators
+    #: Subset of config_keys holding a base URL/endpoint. Operators
     #: routinely supply these with or without a scheme ("host.example.com"
     #: vs "https://host.example.com") depending on the vendor's own docs —
     #: normalized here so every collector accepts either and ends up with
@@ -148,17 +156,19 @@ class Collector(ABC):
 
     def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
         resolved: dict[str, Any] = {}
-        for key in self.required_config_keys:
+        for key, required in self.config_keys.items():
             if key in explicit:
                 resolved[key] = explicit[key]
                 continue
             env_var = f"{self.env_prefix}_{key.upper()}"
             value = os.environ.get(env_var)
             if value is None:
-                raise ValueError(
-                    f"Missing required config '{key}': set it explicitly or via "
-                    f"env var {env_var}"
-                )
+                if required:
+                    raise ValueError(
+                        f"Missing required config '{key}': set it explicitly or "
+                        f"via env var {env_var}"
+                    )
+                continue
             resolved[key] = value
         for key in self.url_config_keys:
             if key in resolved:

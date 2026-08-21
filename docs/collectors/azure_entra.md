@@ -10,6 +10,7 @@
 | `client_id` | `AZURE_CLIENT_ID` |
 | `client_secret` | `AZURE_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

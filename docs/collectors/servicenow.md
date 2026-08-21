@@ -8,6 +8,17 @@
 | --- | --- |
 | `instance` | `SERVICENOW_INSTANCE` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `auth_type` | `SERVICENOW_AUTH_TYPE` |
+| `client_id` | `SERVICENOW_CLIENT_ID` |
+| `client_secret` | `SERVICENOW_CLIENT_SECRET` |
+| `username` | `SERVICENOW_USERNAME` |
+| `password` | `SERVICENOW_PASSWORD` |
+| `schema_file` | `SERVICENOW_SCHEMA_FILE` |
+
 ## Example
 
 ```python

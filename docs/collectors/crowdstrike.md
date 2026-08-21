@@ -9,6 +9,7 @@
 | `client_id` | `CROWDSTRIKE_CLIENT_ID` |
 | `client_secret` | `CROWDSTRIKE_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

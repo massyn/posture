@@ -51,7 +51,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
-import os
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -202,17 +201,13 @@ class SnykCollector(Collector):
     env_prefix = "SNYK"
     display_name = "Snyk"
     manifest = MANIFEST
-    required_config_keys = ("token",)
+    config_keys = {"token": True, "endpoint": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
-        self._base_url = (
-            (config or {}).get("endpoint")
-            or os.environ.get("SNYK_ENDPOINT")
-            or _DEFAULT_BASE_URL
-        ).rstrip("/")
+        self._base_url = (self._config.get("endpoint") or _DEFAULT_BASE_URL).rstrip("/")
 
     def _authenticate(self) -> None:
         self._session.headers["Accept"] = "application/json"

@@ -10,6 +10,7 @@
 | `client_id` | `MDE_CLIENT_ID` |
 | `client_secret` | `MDE_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

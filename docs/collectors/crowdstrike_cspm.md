@@ -9,6 +9,7 @@
 | `client_id` | `CROWDSTRIKE_CSPM_CLIENT_ID` |
 | `client_secret` | `CROWDSTRIKE_CSPM_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
-import os
 import time
 from typing import Any
 
@@ -179,17 +178,13 @@ class UpGuardCollector(Collector):
     env_prefix = "UPGUARD"
     display_name = "UpGuard"
     manifest = MANIFEST
-    required_config_keys = ("api_key",)
+    config_keys = {"api_key": True, "base_url": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
-        self._base_url = (
-            (config or {}).get("base_url")
-            or os.environ.get("UPGUARD_BASE_URL")
-            or _DEFAULT_BASE_URL
-        ).rstrip("/")
+        self._base_url = (self._config.get("base_url") or _DEFAULT_BASE_URL).rstrip("/")
 
     def _authenticate(self) -> None:
         self._session.headers["Accept"] = "application/json"

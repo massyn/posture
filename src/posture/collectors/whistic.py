@@ -142,13 +142,13 @@ class WhisticCollector(Collector):
     env_prefix = "WHISTIC"
     display_name = "Whistic"
     manifest = MANIFEST
-    required_config_keys = ("token",)
+    config_keys = {"token": True, "endpoint": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
-        endpoint = (config or {}).get("endpoint") or _DEFAULT_ENDPOINT
+        endpoint = self._config.get("endpoint") or _DEFAULT_ENDPOINT
         self._base_url = self._normalize_url(endpoint)
 
     def _authenticate(self) -> None:

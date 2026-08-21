@@ -127,7 +127,7 @@ class SailpointCollector(Collector):
     env_prefix = "SAILPOINT"
     display_name = "SailPoint Identity Security Cloud"
     manifest = MANIFEST
-    required_config_keys = ("base_url", "client_id", "client_secret")
+    config_keys = {"base_url": True, "client_id": True, "client_secret": True}
     url_config_keys = ("base_url",)
 
     def __init__(

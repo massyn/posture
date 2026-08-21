@@ -9,6 +9,7 @@
 | `client_id` | `PHRIENDLY_PHISHING_CLIENT_ID` |
 | `client_secret` | `PHRIENDLY_PHISHING_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

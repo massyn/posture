@@ -10,6 +10,13 @@
 | `password` | `SALESFORCE_PASSWORD` |
 | `token` | `SALESFORCE_TOKEN` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `domain` | `SALESFORCE_DOMAIN` |
+| `schema_file` | `SALESFORCE_SCHEMA_FILE` |
+
 ## Example
 
 ```python

@@ -8,6 +8,12 @@
 | --- | --- |
 | `token` | `WHISTIC_TOKEN` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `endpoint` | `WHISTIC_ENDPOINT` |
+
 ## Example
 
 ```python

@@ -199,14 +199,20 @@ key listed there through `_normalize_url`: a bare host
 (`host.example.com`) and a full URL (`https://host.example.com/`) both
 collapse to the same shape — explicit `https://`, no trailing slash.
 Operators shouldn't have to know which vendor's docs show the scheme and
-which don't, and the collector shouldn't guess at request time. A key
-resolved outside `required_config_keys` (e.g. DNSimple's `endpoint`, which
-has a default rather than being required) still needs normalizing
-explicitly via `self._normalize_url(...)` at the point it's set in
-`_resolve_config`, since the generic `url_config_keys` loop only runs over
-already-resolved `required_config_keys`. Because normalization always
-strips the trailing slash, path-joining call sites must supply their own
-separator (`f"{self._base_url}/{path}"`), not raw concatenation.
+which don't, and the collector shouldn't guess at request time. `config_keys`
+(`base.py`) maps every key a collector accepts to whether it's required —
+`{"token": True, "endpoint": False}` — and `catalog()`/the generated docs
+read this map directly, so an optional key (e.g. DNSimple's `endpoint`,
+which has a default rather than being required) is still documented instead
+of being invisible. Resolving an optional key via a raw `os.environ.get(...)`
+call in a collector's own `__init__` instead of listing it in `config_keys`
+defeats that — don't do it. A key with a default that still needs
+normalizing (DNSimple's `endpoint`) applies `self._normalize_url(...)`
+explicitly at the point it's set in an overridden `_resolve_config`, since
+the generic `url_config_keys` loop only normalizes keys already present in
+the resolved config. Because normalization always strips the trailing
+slash, path-joining call sites must supply their own separator
+(`f"{self._base_url}/{path}"`), not raw concatenation.
 
 ### Collector `__init__` overrides must forward `record_limit`
 

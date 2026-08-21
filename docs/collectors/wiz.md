@@ -10,6 +10,12 @@
 | `client_secret` | `WIZ_CLIENT_SECRET` |
 | `api_endpoint` | `WIZ_API_ENDPOINT` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `token_url` | `WIZ_TOKEN_URL` |
+
 ## Example
 
 ```python

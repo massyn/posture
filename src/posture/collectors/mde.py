@@ -246,7 +246,7 @@ class MdeCollector(Collector):
     env_prefix = "MDE"
     display_name = "Microsoft Defender for Endpoint"
     manifest = MANIFEST
-    required_config_keys = ("tenant_id", "client_id", "client_secret")
+    config_keys = {"tenant_id": True, "client_id": True, "client_secret": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

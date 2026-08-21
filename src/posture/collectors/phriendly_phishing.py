@@ -86,7 +86,7 @@ class PhriendlyPhishingCollector(Collector):
     env_prefix = "PHRIENDLY_PHISHING"
     display_name = "PhriendlyPhishing"
     manifest = MANIFEST
-    required_config_keys = ("client_id", "client_secret")
+    config_keys = {"client_id": True, "client_secret": True}
 
     def _authenticate(self) -> None:
         response = self._session.post(

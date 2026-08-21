@@ -8,6 +8,12 @@
 | --- | --- |
 | `api_key` | `UPGUARD_API_KEY` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `base_url` | `UPGUARD_BASE_URL` |
+
 ## Example
 
 ```python

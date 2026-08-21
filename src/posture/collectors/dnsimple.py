@@ -24,7 +24,6 @@ don't match.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -62,7 +61,7 @@ class DnsimpleCollector(Collector):
     env_prefix = "DNSIMPLE"
     display_name = "DNSimple"
     manifest = MANIFEST
-    required_config_keys = ("token",)
+    config_keys = {"token": True, "endpoint": False}
     url_config_keys = ("endpoint",)
 
     def __init__(
@@ -75,9 +74,7 @@ class DnsimpleCollector(Collector):
     def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
         resolved = super()._resolve_config(explicit)
         resolved["endpoint"] = self._normalize_url(
-            explicit.get(
-                "endpoint", os.environ.get("DNSIMPLE_ENDPOINT", _DEFAULT_BASE_URL)
-            )
+            resolved.get("endpoint") or _DEFAULT_BASE_URL
         )
         return resolved
 

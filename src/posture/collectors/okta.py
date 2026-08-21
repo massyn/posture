@@ -214,7 +214,7 @@ class OktaCollector(Collector):
     env_prefix = "OKTA"
     display_name = "Okta"
     manifest = MANIFEST
-    required_config_keys = ("domain", "token")
+    config_keys = {"domain": True, "token": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

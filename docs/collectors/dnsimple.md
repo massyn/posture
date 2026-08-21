@@ -8,6 +8,12 @@
 | --- | --- |
 | `token` | `DNSIMPLE_TOKEN` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `endpoint` | `DNSIMPLE_ENDPOINT` |
+
 ## Example
 
 ```python

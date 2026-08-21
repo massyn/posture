@@ -10,6 +10,12 @@
 | `client_secret` | `WORKSPACEONE_CLIENT_SECRET` |
 | `api_server` | `WORKSPACEONE_API_SERVER` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `token_url` | `WORKSPACEONE_TOKEN_URL` |
+
 ## Example
 
 ```python

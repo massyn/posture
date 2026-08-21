@@ -73,9 +73,21 @@ class ServicenowCollector(Collector):
     display_name = "ServiceNow"
     manifest = MANIFEST
     # instance is always required; auth_type/credential keys are resolved
-    # conditionally in _resolve_config (base's flat required_config_keys
-    # can't express "one of these two credential sets").
-    required_config_keys = ("instance",)
+    # conditionally in _resolve_config, which is overridden below (a flat
+    # required/optional map can't express "one of these two credential
+    # sets"). config_keys is declared anyway, purely so catalog() and the
+    # generated docs can list every key this collector accepts — it plays
+    # no part in resolution here. auth_type/credential keys are marked
+    # optional since none of them is unconditionally required.
+    config_keys = {
+        "instance": True,
+        "auth_type": False,
+        "client_id": False,
+        "client_secret": False,
+        "username": False,
+        "password": False,
+        "schema_file": False,
+    }
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

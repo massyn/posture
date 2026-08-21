@@ -8,6 +8,12 @@
 | --- | --- |
 | `token` | `SNYK_TOKEN` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `endpoint` | `SNYK_ENDPOINT` |
+
 ## Example
 
 ```python

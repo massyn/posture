@@ -26,7 +26,6 @@ tenant's response on first use and adjusted here if they don't match.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -213,8 +212,15 @@ class WizCollector(Collector):
     env_prefix = "WIZ"
     display_name = "Wiz"
     manifest = MANIFEST
-    required_config_keys = ("client_id", "client_secret", "api_endpoint")
-    url_config_keys = ("api_endpoint",)
+    # token_url is optional: most tenants use the shared Auth0 endpoint,
+    # only Cognito-provisioned tenants need to override it.
+    config_keys = {
+        "client_id": True,
+        "client_secret": True,
+        "api_endpoint": True,
+        "token_url": False,
+    }
+    url_config_keys = ("api_endpoint", "token_url")
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
@@ -222,16 +228,6 @@ class WizCollector(Collector):
         super().__init__(config, record_limit=record_limit)
         self._token_url = self._config.get("token_url") or _DEFAULT_TOKEN_URL
         self._api_endpoint = self._config["api_endpoint"]
-
-    def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
-        resolved = super()._resolve_config(explicit)
-        # token_url is optional: most tenants use the shared Auth0 endpoint,
-        # only Cognito-provisioned tenants need to override it.
-        token_url = explicit.get("token_url", os.environ.get("WIZ_TOKEN_URL"))
-        resolved["token_url"] = (
-            self._normalize_url(token_url) if token_url else token_url
-        )
-        return resolved
 
     def _authenticate(self) -> None:
         response = self._session.post(

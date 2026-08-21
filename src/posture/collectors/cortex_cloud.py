@@ -177,7 +177,7 @@ class CortexCloudCollector(Collector):
     env_prefix = "CORTEX"
     display_name = "Palo Alto Cortex Cloud"
     manifest = MANIFEST
-    required_config_keys = ("token", "api_key_id", "endpoint")
+    config_keys = {"token": True, "api_key_id": True, "endpoint": True}
     url_config_keys = ("endpoint",)
 
     def _authenticate(self) -> None:

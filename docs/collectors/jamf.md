@@ -10,6 +10,7 @@
 | `client_id` | `JAMF_CLIENT_ID` |
 | `client_secret` | `JAMF_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

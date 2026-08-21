@@ -130,7 +130,7 @@ class CloudflareCollector(Collector):
     env_prefix = "CLOUDFLARE"
     display_name = "Cloudflare"
     manifest = MANIFEST
-    required_config_keys = ("api_token",)
+    config_keys = {"api_token": True}
 
     def _authenticate(self) -> None:
         self._session.headers["Accept"] = "application/json"

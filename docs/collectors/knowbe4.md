@@ -8,6 +8,12 @@
 | --- | --- |
 | `token` | `KNOWBE4_TOKEN` |
 
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+| `region` | `KNOWBE4_REGION` |
+
 ## Example
 
 ```python

@@ -9,6 +9,7 @@
 | `client_id` | `VANTA_CLIENT_ID` |
 | `client_secret` | `VANTA_CLIENT_SECRET` |
 
+
 ## Example
 
 ```python

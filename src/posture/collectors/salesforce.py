@@ -27,7 +27,6 @@ Dependencies
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +57,13 @@ class SalesforceCollector(Collector):
     env_prefix = "SALESFORCE"
     display_name = "Salesforce"
     manifest = MANIFEST
-    required_config_keys = ("username", "password", "token")
+    config_keys = {
+        "username": True,
+        "password": True,
+        "token": True,
+        "domain": False,
+        "schema_file": False,
+    }
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
@@ -67,18 +72,14 @@ class SalesforceCollector(Collector):
         # None = production (login.salesforce.com); "test" = sandbox
         # (test.salesforce.com); simple_salesforce also accepts a custom My
         # Domain string here for orgs that need one.
-        self._domain = (config or {}).get("domain") or os.environ.get(
-            "SALESFORCE_DOMAIN"
-        )
+        self._domain = self._config.get("domain")
         self._sf: Any = None
 
         # Unlike every other collector's manifest (fixed per source), this one
         # is generated from salesforce.json. A caller with a different set of
         # Salesforce objects to collect can point at their own schema file
         # instead of editing the one shipped with posture.
-        schema_file = (config or {}).get("schema_file") or os.environ.get(
-            "SALESFORCE_SCHEMA_FILE"
-        )
+        schema_file = self._config.get("schema_file")
         if schema_file:
             self.manifest = _load_manifest(Path(schema_file))
 

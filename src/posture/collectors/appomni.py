@@ -207,7 +207,7 @@ class AppOmniCollector(Collector):
     env_prefix = "APPOMNI"
     display_name = "AppOmni"
     manifest = MANIFEST
-    required_config_keys = ("access_token", "instance")
+    config_keys = {"access_token": True, "instance": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

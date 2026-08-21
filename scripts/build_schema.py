@@ -50,7 +50,17 @@ _COLLECTOR_TEMPLATE = _env.from_string(
 | `{{ key }}` | `{{ env_var }}` |
 {% endfor %}
 {% else %}\
-No configuration required.
+No required configuration.
+{% endif %}
+
+{% if source.optional_config %}\
+### Optional
+
+| Config key | Environment variable |
+| --- | --- |
+{% for key, env_var in source.optional_config.items() %}\
+| `{{ key }}` | `{{ env_var }}` |
+{% endfor %}
 {% endif %}
 
 ## Example
@@ -124,6 +134,7 @@ def build() -> None:
                 "name": name,
                 "display_name": info["display_name"],
                 "required_config": info["required_config"],
+                "optional_config": info["optional_config"],
                 "resources": resources,
             }
         )
