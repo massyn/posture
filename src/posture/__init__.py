@@ -22,7 +22,11 @@ from posture.exceptions import (
     PostureError,
     RateLimitExhausted,
     ResourceUnknown,
+    StorageConfigError,
+    StorageError,
+    StorageWriteError,
 )
+from posture.storage import Storage, storage_catalog, write_storage
 
 logging.getLogger("posture").addHandler(logging.NullHandler())
 
@@ -30,16 +34,22 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
 
 __all__ = [
     "CCM",
     "catalog",
+    "Storage",
+    "storage_catalog",
+    "write_storage",
     "AuthenticationError",
     "IncompleteCollection",
     "PostureError",
     "RateLimitExhausted",
     "ResourceUnknown",
+    "StorageError",
+    "StorageConfigError",
+    "StorageWriteError",
 ]
 
 _SOURCES: dict[str, type[Collector]] = {}

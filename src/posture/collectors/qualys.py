@@ -266,6 +266,9 @@ class QualysCollector(Collector):
             # to "one record" instead of "the whole tree" and never hands
             # expat more than a bounded chunk at a time.
             response.raw.decode_content = True
+            # xml.etree is XXE/entity-bomb vulnerable on Python <=3.10, but
+            # this parses an authenticated Qualys API response, not
+            # attacker-controlled input — accepted risk, no defusedxml dep.
             for event, elem in ElementTree.iterparse(
                 response.raw, events=("start", "end")
             ):
@@ -380,6 +383,9 @@ def _parse_simple_return_error(content: bytes) -> tuple[str | None, str | None]:
     through to the existing rate-limit retry path unchanged.
     """
     try:
+        # xml.etree is XXE/entity-bomb vulnerable on Python <=3.10, but this
+        # parses an authenticated Qualys API response, not attacker-
+        # controlled input — accepted risk, no defusedxml dep.
         root = ElementTree.fromstring(content)
     except ElementTree.ParseError:
         return None, None

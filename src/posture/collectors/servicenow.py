@@ -95,6 +95,10 @@ class ServicenowCollector(Collector):
         super().__init__(config, record_limit=record_limit)
         self._base_url = f"https://{self._config['instance']}.service-now.com"
 
+        # schema_file is set by whoever configures/deploys this collector
+        # (explicit config or their own env), the same trust level as
+        # `instance`/credentials — not attacker-controlled input, so no
+        # path-traversal sanitisation here. Accepted risk.
         schema_file = (config or {}).get("schema_file") or os.environ.get(
             "SERVICENOW_SCHEMA_FILE"
         )

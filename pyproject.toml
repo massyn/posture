@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "posture"
-version = "0.14.0"
+version = "0.15.0"
 description = "Runtime-agnostic Python library for CCM (Continuous Control Monitoring) data collection."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,9 @@ dependencies = [
     "requests>=2.31",
     "pandas>=2.0",
     "python-dotenv>=1.0",
+    "pyarrow>=14.0",
+    "psycopg[binary]>=3.1",
+    "duckdb>=1.0",
 ]
 
 [project.optional-dependencies]

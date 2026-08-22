@@ -52,9 +52,16 @@ underlying API page, so peak memory is bounded to a single page rather than the 
 resource:
 
 ```python
+from posture import Storage
+
+store = Storage("sqlite", {"path": "posture.db"})
 for df in ccm.collect_page("machine_vulnerabilities"):
-    df.to_sql("machine_vulnerabilities", con, if_exists="append", index=False)
+    store.write_page(df, "machine_vulnerabilities", mode="append")
 ```
+
+`Storage("sqlite", ...)` mirrors `CCM("crowdstrike", ...)` — one instance, reused across
+writes. A concrete class (`from posture.storage import SqliteStorage`) works identically
+when the backend is hardcoded rather than a runtime value.
 
 `collect()` is a thin wrapper over `collect_page()` — it just concatenates every page
 into one DataFrame — so both share the same all-or-nothing guarantee: if collection
@@ -88,26 +95,72 @@ registered `Collector` classes. It only reports *required* config — optional k
 (e.g. `region`, `base_url`) aren't tracked as data, so check a source's page in
 [`docs/index.md`](docs/index.md) for those.
 
+`storage_catalog()` is the same idea for the storage layer:
+
+```python
+from posture import storage_catalog
+
+storage_catalog()
+# {
+#   "csv":      {"class_name": "CsvStorage", "required_config": {"path": "POSTURE_CSV_PATH"}, "optional_config": {}},
+#   "postgres": {"class_name": "PostgresStorage", "required_config": {}, "optional_config": {"dsn": "POSTURE_POSTGRES_DSN", "host": "POSTURE_POSTGRES_HOST", ...}},
+#   ...
+# }
+```
+
+Same guarantees — no instantiation, no writes, no credentials needed. Postgres's config
+keys all show up as *optional* here even though one specific combination (`dsn` alone,
+or all of `host`/`dbname`/`user`/`password`) is actually required — that either/or logic
+lives in `PostgresStorage.__init__`, not in a flat required/optional key list.
+
 ## Example: export Crowdstrike hosts to local JSON
 
 ```python
-import json
-from pathlib import Path
-
-from posture import CCM
+from posture import CCM, write_storage
 
 # CROWDSTRIKE_CLIENT_ID / CROWDSTRIKE_CLIENT_SECRET must be set in the environment
 ccm = CCM("crowdstrike")
 df = ccm.collect("hosts")
 
-output_dir = Path("output")
-output_dir.mkdir(exist_ok=True)
+write_storage(df, "json", "hosts", config={"path": "output"}, mode="truncate")
 
-output_path = output_dir / "hosts.json"
-output_path.write_text(df.to_json(orient="records", date_format="iso", indent=2))
-
-print(f"Wrote {len(df)} hosts to {output_path}")
+print(f"Wrote {len(df)} hosts to output/hosts.json")
 ```
+
+### Storage: writing a DataFrame somewhere durable
+
+```python
+from posture import write_storage
+
+write_storage(df, "csv", "hosts", config={"path": "output"})                 # output/hosts.csv
+write_storage(df, "parquet", "hosts", config={"path": "output"})             # output/hosts.parquet
+write_storage(df, "sqlite", "hosts", config={"path": "output/posture.db"})   # table "hosts"
+write_storage(df, "duckdb", "hosts", config={"path": "output/posture.duckdb"})  # table "hosts"
+write_storage(df, "postgres", "hosts", config={"dsn": "postgresql://..."})   # table "hosts"
+write_storage(                                                               # same, discrete keys
+    df, "postgres", "hosts",
+    config={"host": "...", "dbname": "...", "user": "...", "password": "..."},
+)
+```
+
+`storage` is one of `"csv"`, `"json"`, `"parquet"`, `"sqlite"`, `"duckdb"`, `"postgres"`.
+Postgres accepts either a single `dsn` or discrete `host`/`port`/`dbname`/`user`/
+`password` keys (same convention every collector uses for its own credentials,
+resolved from `POSTURE_POSTGRES_HOST` etc. if not passed explicitly) — `dsn` takes
+precedence if both are given.
+
+`mode` controls both overwrite behaviour and history:
+
+- `"truncate"` (the default — latest load is all posture cares about by default) —
+  overwrites/replaces in place: `output/hosts.csv`, or table `hosts` recreated.
+- `"append"` — keeps a dated snapshot per day: `output/2026/08/22/hosts.csv`, or rows
+  appended to the existing `hosts` table. Opt in deliberately — it has real storage
+  growth implications the default doesn't.
+
+Every file write goes through a temp file and an atomic rename, so a failure partway
+through never leaves a broken file at the real path. For a paginated collection, use
+`write_page()` on a backend instance instead of `write_storage()` — see
+[Paginated retrieval](#paginated-retrieval-for-large-resources) above.
 
 ## Supported sources
 

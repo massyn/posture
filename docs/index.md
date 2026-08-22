@@ -198,3 +198,11 @@
 
 - [computers](collectors/workspaceone.md#computers)
 
+# Storage backends
+
+- [csv](storage/csv.md)
+- [duckdb](storage/duckdb.md)
+- [json](storage/json.md)
+- [parquet](storage/parquet.md)
+- [postgres](storage/postgres.md)
+- [sqlite](storage/sqlite.md)

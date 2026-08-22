@@ -71,3 +71,26 @@ class IncompleteCollection(PostureError):
         super().__init__(message, source=source)
         self.resource = resource
         self.records_so_far = records_so_far
+
+
+class StorageError(PostureError):
+    """Base class for all posture.storage exceptions."""
+
+
+class StorageConfigError(StorageError, ValueError):
+    """Raised for an invalid storage backend config or write() argument —
+    e.g. missing required config, an unrecognised `mode`, or an unknown
+    backend name. Also a ValueError (storage backends historically raised
+    plain ValueError for these), so existing ``except ValueError`` code
+    keeps working unchanged.
+    """
+
+
+class StorageWriteError(StorageError):
+    """Raised when a write to the underlying storage target fails.
+
+    Wraps the originating driver/library exception (psycopg, sqlite3,
+    duckdb, pyarrow, OSError, ...) as ``__cause__`` — nothing is swallowed,
+    this just gives every backend's write failures one common, catchable
+    type instead of a different raw exception per backend.
+    """
