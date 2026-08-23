@@ -49,7 +49,6 @@ match.
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 from typing import Any
 
@@ -254,15 +253,12 @@ class SnykCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_ORG_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(org_ids)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(self._fetch_all_for_org, resource, org_id): org_id
-                for org_id in org_ids
-            }
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            resource,
+            org_ids,
+            lambda org_id: self._fetch_all_for_org(resource, org_id),
+            workers,
+        )
         return all_records, None
 
     def _fetch_all_for_org(self, resource: str, org_id: str) -> list[dict[str, Any]]:
@@ -319,17 +315,12 @@ class SnykCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_ORG_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(projects)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(
-                    self._fetch_aggregated_issues_for_project, org_id, project_id
-                ): (org_id, project_id)
-                for org_id, project_id in projects
-            }
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            "aggregated_issues",
+            projects,
+            lambda pair: self._fetch_aggregated_issues_for_project(pair[0], pair[1]),
+            workers,
+        )
         return all_records, None
 
     def _fetch_aggregated_issues_for_project(

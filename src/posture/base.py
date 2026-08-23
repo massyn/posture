@@ -9,6 +9,7 @@ schema introspection — lives here so it is never reimplemented per vendor.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import logging
 import os
@@ -18,7 +19,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 import pandas as pd
 import requests
@@ -145,6 +146,11 @@ class Collector(ABC):
         self._spill = SpillStore()
         self._cache: dict[tuple[str, tuple], _CacheEntry] = {}
         self._reports: dict[str, _CollectionReport] = {}
+        #: Per-resource progress for _resumable_fanout(), keyed by resource,
+        #: value is {item_id: fetch_one(item_id) result}. Survives a
+        #: _fetch_page retry within the same fan-out (see _resumable_fanout);
+        #: cleared on that fan-out's success.
+        self._fanout_progress: dict[str, dict[Any, Any]] = {}
         #: Caps raw records per resource, for a quick smoke test instead of a
         #: full collection run. Truncates after whichever page crosses the
         #: limit rather than requesting an exact count — a page or two of
@@ -252,6 +258,74 @@ class Collector(ABC):
         for page in self._iter_raw_pages(resource, kwargs):
             raw_records.extend(page)
         return raw_records
+
+    def _resumable_fanout(
+        self,
+        resource: str,
+        ids: list[Any],
+        fetch_one: Callable[[Any], Any],
+        max_workers: int,
+    ) -> list[dict[str, Any]]:
+        """Fan ``fetch_one`` out across ``ids`` on a thread pool, persisting
+        partial progress across retries of the same ``_fetch_page`` call.
+
+        A per-item fan-out (e.g. one detail request per id) that models the
+        whole id list as a single page has no cursor to resume from — a mid-
+        run failure (token expiry, a transient connection error) makes
+        ``_request_with_retry`` re-call ``_fetch_page`` from scratch. Without
+        this, every already-completed id would be re-fetched. Progress is
+        recorded into ``self._fanout_progress[resource]`` as each future
+        completes, not batched into a local list only assembled at the end,
+        so a mid-run exception leaves the completed work intact for the next
+        attempt to resume from; only ids missing from progress are resubmitted.
+
+        Cleared on success so state doesn't leak into a later, unrelated call
+        for the same resource. Safe without locking: ``collect_page`` drives
+        ``_paginate`` serially, so ``_fetch_page`` is never called
+        concurrently for the same resource on the same collector instance.
+
+        ``fetch_one`` may return a single record, ``None`` (e.g. a 404 the
+        caller treats as "confirmed missing" — still a completed result, not
+        re-fetched on retry), or a list of records (e.g. an id whose own
+        fetch is itself paginated). Returned records are flattened
+        accordingly; ``None`` results are dropped.
+        """
+        progress = self._fanout_progress.setdefault(resource, {})
+        remaining_ids = [item_id for item_id in ids if item_id not in progress]
+        if remaining_ids:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=max_workers
+            ) as executor:
+                futures = {
+                    executor.submit(fetch_one, item_id): item_id
+                    for item_id in remaining_ids
+                }
+                try:
+                    for future in concurrent.futures.as_completed(futures):
+                        item_id = futures[future]
+                        progress[item_id] = future.result()
+                except BaseException:
+                    # A worker failed (e.g. token expired mid-run, raising
+                    # UnauthorizedSignal). Cancel every future that hasn't
+                    # started yet so the pool doesn't keep burning through the
+                    # remaining queue against a dead token before __exit__'s
+                    # shutdown(wait=True) can return control to
+                    # _request_with_retry. progress already has every result
+                    # completed before this point.
+                    for pending in futures:
+                        pending.cancel()
+                    raise
+
+        records: list[dict[str, Any]] = []
+        for result in progress.values():
+            if result is None:
+                continue
+            if isinstance(result, list):
+                records.extend(result)
+            else:
+                records.append(result)
+        del self._fanout_progress[resource]
+        return records
 
     def _iter_raw_pages(
         self, resource: str, kwargs: dict[str, Any]
@@ -418,12 +492,9 @@ class Collector(ABC):
                 time.sleep(_CONNECTION_RETRY_WAIT_SECONDS)
 
     def _ensure_authenticated(self) -> None:
-        near_expiry = (
-            self._token_expires_at is not None
-            and datetime.now(timezone.utc)
-            >= self._token_expires_at
-            - timedelta(seconds=_TOKEN_REFRESH_MARGIN_SECONDS)
-        )
+        near_expiry = self._token_expires_at is not None and datetime.now(
+            timezone.utc
+        ) >= self._token_expires_at - timedelta(seconds=_TOKEN_REFRESH_MARGIN_SECONDS)
         if not self._authenticated or near_expiry:
             self._authenticate()
             self._authenticated = True

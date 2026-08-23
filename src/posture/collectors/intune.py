@@ -23,7 +23,6 @@ Resources: ``managed_devices``, ``users``, ``device_configurations``,
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -355,29 +354,7 @@ class IntuneCollector(Collector):
                     return None
                 raise
 
-        records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=_MAX_FANOUT_WORKERS
-        ) as executor:
-            futures = {
-                executor.submit(_fetch_one, record_id): record_id for record_id in ids
-            }
-            try:
-                for future in concurrent.futures.as_completed(futures):
-                    result = future.result()
-                    if result is not None:
-                        records.append(result)
-            except BaseException:
-                # A worker failed (e.g. token expired mid-run, raising
-                # UnauthorizedSignal via graph_get_json). Cancel every future
-                # that hasn't started yet so the pool doesn't keep burning
-                # through the remaining queue against a dead token before
-                # __exit__'s shutdown(wait=True) can return control to
-                # base.py's retry/reauth handler.
-                for pending in futures:
-                    pending.cancel()
-                raise
-
+        records = self._resumable_fanout(resource, ids, _fetch_one, _MAX_FANOUT_WORKERS)
         return records, None
 
     def _fetch_attack_simulation_users_page(
@@ -424,25 +401,9 @@ class IntuneCollector(Collector):
                 record["_simulation_id"] = simulation_id
             return sim_records
 
-        records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=_MAX_FANOUT_WORKERS
-        ) as executor:
-            futures = {
-                executor.submit(_fetch_one, simulation_id): simulation_id
-                for simulation_id in simulation_ids
-            }
-            try:
-                for future in concurrent.futures.as_completed(futures):
-                    records.extend(future.result())
-            except BaseException:
-                # See _fetch_detail_page: cancel unstarted futures on first
-                # failure so a dead token doesn't get retried against the
-                # whole remaining queue before base.py can reauth.
-                for pending in futures:
-                    pending.cancel()
-                raise
-
+        records = self._resumable_fanout(
+            "attack_simulation_users", simulation_ids, _fetch_one, _MAX_FANOUT_WORKERS
+        )
         return records, None
 
     def _drain_simulation_users(self, path: str) -> list[dict[str, Any]]:

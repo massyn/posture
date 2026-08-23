@@ -21,7 +21,6 @@ PST ids, fetched internally from ``psts`` when absent).
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 import threading
 import time
@@ -44,11 +43,13 @@ _PAGE_SIZE = 500
 # sustained. ``pst_recipients`` fans out across a thread pool and can run for
 # well over a minute across many PSTs/pages, so pacing on the 4 req/s figure
 # alone isn't enough — held up for more than ~12s it blows straight through
-# the 50/min sustained cap (4 req/s * 60s = 240/min), and every retry
-# re-bursts the same way (the whole fan-out is redone from scratch on
-# RateLimitExhausted — see base.py's all-or-nothing contract), exhausting
-# retries without ever landing a record. Worker count is capped to match the
-# 4 req/s ceiling; the pacing lock enforces both ceilings even under retry.
+# the 50/min sustained cap (4 req/s * 60s = 240/min). A 429 that escapes to
+# base.py's retry/reauth handler resumes via Collector._resumable_fanout
+# (only PSTs not yet fetched are re-submitted), so a retry re-bursts at
+# reduced scale, not from scratch — but that still means every retry
+# re-hits the ceiling if pacing isn't conservative enough on its own. Worker
+# count is capped to match the 4 req/s ceiling; the pacing lock enforces
+# both ceilings even under retry.
 _DEFAULT_PST_RECIPIENTS_MAX_WORKERS = 4
 _MIN_REQUEST_INTERVAL_SECONDS = 0.25
 _MAX_REQUESTS_PER_MINUTE = 50
@@ -199,15 +200,9 @@ class Knowbe4Collector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_PST_RECIPIENTS_MAX_WORKERS)
         workers = max(1, min(max_workers, len(pst_ids)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(self._fetch_all_recipients_for_pst, pst_id): pst_id
-                for pst_id in pst_ids
-            }
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            "pst_recipients", pst_ids, self._fetch_all_recipients_for_pst, workers
+        )
         return all_records, None
 
     def _fetch_all_recipients_for_pst(self, pst_id: Any) -> list[dict[str, Any]]:

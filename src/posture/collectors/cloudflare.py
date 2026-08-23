@@ -37,7 +37,6 @@ on this collector, and correct ``MANIFEST`` if they don't match.
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 from typing import Any
 
@@ -172,15 +171,12 @@ class CloudflareCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_ZONE_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(zone_ids)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(self._fetch_all_for_zone, resource, zone_id)
-                for zone_id in zone_ids
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            resource,
+            zone_ids,
+            lambda zone_id: self._fetch_all_for_zone(resource, zone_id),
+            workers,
+        )
         return all_records, None
 
     def _fetch_all_for_zone(self, resource: str, zone_id: str) -> list[dict[str, Any]]:
@@ -227,7 +223,9 @@ class CloudflareCollector(Collector):
         response.raise_for_status()
         return response
 
-    def _get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _get_json(
+        self, url: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """GET and parse the Cloudflare v4 envelope, treating ``success: false``
         as a failure.
 
@@ -241,9 +239,12 @@ class CloudflareCollector(Collector):
         payload = self._get(url, params=params).json()
         if payload.get("success") is False:
             errors = payload.get("errors") or []
-            detail = "; ".join(
-                str(err.get("message", err)) if isinstance(err, dict) else str(err)
-                for err in errors
-            ) or "no error detail returned"
+            detail = (
+                "; ".join(
+                    str(err.get("message", err)) if isinstance(err, dict) else str(err)
+                    for err in errors
+                )
+                or "no error detail returned"
+            )
             raise RuntimeError(f"Cloudflare API request failed: {detail}")
         return payload

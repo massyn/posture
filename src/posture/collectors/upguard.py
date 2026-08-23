@@ -240,70 +240,107 @@ class UpGuardCollector(Collector):
         if not hostnames:
             return [], None
 
-        all_records: list[dict[str, Any]] = []
-        truncated_hostnames: list[str] = []
-        workers = max(1, min(max_workers, len(hostnames)))
+        # Hand-rolled against self._fanout_progress (the same store
+        # _resumable_fanout uses) rather than calling that helper directly:
+        # _fetch_risks_for_hostname returns a (records, truncated) tuple, not
+        # a bare record/list/None, and this fan-out's per-completion progress
+        # logging and truncated-hostname tracking don't fit the helper's
+        # generic contract. A worker here still never raises except on
+        # UnauthorizedSignal (see _fetch_risks_for_hostname) — that's the
+        # case this preserves progress across: a retried _fetch_page call
+        # only re-fetches hostnames missing from progress, instead of
+        # re-running the whole ~hundreds-of-vendor sweep from scratch.
+        progress: dict[str, tuple[list[dict[str, Any]], bool]] = (
+            self._fanout_progress.setdefault("vendor_risks", {})
+        )
+        remaining_hostnames = [h for h in hostnames if h not in progress]
+        workers = max(1, min(max_workers, len(remaining_hostnames) or 1))
         started_at = time.monotonic()
-        completed = 0
+        completed = len(hostnames) - len(remaining_hostnames)
         log_every = max(1, len(hostnames) // 20)  # ~20 progress lines total
 
-        logger.info(
-            "vendor_risks fan-out starting: %d vendors, %d workers",
-            len(hostnames),
-            workers,
-            extra={
-                "source": "upguard",
-                "vendor_count": len(hostnames),
-                "max_workers": workers,
-            },
-        )
+        if remaining_hostnames:
+            logger.info(
+                "vendor_risks fan-out starting: %d vendors (%d already fetched "
+                "from a prior attempt), %d workers",
+                len(remaining_hostnames),
+                completed,
+                workers,
+                extra={
+                    "source": "upguard",
+                    "vendor_count": len(remaining_hostnames),
+                    "already_fetched": completed,
+                    "max_workers": workers,
+                },
+            )
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(
-                    self._fetch_risks_for_hostname, hostname, min_severity
-                ): hostname
-                for hostname in hostnames
-            }
-            for future in concurrent.futures.as_completed(futures):
-                hostname = futures[future]
-                records, truncated = future.result()
-                for record in records:
-                    record["_requested_primary_hostname"] = hostname
-                all_records.extend(records)
-                if truncated:
-                    truncated_hostnames.append(hostname)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(
+                        self._fetch_risks_for_hostname, hostname, min_severity
+                    ): hostname
+                    for hostname in remaining_hostnames
+                }
+                try:
+                    for future in concurrent.futures.as_completed(futures):
+                        hostname = futures[future]
+                        records, truncated = future.result()
+                        for record in records:
+                            record["_requested_primary_hostname"] = hostname
+                        progress[hostname] = (records, truncated)
 
-                completed += 1
-                logger.debug(
-                    "vendor_risks vendor complete: %s (%d records, truncated=%s)",
-                    hostname,
-                    len(records),
-                    truncated,
-                    extra={
-                        "source": "upguard",
-                        "hostname": hostname,
-                        "records": len(records),
-                        "truncated": truncated,
-                    },
-                )
-                if completed % log_every == 0 or completed == len(hostnames):
-                    elapsed = time.monotonic() - started_at
-                    logger.info(
-                        "vendor_risks progress: %d/%d vendors, %d records so far, "
-                        "%.1fs elapsed",
-                        completed,
-                        len(hostnames),
-                        len(all_records),
-                        elapsed,
-                        extra={
-                            "source": "upguard",
-                            "completed": completed,
-                            "total": len(hostnames),
-                            "records_so_far": len(all_records),
-                            "elapsed_seconds": round(elapsed, 1),
-                        },
-                    )
+                        completed += 1
+                        logger.debug(
+                            "vendor_risks vendor complete: %s (%d records, "
+                            "truncated=%s)",
+                            hostname,
+                            len(records),
+                            truncated,
+                            extra={
+                                "source": "upguard",
+                                "hostname": hostname,
+                                "records": len(records),
+                                "truncated": truncated,
+                            },
+                        )
+                        if completed % log_every == 0 or completed == len(hostnames):
+                            elapsed = time.monotonic() - started_at
+                            logger.info(
+                                "vendor_risks progress: %d/%d vendors, %d records "
+                                "so far, %.1fs elapsed",
+                                completed,
+                                len(hostnames),
+                                sum(len(r) for r, _ in progress.values()),
+                                elapsed,
+                                extra={
+                                    "source": "upguard",
+                                    "completed": completed,
+                                    "total": len(hostnames),
+                                    "records_so_far": sum(
+                                        len(r) for r, _ in progress.values()
+                                    ),
+                                    "elapsed_seconds": round(elapsed, 1),
+                                },
+                            )
+                except BaseException:
+                    # A worker raised (only UnauthorizedSignal escapes
+                    # _fetch_risks_for_hostname — everything else is retried
+                    # or turned into a truncated=True result locally). Cancel
+                    # unstarted futures so a dead token doesn't get retried
+                    # against the whole remaining queue before base.py's
+                    # retry/reauth handler runs; progress already has every
+                    # hostname completed before this point.
+                    for pending in futures:
+                        pending.cancel()
+                    raise
+
+        all_records: list[dict[str, Any]] = []
+        truncated_hostnames: list[str] = []
+        for hostname, (records, truncated) in progress.items():
+            all_records.extend(records)
+            if truncated:
+                truncated_hostnames.append(hostname)
+        del self._fanout_progress["vendor_risks"]
 
         if truncated_hostnames:
             logger.warning(

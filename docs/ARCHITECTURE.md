@@ -155,20 +155,44 @@ tests/
 
 Some resources require one network call per item rather than one paginated call per
 resource — Intune's `managed_device_detail`, `device_configuration_detail`, and
-`attack_simulation_users`, and MDE's `machine_vulnerabilities`, are the reference
-cases (a detail lookup per device id, a per-simulation user-report drain, a
-per-machine vulnerability pull). Run at a real tenant's scale, a serial `for` loop
-over these is the dominant cost of the whole collection.
+`attack_simulation_users` are reference cases (a detail lookup per device id, a
+per-simulation user-report drain). Run at a real tenant's scale, a serial `for` loop
+over these is the dominant cost of the whole collection, and — because these
+resources have no cursor to resume from, unlike ordinary pagination — a mid-run
+failure used to discard every already-fetched item and restart the entire fan-out
+from zero on retry. A live Intune incident (25k+ devices, a token expiring ~71
+minutes into the fan-out) turned an 85-minute run into one that re-fetched 6,801
+already-completed devices on top of the rest. This is now fixed at the base-class
+level; every collector doing per-item fan-out **must** use it.
 
-- Fan out with a bounded `concurrent.futures.ThreadPoolExecutor` inside the
-  collector's `_fetch_page`-family method (`executor.map(_fetch_one, ids)`, or
-  `executor.submit` + `as_completed` if you need the machine/simulation id back
-  alongside each result — see `mde.py`'s `_fetch_machine_vulnerabilities_page`),
-  not an unbounded thread-per-item burst. Worker count is a module constant per
-  collector, not a base-class default, since the right ceiling depends on the
-  vendor's own throttling — 10 in `intune.py` (`_MAX_FANOUT_WORKERS`), 25 in
-  `mde.py` (`_DEFAULT_MACHINE_VULN_MAX_WORKERS`, overridable via a `max_workers`
-  kwarg since it mirrors the reference implementation's tuning knob).
+- Fan out via `Collector._resumable_fanout(resource, ids, fetch_one, max_workers)`
+  (`base.py`) rather than hand-rolling a `ThreadPoolExecutor` — it is the base-class
+  primitive for this shape, promoted there after the same discard-on-retry bug was
+  found independently in eight collectors (intune, github, okta, cloudflare, snyk,
+  upguard, whistic, appomni, knowbe4 — effectively every fan-out in the codebase).
+  It persists per-resource progress (`self._fanout_progress[resource] = {id:
+  result}`) across retries of the same `_fetch_page` call: a mid-run exception
+  (token expiry, a transient connection error) leaves already-completed ids intact,
+  so a retry only re-fetches what's missing instead of starting over. `None` is a
+  valid completed result (e.g. a 404 treated as confirmed-missing), not re-fetched
+  on retry. `fetch_one` may return a single record or a list of records (for an id
+  whose own fetch is itself paginated, e.g. `attack_simulation_users`) — both are
+  flattened into the returned list. Progress is cleared automatically once a fan-out
+  completes successfully, so it never leaks into an unrelated later call. Worker
+  count is still a module constant per collector (the `max_workers` parameter),
+  since the right ceiling depends on the vendor's own throttling — 10 in
+  `intune.py` (`_MAX_FANOUT_WORKERS`), 5 in `okta.py` (tighter limits), etc.
+- `_resumable_fanout` does not fit every shape verbatim — if `fetch_one` needs to
+  return something other than a record/list/None (e.g. UpGuard's
+  `_fetch_risks_for_hostname`, which returns a `(records, truncated)` tuple to
+  support per-vendor truncation tracking and progress logging), hand-roll the same
+  pattern directly against `self._fanout_progress[resource]` rather than forcing
+  the shape through the helper or reverting to a plain, non-resumable
+  `ThreadPoolExecutor`. See `upguard.py::_fetch_vendor_risks_page` for the
+  reference shape: skip ids already in progress, write into progress as each
+  future completes (not batched into a local list only assembled at the end),
+  cancel pending futures and re-raise on `except BaseException`, clear progress on
+  success.
 - `Collector.__init__` mounts an `HTTPAdapter(pool_maxsize=_HTTP_POOL_MAXSIZE)` on
   the shared session (`base.py`) so concurrent requests from one collector don't
   starve urllib3's connection pool. `_HTTP_POOL_MAXSIZE` must stay >= the largest
@@ -176,18 +200,19 @@ over these is the dominant cost of the whole collection.
   fan-out width outgrows it.
 - `requests.Session` is safe to share across threads for making calls — no lock
   needed around `self._session.get(...)`. Do NOT add locking there.
-- Retry/re-auth stays outside the fan-out: `_request_with_retry` in `base.py` wraps
-  the *whole* `_fetch_page` call, so a 401/429 raised by any worker propagates up and
-  the entire per-item batch is retried as one unit — same all-or-nothing contract as
-  paginated resources, just re-fetching already-succeeded items on that path. This is
-  deliberate: keeping retry/backoff single-threaded in the base class avoids
-  reimplementing rate-limit and auth-refresh logic per collector under concurrency.
-  Do not add per-worker retry — if a vendor needs finer-grained retry than "redo the
-  batch," that's a new base-class primitive to design deliberately, not something to
-  bolt onto one collector.
-- This pattern lives in the collector, not `base.py`, per the anti-overfitting rule —
-  promote the fan-out helper to `base.py` only once a second collector demonstrably
-  needs the identical shape.
+- Retry/re-auth still stays outside the fan-out: `_request_with_retry` in `base.py`
+  wraps the *whole* `_fetch_page` call, so a 401/429 raised by any worker propagates
+  up and the entire `_fetch_page` call is retried as one unit — but as of
+  `_resumable_fanout`, that retry now skips ids already completed rather than
+  re-fetching everything. Do not add per-worker retry beyond what a vendor's own
+  local backoff needs (e.g. `okta.py`'s per-parent 429 handling in `_drain_scoped`)
+  — auth refresh and outer rate-limit handling stay single-threaded in the base
+  class.
+- New collectors that need this shape use `_resumable_fanout` directly — it is a
+  base-class primitive now, not something to reintroduce as a fresh
+  `ThreadPoolExecutor` per collector (the anti-overfitting rule no longer applies
+  here; this was already promoted after the second, third, ... collector
+  demonstrated the identical need).
 
 ### URL/endpoint config is normalized, never trusted raw
 
@@ -343,13 +368,17 @@ why something is built the way it is, not how to configure or call it.
   tables).
 - **UpGuard** — `vendor_risks` fans a single (unpaginated — UpGuard's
   `/risks/vendors` has no pagination) request out per vendor across a thread pool
-  (1–60s per vendor, and there can be hundreds), the only posture resource that does
-  concurrent per-parent network calls rather than sequential pagination. See
-  Performance above for the general fan-out pattern this follows.
+  (1–60s per vendor, and there can be hundreds). `_fetch_risks_for_hostname` returns
+  a `(records, truncated)` tuple rather than a bare record, so this fan-out
+  hand-rolls the resumable-progress pattern directly against
+  `self._fanout_progress["vendor_risks"]` instead of calling
+  `Collector._resumable_fanout` — see Performance above for why, and for the
+  reference shape.
 - **KnowBe4** — `pst_recipients` (per-recipient phishing test results) fans out one
-  paginated call per PST id across a bounded thread pool, the same per-item fan-out
-  pattern as UpGuard's `vendor_risks`. PST ids are read from `psts` internally unless
-  a `pst_ids` kwarg is given.
+  paginated call per PST id across a bounded thread pool via
+  `Collector._resumable_fanout`, the same per-item fan-out pattern as UpGuard's
+  `vendor_risks`. PST ids are read from `psts` internally unless a `pst_ids` kwarg
+  is given.
 - **Salesforce** — auth is username + password + security token (no connected
   app / client id-secret needed); the alternative would be hand-rolling
   Salesforce's SOAP login flow, so `simple_salesforce` is an approved vendor-SDK

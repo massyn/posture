@@ -43,7 +43,6 @@ Resources: ``organizations``, ``repositories``, ``members``,
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 from typing import Any
 
@@ -303,15 +302,12 @@ class GithubCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(org_logins)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(self._fetch_all_for_org, path_template, org)
-                for org in org_logins
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            resource,
+            org_logins,
+            lambda org: self._fetch_all_for_org(path_template, org),
+            workers,
+        )
         return all_records, None
 
     def _fetch_all_for_org(self, path_template: str, org: str) -> list[dict[str, Any]]:
@@ -343,15 +339,12 @@ class GithubCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(repos)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(self._fetch_all_for_repo, path_template, org, full_name)
-                for org, full_name in repos
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            resource,
+            repos,
+            lambda repo: self._fetch_all_for_repo(path_template, repo[0], repo[1]),
+            workers,
+        )
         return all_records, None
 
     def _fetch_all_for_repo(
@@ -387,15 +380,12 @@ class GithubCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(branch_triples)))
 
-        all_records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(self._fetch_branch_rules, org, repo, branch)
-                for org, repo, branch in branch_triples
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                all_records.extend(future.result())
-
+        all_records = self._resumable_fanout(
+            "branch_protection_rules",
+            branch_triples,
+            lambda triple: self._fetch_branch_rules(triple[0], triple[1], triple[2]),
+            workers,
+        )
         return all_records, None
 
     def _fetch_branch_rules(

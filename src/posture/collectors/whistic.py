@@ -39,7 +39,6 @@ intentionally out of scope — posture is a read-only collection library.
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -219,15 +218,9 @@ class WhisticCollector(Collector):
         max_workers = kwargs.get("max_workers", _VENDOR_DETAILS_MAX_WORKERS)
         workers = max(1, min(max_workers, len(vendor_ids)))
 
-        records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(self._fetch_vendor_detail, vendor_id)
-                for vendor_id in vendor_ids
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                records.append(future.result())
-
+        records = self._resumable_fanout(
+            "vendor_details", vendor_ids, self._fetch_vendor_detail, workers
+        )
         return records, None
 
     def _fetch_vendor_detail(self, vendor_id: Any) -> dict[str, Any]:

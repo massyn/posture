@@ -13,7 +13,6 @@ deliberately left out of scope.
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 import random
 import re
@@ -236,21 +235,21 @@ class OktaCollector(Collector):
             return self._fetch_list_page(_DEVICES_PATH, kwargs, cursor)
         if resource == "device_users":
             return self._fetch_scoped_page(
-                _DEVICES_PATH, _DEVICE_USERS_PATH, "device_id", kwargs, cursor
+                resource, _DEVICES_PATH, _DEVICE_USERS_PATH, "device_id", kwargs, cursor
             )
         if resource == "groups":
             return self._fetch_list_page(_GROUPS_PATH, kwargs, cursor)
         if resource == "group_members":
             return self._fetch_scoped_page(
-                _GROUPS_PATH, _GROUP_MEMBERS_PATH, "group_id", kwargs, cursor
+                resource, _GROUPS_PATH, _GROUP_MEMBERS_PATH, "group_id", kwargs, cursor
             )
         if resource == "user_factors":
             return self._fetch_scoped_page(
-                _USERS_PATH, _USER_FACTORS_PATH, "user_id", kwargs, cursor
+                resource, _USERS_PATH, _USER_FACTORS_PATH, "user_id", kwargs, cursor
             )
         if resource == "user_roles":
             return self._fetch_scoped_page(
-                _USERS_PATH, _USER_ROLES_PATH, "user_id", kwargs, cursor
+                resource, _USERS_PATH, _USER_ROLES_PATH, "user_id", kwargs, cursor
             )
         raise ValueError(f"Unsupported resource '{resource}'")
 
@@ -272,6 +271,7 @@ class OktaCollector(Collector):
 
     def _fetch_scoped_page(
         self,
+        resource: str,
         parent_path: str,
         child_path_template: str,
         id_field: str,
@@ -283,29 +283,14 @@ class OktaCollector(Collector):
         )
 
         parent_ids = [pid for p in parents if (pid := p.get("id"))]
-        records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=_MAX_FANOUT_WORKERS
-        ) as executor:
-            futures = {
-                executor.submit(
-                    self._drain_scoped, child_path_template, id_field, parent_id
-                ): parent_id
-                for parent_id in parent_ids
-            }
-            try:
-                for future in concurrent.futures.as_completed(futures):
-                    records.extend(future.result())
-            except BaseException:
-                # A worker hit something other than a 429 (already retried
-                # locally by _drain_scoped) — e.g. UnauthorizedSignal or a
-                # connection error. Cancel unstarted futures so a dead
-                # token/connection doesn't get retried against the whole
-                # remaining queue before base.py's retry/reauth handler runs.
-                for pending in futures:
-                    pending.cancel()
-                raise
-
+        records = self._resumable_fanout(
+            resource,
+            parent_ids,
+            lambda parent_id: self._drain_scoped(
+                child_path_template, id_field, parent_id
+            ),
+            _MAX_FANOUT_WORKERS,
+        )
         return records, next_parents_cursor
 
     def _drain_scoped(

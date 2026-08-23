@@ -43,7 +43,6 @@ whether a policy/rule-set is well-covered vs. mostly broken.
 
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 from typing import Any
 
@@ -272,15 +271,9 @@ class AppOmniCollector(Collector):
         max_workers = kwargs.get("max_workers", _POLICY_RISK_SUMMARY_MAX_WORKERS)
         workers = max(1, min(max_workers, len(policy_ids)))
 
-        records: list[dict[str, Any]] = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = [
-                executor.submit(self._fetch_policy_detail, policy_id)
-                for policy_id in policy_ids
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                records.append(future.result())
-
+        records = self._resumable_fanout(
+            "policy_risk_summary", policy_ids, self._fetch_policy_detail, workers
+        )
         return records, None
 
     def _fetch_policy_detail(self, policy_id: Any) -> dict[str, Any]:

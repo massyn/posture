@@ -44,7 +44,11 @@ from posture.collectors._azure_oauth import fetch_azure_ad_token
 logger = logging.getLogger("posture.collectors.mde")
 
 _API_BASE_URL = "https://api.security.microsoft.com"
-_PAGE_SIZE = 1000  # comfortably under the documented $top max of 8,000
+_PAGE_SIZE = 5000  # comfortably under the documented $top max of 8,000; kept
+# well below the max (rather than jumping straight to 8,000) as a margin
+# against undocumented response-size/timeout limits on large tenants —
+# machine_vulnerabilities' own page size was lowered from 50k after a similar
+# limit tripped a request timeout on large CVE volumes (see comment below).
 
 # MDE's documented general API limit is ~100 calls/minute per app registration.
 # Staying comfortably under that (0.65s between requests ~= 92/min) leaves
