@@ -408,6 +408,13 @@ class Collector(ABC):
                 if self._record_limit is not None and count >= self._record_limit:
                     break
         except Exception:
+            # Close before delete: on Windows, unlinking a still-open file
+            # handle raises PermissionError (unlike POSIX, where the inode
+            # persists until close) — fh must be closed first, not in the
+            # finally block below, which runs after this except clause.
+            if fh is not None:
+                fh.close()
+                fh = None
             if path is not None:
                 self._spill.delete(path)
             raise

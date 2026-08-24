@@ -178,9 +178,16 @@ def _coerce_datetime(
         parsed = _parse_epoch(value)
     else:
         text = str(value)
-        parsed = _parse_iso(text)
-        if parsed is None and "format" in hints:
+        if "format" in hints:
+            # An explicit format is authoritative, not a fallback tried only
+            # after the generic ISO guess fails: a manifest only declares one
+            # when the field's format is otherwise ambiguous (e.g. day-first
+            # DD/MM/YYYY) — the generic parser would happily "succeed" on
+            # such a value, just silently wrong (swapping day/month), so it
+            # must never get first refusal.
             parsed = _parse_with_format(text, hints["format"])
+        else:
+            parsed = _parse_iso(text)
 
     if parsed is not None and not (
         pd.Timestamp.min.tz_localize("UTC")

@@ -66,7 +66,7 @@ for table in ccm.tables():
 | `operating_system` | `str` |
 | `os_build_version` | `str` |
 | `last_seen` | `datetime` |
-| `last_enrolled_on` | `str` |
+| `last_enrolled_on` | `datetime` |
 | `enrollment_status` | `str` |
 | `compliance_status` | `str` |
 | `compromised_status` | `str` |

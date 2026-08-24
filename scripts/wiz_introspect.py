@@ -5,7 +5,7 @@ import json
 from posture import CCM
 
 ccm = CCM("wiz")
-ccm._ensure_authenticated()  # noqa: SLF001
+ccm._ensure_authenticated()
 
 _QUERY = """
 query InputFields {
@@ -23,8 +23,8 @@ query InputFields {
 }
 """
 
-response = ccm._session.post(  # noqa: SLF001
-    ccm._api_endpoint,  # noqa: SLF001
+response = ccm._session.post(
+    ccm._api_endpoint,
     json={"query": _QUERY},
     timeout=30,
 )

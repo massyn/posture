@@ -137,12 +137,27 @@ tests/
 
 ## Datetime policy
 
+- **Every date a vendor gives us becomes a real datetime. No exceptions.** A
+  collector that leaves a known-format date field typed `str` because the format
+  is inconvenient (ambiguous, non-ISO, whatever) has not implemented the
+  contract — it's implemented a partial one and left the parsing as the
+  caller's problem. Type it `datetime` and give `parse.py` what it needs
+  (a `format` hint) to parse it correctly. This was gotten wrong once already
+  (`precise.py`'s day-first `valid_from`/`valid_to` were shipped as `str` to
+  dodge an ambiguous-date bug — the bug was in `parse.py`'s hint priority, not
+  a reason to abandon typing the column correctly) — don't repeat it.
 - ONE parse function handles all datetime parsing. Output is always tz-aware UTC
   (`datetime64[us, UTC]`) — never naive. Localisation is the consumer's problem.
   Microsecond precision matches Arrow/Parquet/BigQuery/Snowflake defaults, avoiding
   unsafe-cast failures downstream on values with no genuine sub-microsecond precision.
-- Cascade: epoch by magnitude (10 digits = s, 13 = ms, 16 = µs) → ISO 8601 family →
-  explicit `format` hint from the manifest for stragglers. Naked timestamps assumed UTC.
+- Cascade: epoch by magnitude (10 digits = s, 13 = ms, 16 = µs) → explicit `format`
+  hint from the manifest, when the column declares one → ISO 8601 family otherwise.
+  A `format` hint is authoritative, not a last-resort fallback: a collector only
+  declares one because the field's format is otherwise ambiguous (e.g. day-first
+  `DD/MM/YYYY`, indistinguishable from month-first for any date where both
+  components are ≤12) — the generic ISO parser would happily "succeed" on such a
+  value, just silently wrong (day/month swapped), so it must never get first
+  refusal at parsing it. Naked timestamps assumed UTC.
 - Unparseable → `NaT` + a warning carrying resource, column, sample value, count.
   Never raise mid-collection over a bad value; never pass strings through into a
   datetime column. Same coercion policy for bool and numerics.
@@ -857,6 +872,103 @@ why something is built the way it is, not how to configure or call it.
   including the `hotspots` field set, which was the lower-confidence guess
   at write time. `docs/credentials/sonarcloud.md` documents provisioning a
   dedicated read-only organization member and generating its user token.
+
+- **runZero** — raw `requests` against runZero's Export API
+  (`https://console.runzero.com/api/v1.0`), no vendor SDK. Auth is a static
+  Export API key issued out-of-band in the runZero console — export-only by
+  design, no write capability regardless of the generating user's own role.
+  `assets` hits the bulk export endpoint (`/export/org/assets.json`), a
+  single unpaginated request returning a bare JSON array — the same
+  "no envelope at all" shape as Kandji's `devices`/AppOmni's
+  `monitored_services`. `endpoint` is optional config for a self-hosted
+  console, same shape as DNSimple's `endpoint`.
+  **Caveat:** ported from a legacy in-house extraction script (which called
+  only `/export/org/assets.json`) and cross-checked against runZero's public
+  Export API documentation — no live credentials were available to verify
+  this collector against a real org's response. Same caveat tier as
+  `wiz.py`/`appomni.py`/etc., but stronger: verify both field names and the
+  single-unpaginated-call assumption before relying on this collector.
+
+- **Select Star** — raw `requests` against Select Star's REST API v1
+  (`https://api.production.selectstar.com`), no vendor SDK. Auth is a static
+  token, header shape `Authorization: Token <token>` (Select Star's own
+  scheme, not `Bearer`). Pagination is DRF-style with `next` already a
+  complete URL, the same shape as AppOmni's `policies`/`open_policy_issues`.
+  `databases` and `tables` are the only two resources — the pair the legacy
+  extraction script this collector was ported from actually called.
+  **Caveat:** ported from that legacy script and cross-checked against
+  Select Star's public API documentation — no live credentials were
+  available to verify this collector against a real workspace's response.
+  Same caveat tier as `wiz.py`/`appomni.py`/etc. Verify field names/nesting
+  before relying on this collector.
+
+- **Obsidian Security** — raw `requests` against Obsidian's GraphQL API
+  (`https://api.obsec.io/v1/gql`), no vendor SDK. Auth is a static bearer
+  token, same "just set the header" shape as AppOmni/Snyk/UpGuard, over
+  GraphQL POST rather than REST GET. Pagination is cursor-based but with
+  Obsidian's own field names (`has_more_results`/`cursor` on the top-level
+  query result) rather than `wiz.py`'s Relay-style `pageInfo.hasNextPage`/
+  `endCursor`. `posture_rules` (`ListGlobalPostureRules`) is the global
+  posture-rule catalogue; `posture_rule_tenant_states` explodes each rule's
+  nested `tenant_states` list to its own grain (`derived_from`
+  `posture_rules`), the same shape as `crowdstrike.py`'s
+  `vulnerability_remediations`. `posture_scores`
+  (`getScoreRankWidgetData`) reshapes a `{key: {...metrics}}` dict per
+  scoring period into one flat record per key at fetch time — the same
+  "transform before parse.py ever sees it" shape `qualys.py`/`tenablesc.py`
+  use for their own non-record-list envelopes — and folds both groupings
+  the query returns in one call (by platform, by compliance standard) into
+  one resource distinguished by a `group_by` column, rather than querying
+  twice for data already in hand. Defaults to the trailing day
+  (`interval: DAILY`), kwargs win over that default per the locked
+  kwargs-override-defaults rule.
+  **Caveat:** ported directly from a legacy in-house extraction script, not
+  a live schema introspection — no live credentials were available to
+  verify this collector. Same caveat tier as `wiz.py`/`appomni.py`/etc., but
+  stronger for `posture_scores`' pagination: the reference script advances
+  the cursor using only the platforms grouping's `has_more_results`/
+  `cursor` and ignores the compliance grouping's own pagination state
+  entirely — carried forward unchanged rather than guessed at, which means
+  a tenant with more compliance-grouped pages than platform-grouped ones
+  could see that grouping truncate silently. Verify field names, the
+  compliance-side pagination assumption, and the score payload's actual
+  metric keys against a real tenant's response before relying on this
+  collector.
+
+- **Nullify** — raw `requests` against Nullify's REST API
+  (`https://api.<TENANT>.nullify.ai`), no vendor SDK. Auth is a static
+  service-account token, same "just set the header" shape as
+  AppOmni/Snyk/UpGuard. `endpoint` is required config (tenant-scoped host,
+  no cross-tenant discovery, same shape as Wiz's `api_endpoint`).
+  `github_owner_id` is also required config, not a per-call kwarg — it
+  identifies which tenant's data a request reads (the "who am I" side of
+  the locked kwargs-vs-config split), appended to every request rather than
+  exposed for the caller to vary per collect(). Pagination is cursor-based
+  (`limit`/`nextToken` on the request, `nextToken` echoed back on the
+  response). `repositories` (`/admin/repositories`), `sca_events`
+  (`/sca/events`), `sast_events` (`/sast/events`).
+  **This collector replaces a legacy in-house extraction script confirmed
+  broken against Nullify's current public API** (checked directly against
+  docs.nullify.ai, 2026-08-25): the legacy script paginated both event
+  endpoints with a `fromEvent` query param and read the next cursor from a
+  `nextEventId` response field — neither exists in Nullify's documented API;
+  the real pagination contract is `nextToken` on both sides. Against the
+  real API the legacy script's loop would have silently stopped after one
+  page every time. The legacy script's fourth resource,
+  `/sca/counts/severity/latest`, does not appear anywhere in Nullify's
+  current public API reference (checked the dependency-analysis, SAST, and
+  admin pages directly) and was dropped rather than kept as a resource that
+  would 404 against every real tenant.
+  **Caveat — weaker tier than usual:** endpoint paths, auth, and the
+  pagination contract are confirmed from Nullify's public docs, but the
+  docs' response-schema examples are embedded in a rendered component this
+  collector could not extract as plain text, so `MANIFEST`'s field names
+  are inferred from each endpoint's documented purpose and comparable
+  collectors in this codebase (`snyk.py`'s `issues`, `wiz.py`'s
+  `vulnerabilityFindings`) rather than confirmed against any schema or
+  example payload. No live tenant was available to verify against. Treat
+  every column name as a guess and verify against a real tenant's response
+  before relying on this collector.
 
 ## Version bumps
 

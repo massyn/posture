@@ -17,6 +17,9 @@ from posture import CCM
 ccm = CCM("cloudflare")  # credentials from CLOUDFLARE_API_TOKEN
 df = ccm.collect("cdn_protected_domains")
 df = ccm.collect("dns_records")
+df = ccm.collect("pages_projects")
+df = ccm.collect("workers_routes")
+df = ccm.collect("workers_scripts")
 df = ccm.collect("zones")
 ```
 
@@ -41,6 +44,9 @@ for table in ccm.tables():
 
 - [cdn_protected_domains](#cdn_protected_domains)
 - [dns_records](#dns_records)
+- [pages_projects](#pages_projects)
+- [workers_routes](#workers_routes)
+- [workers_scripts](#workers_scripts)
 - [zones](#zones)
 
 ### cdn_protected_domains
@@ -76,6 +82,49 @@ for table in ccm.tables():
 | `tags` | `json` |
 | `created_on` | `datetime` |
 | `modified_on` | `datetime` |
+
+### pages_projects
+
+| Column | Type |
+| --- | --- |
+| `account_id` | `str` |
+| `account_name` | `str` |
+| `id` | `str` |
+| `name` | `str` |
+| `subdomain` | `str` |
+| `domains` | `json` |
+| `production_branch` | `str` |
+| `source_type` | `str` |
+| `source_config_owner` | `str` |
+| `source_config_repo_name` | `str` |
+| `created_on` | `datetime` |
+| `latest_deployment_id` | `str` |
+| `latest_deployment_url` | `str` |
+| `latest_deployment_environment` | `str` |
+
+### workers_routes
+
+| Column | Type |
+| --- | --- |
+| `zone_id` | `str` |
+| `zone_name` | `str` |
+| `id` | `str` |
+| `pattern` | `str` |
+| `script` | `str` |
+
+### workers_scripts
+
+| Column | Type |
+| --- | --- |
+| `account_id` | `str` |
+| `account_name` | `str` |
+| `id` | `str` |
+| `etag` | `str` |
+| `created_on` | `datetime` |
+| `modified_on` | `datetime` |
+| `usage_model` | `str` |
+| `logpush` | `bool` |
+| `tags` | `json` |
 
 ### zones
 

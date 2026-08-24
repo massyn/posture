@@ -11,6 +11,7 @@ The entire contract: credentials in, DataFrame out.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from dotenv import find_dotenv, load_dotenv
@@ -34,7 +35,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.16.1"
+__version__ = "0.17.0"
 
 __all__ = [
     "CCM",
@@ -48,6 +49,7 @@ __all__ = [
     "StorageError",
     "StorageWriteError",
     "catalog",
+    "runnable_sources",
     "storage_catalog",
     "write_storage",
 ]
@@ -67,20 +69,28 @@ def _register_sources() -> None:
     from posture.collectors.crowdstrike_identity import CrowdstrikeIdentityCollector
     from posture.collectors.dnsimple import DnsimpleCollector
     from posture.collectors.github import GithubCollector
+    from posture.collectors.google_workspace import GoogleWorkspaceCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
     from posture.collectors.kandji import KandjiCollector
     from posture.collectors.knowbe4 import Knowbe4Collector
     from posture.collectors.mde import MdeCollector
+    from posture.collectors.nullify import NullifyCollector
+    from posture.collectors.obsidian import ObsidianCollector
     from posture.collectors.okta import OktaCollector
     from posture.collectors.phriendly_phishing import PhriendlyPhishingCollector
+    from posture.collectors.precise import PreciseCollector
     from posture.collectors.qualys import QualysCollector
+    from posture.collectors.runzero import RunzeroCollector
     from posture.collectors.sailpoint import SailpointCollector
     from posture.collectors.salesforce import SalesforceCollector
+    from posture.collectors.select_star import SelectStarCollector
     from posture.collectors.sentinelone import SentinelOneCollector
     from posture.collectors.servicenow import ServicenowCollector
+    from posture.collectors.slack import SlackCollector
     from posture.collectors.snyk import SnykCollector
     from posture.collectors.sonarcloud import SonarcloudCollector
+    from posture.collectors.teams import TeamsCollector
     from posture.collectors.tenableio import TenableioCollector
     from posture.collectors.tenablesc import TenablescCollector
     from posture.collectors.upguard import UpGuardCollector
@@ -98,20 +108,28 @@ def _register_sources() -> None:
     _SOURCES["crowdstrike_identity"] = CrowdstrikeIdentityCollector
     _SOURCES["dnsimple"] = DnsimpleCollector
     _SOURCES["github"] = GithubCollector
+    _SOURCES["google_workspace"] = GoogleWorkspaceCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector
     _SOURCES["kandji"] = KandjiCollector
     _SOURCES["knowbe4"] = Knowbe4Collector
     _SOURCES["mde"] = MdeCollector
+    _SOURCES["nullify"] = NullifyCollector
+    _SOURCES["obsidian"] = ObsidianCollector
     _SOURCES["okta"] = OktaCollector
     _SOURCES["phriendly_phishing"] = PhriendlyPhishingCollector
+    _SOURCES["precise"] = PreciseCollector
     _SOURCES["qualys"] = QualysCollector
+    _SOURCES["runzero"] = RunzeroCollector
     _SOURCES["sailpoint"] = SailpointCollector
     _SOURCES["salesforce"] = SalesforceCollector
+    _SOURCES["select_star"] = SelectStarCollector
     _SOURCES["sentinelone"] = SentinelOneCollector
     _SOURCES["servicenow"] = ServicenowCollector
+    _SOURCES["slack"] = SlackCollector
     _SOURCES["snyk"] = SnykCollector
     _SOURCES["sonarcloud"] = SonarcloudCollector
+    _SOURCES["teams"] = TeamsCollector
     _SOURCES["tenableio"] = TenableioCollector
     _SOURCES["tenablesc"] = TenablescCollector
     _SOURCES["upguard"] = UpGuardCollector
@@ -172,10 +190,24 @@ def catalog() -> dict[str, Any]:
                     "derived_from": manifest.get("derived_from"),
                     "columns": list(manifest["columns"]),
                     "column_types": {
-                        col: type_ for col, (_, type_) in manifest["columns"].items()
+                        col: spec[1] for col, spec in manifest["columns"].items()
                     },
                 }
                 for resource, manifest in cls.manifest.items()
             },
         }
     return sources
+
+
+def runnable_sources() -> dict[str, Any]:
+    """Subset of :func:`catalog` whose required env vars are all set right now.
+
+    Reads ``os.environ`` (a real environment check, unlike ``catalog()``) so a
+    caller — a universal collector cycling through sources — can filter to
+    what will actually run instead of instantiating every source to find out.
+    """
+    return {
+        name: info
+        for name, info in catalog().items()
+        if all(env_var in os.environ for env_var in info["required_config"].values())
+    }

@@ -1,0 +1,21 @@
+[
+    {
+        "id": "proj-1",
+        "name": "marketing-site",
+        "subdomain": "marketing-site.pages.dev",
+        "domains": ["www.example.com"],
+        "production_branch": "main",
+        "source": {
+            "type": "github",
+            "config": {"owner": "acme-corp", "repo_name": "marketing-site"}
+        },
+        "created_on": "2024-01-20T12:00:00Z",
+        "latest_deployment": {
+            "id": "deploy-1",
+            "url": "https://abcd1234.marketing-site.pages.dev",
+            "environment": "production"
+        },
+        "_account_id": "acct-1",
+        "_account_name": "Acme Corp"
+    }
+]

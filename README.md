@@ -95,6 +95,17 @@ registered `Collector` classes. It only reports *required* config — optional k
 (e.g. `region`, `base_url`) aren't tracked as data, so check a source's page in
 [`docs/index.md`](docs/index.md) for those.
 
+`runnable_sources()` filters `catalog()` down to sources whose required env vars are
+all set right now — useful for a universal collector that wants to skip sources with
+no credentials configured instead of instantiating each one to find out:
+
+```python
+from posture import runnable_sources
+
+runnable_sources()
+# same shape as catalog(), but only sources ready to run in the current environment
+```
+
 `storage_catalog()` is the same idea for the storage layer:
 
 ```python

@@ -17,6 +17,9 @@
 
 - [cdn_protected_domains](collectors/cloudflare.md#cdn_protected_domains)
 - [dns_records](collectors/cloudflare.md#dns_records)
+- [pages_projects](collectors/cloudflare.md#pages_projects)
+- [workers_routes](collectors/cloudflare.md#workers_routes)
+- [workers_scripts](collectors/cloudflare.md#workers_scripts)
 - [zones](collectors/cloudflare.md#zones)
 
 ## [CrowdStrike](collectors/crowdstrike.md)
@@ -73,6 +76,17 @@
 - [organizations](collectors/github.md#organizations)
 - [repositories](collectors/github.md#repositories)
 
+## [Google Workspace](collectors/google_workspace.md)
+
+[Credentials](credentials/google_workspace.md)
+
+- [group_members](collectors/google_workspace.md#group_members)
+- [groups](collectors/google_workspace.md#groups)
+- [org_units](collectors/google_workspace.md#org_units)
+- [role_assignments](collectors/google_workspace.md#role_assignments)
+- [roles](collectors/google_workspace.md#roles)
+- [users](collectors/google_workspace.md#users)
+
 ## [Jamf](collectors/jamf.md)
 
 [Credentials](credentials/jamf.md)
@@ -124,6 +138,32 @@
 - [managed_devices](collectors/intune.md#managed_devices)
 - [users](collectors/intune.md#users)
 
+## [Microsoft Teams](collectors/teams.md)
+
+[Credentials](credentials/teams.md)
+
+- [channels](collectors/teams.md#channels)
+- [installed_apps](collectors/teams.md#installed_apps)
+- [team_members](collectors/teams.md#team_members)
+- [team_settings](collectors/teams.md#team_settings)
+- [teams](collectors/teams.md#teams)
+
+## [Nullify](collectors/nullify.md)
+
+[Credentials](credentials/nullify.md)
+
+- [repositories](collectors/nullify.md#repositories)
+- [sast_events](collectors/nullify.md#sast_events)
+- [sca_events](collectors/nullify.md#sca_events)
+
+## [Obsidian Security](collectors/obsidian.md)
+
+[Credentials](credentials/obsidian.md)
+
+- [posture_rule_tenant_states](collectors/obsidian.md#posture_rule_tenant_states)
+- [posture_rules](collectors/obsidian.md#posture_rules)
+- [posture_scores](collectors/obsidian.md#posture_scores)
+
 ## [Okta](collectors/okta.md)
 
 [Credentials](credentials/okta.md)
@@ -150,6 +190,19 @@
 - [clicks](collectors/phriendly_phishing.md#clicks)
 - [trainings](collectors/phriendly_phishing.md#trainings)
 
+## [Precise](collectors/precise.md)
+
+[Credentials](credentials/precise.md)
+
+- [profile_certifications](collectors/precise.md#profile_certifications)
+- [profile_conferences](collectors/precise.md#profile_conferences)
+- [profile_education](collectors/precise.md#profile_education)
+- [profile_experience](collectors/precise.md#profile_experience)
+- [profile_network](collectors/precise.md#profile_network)
+- [profile_skills](collectors/precise.md#profile_skills)
+- [profile_tracks](collectors/precise.md#profile_tracks)
+- [profiles](collectors/precise.md#profiles)
+
 ## [Qualys](collectors/qualys.md)
 
 [Credentials](credentials/qualys.md)
@@ -157,6 +210,12 @@
 - [hosts](collectors/qualys.md#hosts)
 - [vulnerabilities](collectors/qualys.md#vulnerabilities)
 - [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
+
+## [runZero](collectors/runzero.md)
+
+[Credentials](credentials/runzero.md)
+
+- [assets](collectors/runzero.md#assets)
 
 ## [SailPoint Identity Security Cloud](collectors/sailpoint.md)
 
@@ -177,6 +236,13 @@
 - [krow__project_resources__c](collectors/salesforce.md#krow__project_resources__c)
 - [krow__team__c](collectors/salesforce.md#krow__team__c)
 
+## [Select Star](collectors/select_star.md)
+
+[Credentials](credentials/select_star.md)
+
+- [databases](collectors/select_star.md#databases)
+- [tables](collectors/select_star.md#tables)
+
 ## [SentinelOne](collectors/sentinelone.md)
 
 [Credentials](credentials/sentinelone.md)
@@ -195,6 +261,16 @@
 - [cmdb_ci](collectors/servicenow.md#cmdb_ci)
 - [cmdb_ci_service](collectors/servicenow.md#cmdb_ci_service)
 - [cmdb_rel_ci](collectors/servicenow.md#cmdb_rel_ci)
+
+## [Slack](collectors/slack.md)
+
+[Credentials](credentials/slack.md)
+
+- [apps](collectors/slack.md#apps)
+- [channel_members](collectors/slack.md#channel_members)
+- [channels](collectors/slack.md#channels)
+- [user_groups](collectors/slack.md#user_groups)
+- [users](collectors/slack.md#users)
 
 ## [Snyk](collectors/snyk.md)
 

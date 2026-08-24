@@ -1,4 +1,6 @@
-from posture import catalog
+import pytest
+
+from posture import catalog, runnable_sources
 
 
 def test_catalog_lists_all_registered_sources() -> None:
@@ -14,20 +16,28 @@ def test_catalog_lists_all_registered_sources() -> None:
         "crowdstrike_identity",
         "dnsimple",
         "github",
+        "google_workspace",
         "intune",
         "jamf",
         "kandji",
         "knowbe4",
         "mde",
+        "nullify",
+        "obsidian",
         "okta",
         "phriendly_phishing",
+        "precise",
         "qualys",
+        "runzero",
         "sailpoint",
         "salesforce",
+        "select_star",
         "sentinelone",
         "servicenow",
+        "slack",
         "snyk",
         "sonarcloud",
+        "teams",
         "tenableio",
         "tenablesc",
         "upguard",
@@ -95,3 +105,28 @@ def test_catalog_requires_no_credentials_or_network() -> None:
     # a collector or touch the network.
     result = catalog()
     assert result["knowbe4"]["required_config"]["token"] == "KNOWBE4_TOKEN"
+
+
+def test_runnable_sources_excludes_source_missing_env_vars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("KNOWBE4_TOKEN", raising=False)
+
+    assert "knowbe4" not in runnable_sources()
+
+
+def test_runnable_sources_includes_source_with_all_env_vars_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KNOWBE4_TOKEN", "dummy")
+
+    assert "knowbe4" in runnable_sources()
+
+
+def test_runnable_sources_requires_every_required_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CROWDSTRIKE_CLIENT_ID", "dummy")
+    monkeypatch.delenv("CROWDSTRIKE_CLIENT_SECRET", raising=False)
+
+    assert "crowdstrike" not in runnable_sources()

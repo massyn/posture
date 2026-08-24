@@ -1,0 +1,9 @@
+[
+    {
+        "id": "route-1",
+        "pattern": "example.com/api/*",
+        "script": "api-worker",
+        "_zone_id": "zone-1",
+        "_zone_name": "example.com"
+    }
+]

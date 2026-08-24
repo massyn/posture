@@ -26,3 +26,5 @@ def test_computers_page() -> None:
     assert bool(df.loc[1, "is_supervised"]) is False
     assert df["last_seen"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "last_seen"])  # absent in fixture
+    assert df["last_enrolled_on"].dtype == "datetime64[us, UTC]"
+    assert df.loc[0, "last_enrolled_on"] == pd.Timestamp("2026-01-01T00:00:00Z")

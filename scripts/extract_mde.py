@@ -1,5 +1,7 @@
-from posture import CCM
 import logging
+
+from posture import CCM
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",

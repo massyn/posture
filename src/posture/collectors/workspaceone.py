@@ -49,7 +49,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "operating_system": ("operating_system", "str"),
             "os_build_version": ("os_build_version", "str"),
             "last_seen": ("last_seen", "datetime"),
-            "last_enrolled_on": ("last_enrolled_on", "str"),
+            "last_enrolled_on": ("last_enrolled_on", "datetime"),
             "enrollment_status": ("enrollment_status", "str"),
             "compliance_status": ("compliance_status", "str"),
             "compromised_status": ("compromised_status", "str"),

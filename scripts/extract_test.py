@@ -6,7 +6,9 @@ Sources and resources are not hardcoded here — they're read straight off
 library actually offers. Set credentials for whichever sources you want to
 test, either in the environment or a .env file in the current directory; see
 ``catalog()["<source>"]["required_config"]`` (or the README) for the env var
-names. A source with no credentials configured is skipped, not fatal.
+names. Which sources are actually ready to run is determined via
+``posture.runnable_sources()``; a source with no credentials configured is
+skipped, not fatal.
 
     python scripts/extract_test.py
     python scripts/extract_test.py --limit 10
@@ -20,7 +22,7 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
-from posture import CCM, catalog
+from posture import CCM, catalog, runnable_sources
 from posture.exceptions import PostureError
 
 logging.basicConfig(
@@ -89,13 +91,15 @@ output_dir.mkdir(exist_ok=True)
 
 summary: list[dict] = []
 
+ready = runnable_sources()
+
 for source, info in catalog().items():
-    missing_env = [
-        env_var
-        for env_var in info["required_config"].values()
-        if env_var not in os.environ
-    ]
-    if missing_env:
+    if source not in ready:
+        missing_env = [
+            env_var
+            for env_var in info["required_config"].values()
+            if env_var not in os.environ
+        ]
         print(f"{source}: SKIPPED — missing env var(s): {', '.join(missing_env)}")
         summary.append(
             {
