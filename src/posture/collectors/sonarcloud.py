@@ -48,7 +48,7 @@ field set was the lower-confidence guess at write time.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -168,7 +168,7 @@ class SonarcloudCollector(Collector):
     env_prefix = "SONARCLOUD"
     display_name = "SonarCloud"
     manifest = MANIFEST
-    config_keys = {"token": True, "organization": True}
+    config_keys: ClassVar[dict[str, bool]] = {"token": True, "organization": True}
 
     def _authenticate(self) -> None:
         self._session.headers["Accept"] = "application/json"

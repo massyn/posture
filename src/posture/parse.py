@@ -229,7 +229,7 @@ def _parse_iso(value: str) -> pd.Timestamp | None:
 
 def _parse_with_format(value: str, fmt: str) -> pd.Timestamp | None:
     try:
-        dt = datetime.strptime(value, fmt)
+        dt = datetime.strptime(value, fmt)  # noqa: DTZ007 - localized to UTC below
     except ValueError:
         return None
     if dt.tzinfo is None:

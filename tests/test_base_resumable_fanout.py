@@ -8,7 +8,7 @@ already-completed ids from scratch.
 from __future__ import annotations
 
 import threading
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -17,7 +17,7 @@ from posture.base import Collector
 
 class _DummyCollector(Collector):
     env_prefix = "DUMMY"
-    manifest = {"widgets": {"columns": {}}}
+    manifest: ClassVar[dict[str, Any]] = {"widgets": {"columns": {}}}
 
     def _authenticate(self) -> None:
         pass

@@ -26,7 +26,7 @@ tenant's response on first use and adjusted here if they don't match.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -214,7 +214,7 @@ class WizCollector(Collector):
     manifest = MANIFEST
     # token_url is optional: most tenants use the shared Auth0 endpoint,
     # only Cognito-provisioned tenants need to override it.
-    config_keys = {
+    config_keys: ClassVar[dict[str, bool]] = {
         "client_id": True,
         "client_secret": True,
         "api_endpoint": True,

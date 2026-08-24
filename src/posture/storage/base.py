@@ -35,9 +35,9 @@ from __future__ import annotations
 import os
 import uuid
 from abc import ABC, abstractmethod
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 import pandas as pd
 
@@ -80,7 +80,7 @@ class _ConfigResolverMixin:
 
     #: key -> required. A required key missing everywhere raises
     #: StorageConfigError (also a ValueError).
-    config_keys: dict[str, bool] = {}
+    config_keys: ClassVar[dict[str, bool]] = {}
 
     def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
         resolved: dict[str, Any] = {}
@@ -105,7 +105,7 @@ class _ConfigResolverMixin:
 class Storage(_ConfigResolverMixin, ABC):
     """Base class for a single local file-backed storage target."""
 
-    config_keys: dict[str, bool] = {"path": True}
+    config_keys: ClassVar[dict[str, bool]] = {"path": True}
 
     #: File extension written for this format, e.g. "csv".
     extension: str = ""
@@ -145,7 +145,7 @@ class Storage(_ConfigResolverMixin, ABC):
         self._atomic_write(df, path)
 
     def _dated_dir(self) -> Path:
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
         return self._base_dir / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}"
 
     def _page_dir(self, name: str, *, mode: str) -> Path:

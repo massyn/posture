@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
@@ -44,7 +44,7 @@ def test_backend_satisfies_storage_backend_protocol(backend_cls: type) -> None:
 def test_write_storage_default_mode_is_truncate(tmp_path: Path) -> None:
     write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)})
     assert (tmp_path / "hosts.csv").exists()
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     assert not (tmp_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}").exists()
 
 
@@ -68,7 +68,7 @@ def test_write_storage_csv_truncate_overwrites(tmp_path: Path) -> None:
 
 def test_write_storage_csv_append_is_dated(tmp_path: Path) -> None:
     write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)}, mode="append")
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     out = tmp_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}" / "hosts.csv"
     assert out.exists()
     assert pd.read_csv(out).equals(_DF)
@@ -157,7 +157,7 @@ def test_write_page_truncate_accumulates_within_run(tmp_path: Path) -> None:
 def test_write_page_append_never_clears(tmp_path: Path) -> None:
     store = CsvStorage({"path": str(tmp_path)})
     store.write_page(_DF, "hosts", mode="append")
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     page_dir = tmp_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}" / "hosts"
     assert len(list(page_dir.iterdir())) == 1
 

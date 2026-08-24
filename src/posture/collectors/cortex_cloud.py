@@ -66,7 +66,7 @@ this codebase carry (wiz.py, appomni.py, etc.), though the full
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -177,7 +177,11 @@ class CortexCloudCollector(Collector):
     env_prefix = "CORTEX"
     display_name = "Palo Alto Cortex Cloud"
     manifest = MANIFEST
-    config_keys = {"token": True, "api_key_id": True, "endpoint": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "token": True,
+        "api_key_id": True,
+        "endpoint": True,
+    }
     url_config_keys = ("endpoint",)
 
     def _authenticate(self) -> None:

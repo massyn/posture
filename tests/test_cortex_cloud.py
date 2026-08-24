@@ -1,9 +1,11 @@
 import json
 
+import pytest
 import responses
 
 from posture import CCM
 from posture.collectors.cortex_cloud import _nest_dotted_keys
+from posture.exceptions import PostureError
 
 _CONFIG = {
     "token": "secret-key",
@@ -153,8 +155,5 @@ def test_unauthorized_raises_on_401() -> None:
     )
 
     ccm = CCM("cortex_cloud", _CONFIG)
-    try:
+    with pytest.raises(PostureError, match="assets"):
         ccm.collect("assets")
-        assert False, "expected an exception"
-    except Exception as exc:
-        assert "assets" in str(exc)

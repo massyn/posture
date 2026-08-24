@@ -25,7 +25,7 @@ import logging
 import threading
 import time
 from collections import deque
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -146,7 +146,7 @@ class Knowbe4Collector(Collector):
     env_prefix = "KNOWBE4"
     display_name = "KnowBe4"
     manifest = MANIFEST
-    config_keys = {"token": True, "region": False}
+    config_keys: ClassVar[dict[str, bool]] = {"token": True, "region": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

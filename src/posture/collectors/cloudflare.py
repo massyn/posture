@@ -38,7 +38,7 @@ on this collector, and correct ``MANIFEST`` if they don't match.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -129,7 +129,7 @@ class CloudflareCollector(Collector):
     env_prefix = "CLOUDFLARE"
     display_name = "Cloudflare"
     manifest = MANIFEST
-    config_keys = {"api_token": True}
+    config_keys: ClassVar[dict[str, bool]] = {"api_token": True}
 
     def _authenticate(self) -> None:
         self._session.headers["Accept"] = "application/json"

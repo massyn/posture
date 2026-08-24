@@ -40,7 +40,7 @@ intentionally out of scope — posture is a read-only collection library.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -141,7 +141,7 @@ class WhisticCollector(Collector):
     env_prefix = "WHISTIC"
     display_name = "Whistic"
     manifest = MANIFEST
-    config_keys = {"token": True, "endpoint": False}
+    config_keys: ClassVar[dict[str, bool]] = {"token": True, "endpoint": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

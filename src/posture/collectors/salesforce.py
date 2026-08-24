@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -57,7 +57,7 @@ class SalesforceCollector(Collector):
     env_prefix = "SALESFORCE"
     display_name = "Salesforce"
     manifest = MANIFEST
-    config_keys = {
+    config_keys: ClassVar[dict[str, bool]] = {
         "username": True,
         "password": True,
         "token": True,
@@ -99,9 +99,7 @@ class SalesforceCollector(Collector):
                 security_token=self._config["token"],
                 domain=self._domain,
             )
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 - simple_salesforce raises its own taxonomy
+        except Exception as exc:
             raise AuthenticationError(
                 "Salesforce rejected the provided username/password/security token",
                 source="salesforce",

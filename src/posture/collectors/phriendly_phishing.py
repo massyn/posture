@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -86,7 +86,7 @@ class PhriendlyPhishingCollector(Collector):
     env_prefix = "PHRIENDLY_PHISHING"
     display_name = "PhriendlyPhishing"
     manifest = MANIFEST
-    config_keys = {"client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {"client_id": True, "client_secret": True}
 
     def _authenticate(self) -> None:
         response = self._session.post(

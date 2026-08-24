@@ -23,6 +23,6 @@ def test_cmdb_ci_page() -> None:
 
 
 def test_manifest_sysparm_fields_matches_declared_columns() -> None:
-    for _table, definition in MANIFEST.items():
+    for definition in MANIFEST.values():
         fields = [source for source, _dtype in definition["columns"].values()]
         assert definition["sysparm_fields"] == ",".join(fields)

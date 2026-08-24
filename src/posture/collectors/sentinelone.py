@@ -65,7 +65,7 @@ response before relying on this collector, particularly for ``alerts``.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -178,7 +178,7 @@ class SentinelOneCollector(Collector):
     env_prefix = "SENTINELONE"
     display_name = "SentinelOne"
     manifest = MANIFEST
-    config_keys = {"console_url": True, "api_token": True}
+    config_keys: ClassVar[dict[str, bool]] = {"console_url": True, "api_token": True}
     url_config_keys = ("console_url",)
 
     def __init__(

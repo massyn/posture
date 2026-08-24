@@ -30,7 +30,7 @@ tenant's response before relying on this collector, and correct
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -195,7 +195,7 @@ class VantaCollector(Collector):
     env_prefix = "VANTA"
     display_name = "Vanta"
     manifest = MANIFEST
-    config_keys = {"client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {"client_id": True, "client_secret": True}
 
     def _authenticate(self) -> None:
         response = self._session.post(

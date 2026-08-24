@@ -16,10 +16,11 @@ import os
 import random
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, ClassVar
 
 import pandas as pd
 import requests
@@ -104,7 +105,7 @@ class Collector(ABC):
     display_name: str = ""
 
     #: resource name -> manifest dict (see parse.py for manifest shape).
-    manifest: dict[str, dict[str, Any]] = {}
+    manifest: ClassVar[dict[str, dict[str, Any]]] = {}
 
     #: Every config key the collector accepts, mapped to whether it's
     #: required. Each is resolved from the constructor dict, else the env
@@ -115,7 +116,7 @@ class Collector(ABC):
     #: documenting a collector's config surface, so a key resolved via a
     #: raw os.environ.get(...) instead of being listed here is invisible to
     #: catalog() and the generated docs — don't do that.
-    config_keys: dict[str, bool] = {}
+    config_keys: ClassVar[dict[str, bool]] = {}
 
     #: Subset of config_keys holding a base URL/endpoint. Operators
     #: routinely supply these with or without a scheme ("host.example.com"
@@ -373,7 +374,7 @@ class Collector(ABC):
                     break
                 except IncompleteCollection:
                     raise
-                except Exception as exc:  # noqa: BLE001 - convert to domain exception
+                except Exception as exc:
                     raise IncompleteCollection(
                         f"Collection of '{resource}' failed after {count} records: {exc}",
                         source=self.env_prefix.lower(),

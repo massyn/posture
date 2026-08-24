@@ -7,7 +7,7 @@ rename.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import duckdb
 import pandas as pd
@@ -21,7 +21,7 @@ def _quote_ident(name: str) -> str:
 
 class DuckdbStorage(TableStorage):
     env_prefix = "POSTURE_DUCKDB"
-    config_keys: dict[str, bool] = {"path": True}
+    config_keys: ClassVar[dict[str, bool]] = {"path": True}
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         super().__init__(config)

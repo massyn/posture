@@ -17,7 +17,7 @@ import logging
 import random
 import re
 import time
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -213,7 +213,7 @@ class OktaCollector(Collector):
     env_prefix = "OKTA"
     display_name = "Okta"
     manifest = MANIFEST
-    config_keys = {"domain": True, "token": True}
+    config_keys: ClassVar[dict[str, bool]] = {"domain": True, "token": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

@@ -24,7 +24,7 @@ don't match.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -61,7 +61,7 @@ class DnsimpleCollector(Collector):
     env_prefix = "DNSIMPLE"
     display_name = "DNSimple"
     manifest = MANIFEST
-    config_keys = {"token": True, "endpoint": False}
+    config_keys: ClassVar[dict[str, bool]] = {"token": True, "endpoint": False}
     url_config_keys = ("endpoint",)
 
     def __init__(

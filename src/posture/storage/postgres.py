@@ -12,7 +12,7 @@ untouched.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import quote
 
 import pandas as pd
@@ -49,7 +49,7 @@ class PostgresStorage(TableStorage):
     # "dsn" alone or the full host/dbname/user/password set must be present,
     # which _resolve_config's per-key "required" flag can't express. __init__
     # checks that combination itself and raises its own ValueError.
-    config_keys: dict[str, bool] = {
+    config_keys: ClassVar[dict[str, bool]] = {
         "dsn": False,
         "host": False,
         "port": False,
@@ -85,25 +85,20 @@ class PostgresStorage(TableStorage):
 
     def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
         table = sql.Identifier(name)
-        with psycopg.connect(self._dsn) as conn:
-            with conn.cursor() as cur:
-                if recreate:
-                    cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(table))
-                column_defs = sql.SQL(", ").join(
-                    sql.SQL("{} {}").format(
-                        sql.Identifier(col), sql.SQL(_pg_type(df[col]))
-                    )
-                    for col in df.columns
-                )
-                cur.execute(
-                    sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(
-                        table, column_defs
-                    )
-                )
-                if df.empty:
-                    return
-                columns = sql.SQL(", ").join(sql.Identifier(col) for col in df.columns)
-                copy_sql = sql.SQL("COPY {} ({}) FROM STDIN").format(table, columns)
-                with cur.copy(copy_sql) as copy:
-                    for row in df.itertuples(index=False, name=None):
-                        copy.write_row(tuple(None if pd.isna(v) else v for v in row))
+        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
+            if recreate:
+                cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(table))
+            column_defs = sql.SQL(", ").join(
+                sql.SQL("{} {}").format(sql.Identifier(col), sql.SQL(_pg_type(df[col])))
+                for col in df.columns
+            )
+            cur.execute(
+                sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(table, column_defs)
+            )
+            if df.empty:
+                return
+            columns = sql.SQL(", ").join(sql.Identifier(col) for col in df.columns)
+            copy_sql = sql.SQL("COPY {} ({}) FROM STDIN").format(table, columns)
+            with cur.copy(copy_sql) as copy:
+                for row in df.itertuples(index=False, name=None):
+                    copy.write_row(tuple(None if pd.isna(v) else v for v in row))

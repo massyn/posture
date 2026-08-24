@@ -33,8 +33,9 @@ import shutil
 import tempfile
 import time
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 logger = logging.getLogger("posture.spill")
 

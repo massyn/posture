@@ -40,7 +40,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -79,7 +79,7 @@ class ServicenowCollector(Collector):
     # generated docs can list every key this collector accepts — it plays
     # no part in resolution here. auth_type/credential keys are marked
     # optional since none of them is unconditionally required.
-    config_keys = {
+    config_keys: ClassVar[dict[str, bool]] = {
         "instance": True,
         "auth_type": False,
         "client_id": False,

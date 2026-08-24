@@ -38,18 +38,18 @@ __version__ = "0.16.0"
 
 __all__ = [
     "CCM",
-    "catalog",
-    "Storage",
-    "storage_catalog",
-    "write_storage",
     "AuthenticationError",
     "IncompleteCollection",
     "PostureError",
     "RateLimitExhausted",
     "ResourceUnknown",
-    "StorageError",
+    "Storage",
     "StorageConfigError",
+    "StorageError",
     "StorageWriteError",
+    "catalog",
+    "storage_catalog",
+    "write_storage",
 ]
 
 _SOURCES: dict[str, type[Collector]] = {}

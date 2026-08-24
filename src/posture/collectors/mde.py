@@ -36,7 +36,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.collectors._azure_oauth import fetch_azure_ad_token
@@ -236,9 +236,8 @@ def _log_error_to_file(url: str, params: dict[str, Any] | None, response: Any) -
         f"Response body: {response.text}\n"
         f"{'-' * 80}\n"
     )
-    with _ERROR_LOG_LOCK:
-        with open(_ERROR_LOG_PATH, "a", encoding="utf-8") as fh:
-            fh.write(entry)
+    with _ERROR_LOG_LOCK, open(_ERROR_LOG_PATH, "a", encoding="utf-8") as fh:
+        fh.write(entry)
 
 
 # ============================================================================
@@ -250,7 +249,11 @@ class MdeCollector(Collector):
     env_prefix = "MDE"
     display_name = "Microsoft Defender for Endpoint"
     manifest = MANIFEST
-    config_keys = {"tenant_id": True, "client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "tenant_id": True,
+        "client_id": True,
+        "client_secret": True,
+    }
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

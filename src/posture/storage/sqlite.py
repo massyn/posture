@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pandas as pd
 
@@ -18,7 +18,7 @@ from posture.storage.base import TableStorage
 
 class SqliteStorage(TableStorage):
     env_prefix = "POSTURE_SQLITE"
-    config_keys: dict[str, bool] = {"path": True}
+    config_keys: ClassVar[dict[str, bool]] = {"path": True}
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         super().__init__(config)

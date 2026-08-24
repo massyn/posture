@@ -17,7 +17,7 @@ Resources: ``users``, ``signins``, ``audit_logs``.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector
 from posture.collectors._azure_oauth import fetch_azure_ad_token, odata_get_page
@@ -158,7 +158,11 @@ class AzureEntraCollector(Collector):
     env_prefix = "AZURE"
     display_name = "EntraID"
     manifest = MANIFEST
-    config_keys = {"tenant_id": True, "client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "tenant_id": True,
+        "client_id": True,
+        "client_secret": True,
+    }
 
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(

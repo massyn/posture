@@ -44,7 +44,7 @@ Resources: ``organizations``, ``repositories``, ``members``,
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -247,7 +247,7 @@ class GithubCollector(Collector):
     env_prefix = "GITHUB"
     display_name = "GitHub"
     manifest = MANIFEST
-    config_keys = {"token": True, "endpoint": False}
+    config_keys: ClassVar[dict[str, bool]] = {"token": True, "endpoint": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

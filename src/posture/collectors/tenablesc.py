@@ -48,7 +48,7 @@ against a real instance's response before relying on this collector.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector
 from posture.exceptions import AuthenticationError
@@ -182,7 +182,11 @@ class TenablescCollector(Collector):
     env_prefix = "TENABLESC"
     display_name = "Tenable.sc"
     manifest = MANIFEST
-    config_keys = {"endpoint": True, "access_key": True, "secret_key": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "endpoint": True,
+        "access_key": True,
+        "secret_key": True,
+    }
     url_config_keys = ("endpoint",)
 
     def __init__(
@@ -208,7 +212,7 @@ class TenablescCollector(Collector):
                 retries=5,
                 backoff=1,
             )
-        except Exception as exc:  # noqa: BLE001 - pytenable raises its own taxonomy
+        except Exception as exc:
             raise AuthenticationError(
                 "Tenable.sc rejected the provided API keys",
                 source="tenablesc",

@@ -22,7 +22,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import time
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 
@@ -178,7 +178,7 @@ class UpGuardCollector(Collector):
     env_prefix = "UPGUARD"
     display_name = "UpGuard"
     manifest = MANIFEST
-    config_keys = {"api_key": True, "base_url": False}
+    config_keys: ClassVar[dict[str, bool]] = {"api_key": True, "base_url": False}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

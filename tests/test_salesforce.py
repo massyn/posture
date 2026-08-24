@@ -33,7 +33,7 @@ def test_domain_query_built_from_manifest_and_run_via_query() -> None:
     fake_sf.query.assert_called_once_with("select Id,Name,Active__c from domain__c")
     assert len(df) == 1
     assert df.loc[0, "id"] == "001"
-    assert df.loc[0, "active__c"] == True  # noqa: E712
+    assert df.loc[0, "active__c"] == True
 
 
 def test_pagination_follows_next_records_url() -> None:

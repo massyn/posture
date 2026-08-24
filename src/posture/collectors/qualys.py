@@ -50,7 +50,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, ClassVar
 from xml.etree import ElementTree
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
@@ -172,7 +172,11 @@ class QualysCollector(Collector):
     env_prefix = "QUALYS"
     display_name = "Qualys"
     manifest = MANIFEST
-    config_keys = {"username": True, "password": True, "base_url": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "username": True,
+        "password": True,
+        "base_url": True,
+    }
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

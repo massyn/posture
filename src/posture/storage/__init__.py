@@ -38,16 +38,16 @@ from posture.exceptions import StorageConfigError
 from posture.storage.base import StorageBackend
 
 __all__ = [
-    "write_storage",
-    "storage_catalog",
-    "Storage",
-    "StorageBackend",
     "CsvStorage",
     "DuckdbStorage",
     "JsonStorage",
     "ParquetStorage",
     "PostgresStorage",
     "SqliteStorage",
+    "Storage",
+    "StorageBackend",
+    "storage_catalog",
+    "write_storage",
 ]
 
 # storage key (as passed to write_storage) -> (submodule, class name).

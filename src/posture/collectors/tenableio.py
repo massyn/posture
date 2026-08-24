@@ -17,7 +17,7 @@ Dependencies
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector
 from posture.exceptions import AuthenticationError
@@ -68,7 +68,7 @@ class TenableioCollector(Collector):
     env_prefix = "TENABLEIO"
     display_name = "Tenable.io"
     manifest = MANIFEST
-    config_keys = {"access_key": True, "secret_key": True}
+    config_keys: ClassVar[dict[str, bool]] = {"access_key": True, "secret_key": True}
 
     def _authenticate(self) -> None:
         try:
@@ -86,7 +86,7 @@ class TenableioCollector(Collector):
                 retries=5,
                 backoff=1,
             )
-        except Exception as exc:  # noqa: BLE001 - pytenable raises its own taxonomy
+        except Exception as exc:
             raise AuthenticationError(
                 "Tenable.io rejected the provided API keys",
                 source="tenableio",

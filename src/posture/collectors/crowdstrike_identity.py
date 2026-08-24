@@ -30,7 +30,7 @@ before relying on this collector.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -148,7 +148,7 @@ class CrowdstrikeIdentityCollector(Collector):
     env_prefix = "CROWDSTRIKE_IDENTITY"
     display_name = "Crowdstrike Falcon Identity Protection"
     manifest = MANIFEST
-    config_keys = {"client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {"client_id": True, "client_secret": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

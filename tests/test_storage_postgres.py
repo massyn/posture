@@ -34,9 +34,8 @@ _DF = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
 def table_name() -> str:
     name = f"posture_test_{uuid.uuid4().hex[:8]}"
     yield name
-    with psycopg.connect(_DSN) as conn:
-        with conn.cursor() as cur:
-            cur.execute(f'DROP TABLE IF EXISTS "{name}"')
+    with psycopg.connect(_DSN) as conn, conn.cursor() as cur:
+        cur.execute(f'DROP TABLE IF EXISTS "{name}"')
 
 
 def _read(name: str) -> pd.DataFrame:

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -196,7 +196,7 @@ class CrowdstrikeCollector(Collector):
     env_prefix = "CROWDSTRIKE"
     display_name = "CrowdStrike"
     manifest = MANIFEST
-    config_keys = {"client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {"client_id": True, "client_secret": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None

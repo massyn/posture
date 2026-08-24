@@ -25,7 +25,7 @@ page returns fewer than ``limit`` records.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -127,7 +127,11 @@ class SailpointCollector(Collector):
     env_prefix = "SAILPOINT"
     display_name = "SailPoint Identity Security Cloud"
     manifest = MANIFEST
-    config_keys = {"base_url": True, "client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "base_url": True,
+        "client_id": True,
+        "client_secret": True,
+    }
     url_config_keys = ("base_url",)
 
     def __init__(

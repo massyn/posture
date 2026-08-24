@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 
@@ -243,7 +243,11 @@ class IntuneCollector(Collector):
     env_prefix = "INTUNE"
     display_name = "Microsoft Intune"
     manifest = MANIFEST
-    config_keys = {"tenant_id": True, "client_id": True, "client_secret": True}
+    config_keys: ClassVar[dict[str, bool]] = {
+        "tenant_id": True,
+        "client_id": True,
+        "client_secret": True,
+    }
 
     def _authenticate(self) -> None:
         token = fetch_azure_ad_token(

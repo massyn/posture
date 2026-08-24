@@ -11,7 +11,7 @@ Resources: ``computers``.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
@@ -71,7 +71,7 @@ class WorkspaceOneCollector(Collector):
     env_prefix = "WORKSPACEONE"
     display_name = "Workspace ONE"
     manifest = MANIFEST
-    config_keys = {
+    config_keys: ClassVar[dict[str, bool]] = {
         "client_id": True,
         "client_secret": True,
         "api_server": True,

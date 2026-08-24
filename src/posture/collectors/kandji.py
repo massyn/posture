@@ -48,7 +48,7 @@ server, but which grain it returns was not.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -141,7 +141,7 @@ class KandjiCollector(Collector):
     env_prefix = "KANDJI"
     display_name = "Kandji"
     manifest = MANIFEST
-    config_keys = {"api_url": True, "api_token": True}
+    config_keys: ClassVar[dict[str, bool]] = {"api_url": True, "api_token": True}
     url_config_keys = ("api_url",)
 
     def __init__(
