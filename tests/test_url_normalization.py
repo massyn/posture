@@ -20,7 +20,7 @@ from posture.collectors.wiz import WizCollector
         ("host.example.com", "https://host.example.com"),
         ("https://host.example.com", "https://host.example.com"),
         ("https://host.example.com/", "https://host.example.com"),
-        ("http://host.example.com", "http://host.example.com"),
+        ("http://host.example.com", "https://host.example.com"),
     ],
 )
 def test_sailpoint_base_url_normalized(given, expected):

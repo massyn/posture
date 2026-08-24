@@ -5,7 +5,7 @@ import json
 from posture import CCM
 
 ccm = CCM("wiz")
-ccm._ensure_authenticated()  # noqa: SLF001 - debug script, not library usage
+ccm._ensure_authenticated()  # noqa: SLF001
 
 _QUERY = """
 query InputFields {

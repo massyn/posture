@@ -18,7 +18,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install package with dev dependencies
-        run: pip install -q -e ".[dev]"
+        run: |
+          pip install -q --only-binary :all: ".[dev]"
+          pip install -q -e . --no-deps
 
       - name: Lint with ruff
         run: ruff check src tests

@@ -136,7 +136,6 @@ class Collector(ABC):
         self._session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_maxsize=_HTTP_POOL_MAXSIZE)
         self._session.mount("https://", adapter)
-        self._session.mount("http://", adapter)
         self._authenticated = False
         #: When set by a concrete collector's _authenticate() (e.g. Azure AD
         #: collectors, which know their token's expires_in), enables proactive
@@ -184,14 +183,16 @@ class Collector(ABC):
 
     @staticmethod
     def _normalize_url(value: str) -> str:
-        """Ensure a base URL/endpoint has an explicit scheme, no trailing slash.
+        """Ensure a base URL/endpoint has an explicit https:// scheme, no trailing slash.
 
-        Operators may supply a bare host ("host.example.com") or a full URL
-        ("https://host.example.com/") — both normalize to the same shape.
-        A scheme other than http/https (already explicit) is left alone.
+        Operators may supply a bare host ("host.example.com"), a full URL
+        ("https://host.example.com/"), or even an explicit "http://" —
+        all normalize to https://.
         """
         value = value.strip()
-        if not value.startswith(("https://", "http://")):
+        if value.startswith("http://"):
+            value = value[len("http://") :]
+        if not value.startswith("https://"):
             value = f"https://{value}"
         return value.rstrip("/")
 
