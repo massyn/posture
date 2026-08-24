@@ -190,8 +190,7 @@ class Collector(ABC):
         all normalize to https://.
         """
         value = value.strip()
-        if value.startswith("http://"):
-            value = value[len("http://") :]
+        value = value.removeprefix("http://")
         if not value.startswith("https://"):
             value = f"https://{value}"
         return value.rstrip("/")
