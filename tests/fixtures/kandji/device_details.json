@@ -1,0 +1,15 @@
+{
+    "device_id": "1",
+    "device_name": "MAC-1",
+    "serial_number": "SN-1",
+    "platform": "Mac",
+    "os_version": "14.5",
+    "last_check_in": "2026-06-01T00:00:00.000Z",
+    "is_supervised": true,
+    "security": {
+        "filevault": {"enabled": true, "recovery_key_escrowed": true},
+        "firewall": {"enabled": true},
+        "gatekeeper": {"enabled": true},
+        "system_integrity_protection": {"enabled": true}
+    }
+}

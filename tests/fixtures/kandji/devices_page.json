@@ -1,0 +1,23 @@
+[
+    {
+        "device_id": "1",
+        "device_name": "MAC-1",
+        "model": "MacBook Pro",
+        "platform": "Mac",
+        "os_version": "14.5",
+        "serial_number": "SN-1",
+        "blueprint_id": "bp-1",
+        "mdm_enabled": true,
+        "agent_installed": true,
+        "is_missing": false,
+        "is_removed": false,
+        "first_enrollment": "2026-01-01T00:00:00Z",
+        "last_check_in": "2026-06-01T00:00:00.000Z",
+        "user": {"email": "user@example.com"}
+    },
+    {
+        "device_id": "2",
+        "device_name": "MAC-2",
+        "serial_number": "SN-2"
+    }
+]

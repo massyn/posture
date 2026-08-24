@@ -1,0 +1,16 @@
+[
+    {
+        "id": "threat-1",
+        "threatInfo": {
+            "classification": "Malware",
+            "threatName": "evil.exe",
+            "incidentStatusDescription": "Unresolved",
+            "mitigationStatusDescription": "Mitigated",
+            "confidenceLevel": "malicious",
+            "filePath": "C:\\evil.exe",
+            "fileSize": 1024,
+            "createdAt": "2026-06-01T00:00:00.000000Z"
+        },
+        "agentRealtimeInfo": {"agentUuid": "uuid-1"}
+    }
+]

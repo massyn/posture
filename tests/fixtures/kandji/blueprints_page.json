@@ -1,0 +1,9 @@
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {"id": "bp-1", "name": "Standard macOS"},
+        {"id": "bp-2", "name": "Kiosk iPad"}
+    ]
+}

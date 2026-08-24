@@ -1,0 +1,20 @@
+[
+    {
+        "id": "1",
+        "uuid": "uuid-1",
+        "computerName": "WIN-1",
+        "osType": "windows",
+        "agentVersion": "23.4.1.1",
+        "networkStatus": "connected",
+        "isActive": true,
+        "infected": false,
+        "siteId": "site-1",
+        "siteName": "HQ",
+        "lastActiveDate": "2026-06-01T00:00:00.000000Z"
+    },
+    {
+        "id": "2",
+        "uuid": "uuid-2",
+        "computerName": "MAC-2"
+    }
+]

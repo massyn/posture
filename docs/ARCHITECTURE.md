@@ -264,6 +264,101 @@ collector in the codebase at once before (each one independently overrides
 the signature above rather than the older `def __init__(self, config: dict[str, Any]
 | None = None) -> None:` shape still visible in some diffs/history.
 
+- **SentinelOne** — Singularity Platform EDR/XDR, raw `requests` against the
+  tenant-scoped Management API (`https://<console>.sentinelone.net/web/api/v2.1`),
+  no vendor SDK. Auth is a static API token (`Authorization: ApiToken
+  <token>`), same "just set the header" shape as AppOmni/Snyk/UpGuard, but
+  the token inherits the generating user's own role/scope rather than
+  being independently scoped at creation — the read-only shape is
+  "provision a dedicated, minimally-privileged viewer user, then generate
+  that user's token." `console_url` is required config, no cross-tenant
+  discovery, same shape as Wiz's `api_endpoint`. Pagination is one cursor
+  shape shared by every list endpoint (`{"pagination": {"nextCursor"},
+  "data": [...]}`) — simpler than most collectors here, one `_fetch_page`
+  implementation serves every resource keyed only by endpoint path.
+  `threats` and `alerts` deliberately overlap (older endpoint-threat model
+  vs. newer unified XDR alert model) — both are included per explicit
+  instruction rather than picking one, to be revisited once verified
+  against a real tenant which one a given console actually populates.
+  `installed_applications` hits an already-paginated top-level endpoint
+  (filterable by `agentUuid`), not a per-agent fan-out — unlike Jamf's/
+  Intune's per-device detail calls. Deliberately out of scope: SentinelOne's
+  per-app CVE feed (`application-risks`, under the separately-licensed
+  Singularity Ranger Insights module — same reasoning that splits
+  CrowdStrike Falcon Cloud Security into `crowdstrike_cspm.py`) and every
+  response-action surface (agent disconnect/shutdown/uninstall, remote
+  script execution, STAR rules, blocklist management) — read-only
+  collection only.
+  **Caveat:** `MANIFEST` column paths were built from SentinelOne's public
+  API reference and third-party connectors (Cortex XSOAR, Brinqa, Vulcan
+  Cyber), not a live schema introspection — same caveat tier as `wiz.py`,
+  `appomni.py`, `kandji.py`, and others above. `agents`/`threats` are
+  well-corroborated across multiple independent sources; `alerts`,
+  `sites`, and `groups` are lower confidence — verify field names/nesting
+  against a real tenant's response before relying on this collector,
+  particularly for `alerts`.
+
+## Credentials documentation
+
+A collector's `MANIFEST`/`config_keys` document *what* config it needs;
+they say nothing about *how* a technical team actually provisions a
+read-only credential for it in the vendor's own admin console — a distinct
+audience (whoever runs the source system, not whoever runs posture) with a
+distinct need (click-by-click steps, not env var names). Every collector
+**must** have a hand-written `docs/credentials/<source>.md` — `<source>`
+matching its registered name in `_SOURCES` (`src/posture/__init__.py`), the
+same name `catalog()`/`docs/collectors/<source>.md` use. These are prose
+runbooks, not generated: unlike `docs/index.md`/`docs/collectors/*.md`
+(built from `catalog()` by `scripts/build_schema.py` — see "Regenerate
+collector docs" in `CLAUDE.md`), there is no programmatic source of truth
+for "which button to click in the Jamf console," so these are written and
+maintained by hand.
+
+Shape, established by the first batch of these pages (crowdstrike,
+crowdstrike_cspm, jamf, servicenow, qualys, intune, mde):
+
+- A back-link to the collector's generated doc page
+  (`[← back to collector docs](../collectors/<source>.md)`).
+- Numbered/bulleted steps through the vendor's admin console to create a
+  dedicated, minimally-scoped (read-only wherever the vendor's own role
+  model allows it) service identity — API client, service account, or app
+  registration — naming it consistently (`CCM - Read Only`) so an auditor
+  can recognise the same convention across vendors.
+- A **Record the credentials** section as a table mapping each value to
+  the exact collector config key and environment variable
+  (`env_prefix` + `_` + key, upper-cased) it resolves to, so there is no
+  translation step between "what the vendor console shows you" and "what
+  you paste into config/`.env`."
+- Where a vendor's own permission model has no read-only variant for some
+  capability (e.g. MDE's `Alert.ReadWrite.All` — Microsoft provides no
+  read-only alerts scope), that's called out explicitly rather than left
+  looking like an oversight.
+- Where multiple collectors share one underlying identity (Intune and MDE
+  share one Azure AD app registration via `_azure_oauth.py`), each
+  collector still gets its own self-contained page — a team standing up
+  just one of the two shouldn't have to read the other's doc — but each
+  cross-references the other for the "provision one identity for both"
+  shortcut, and each permission table only lists the scopes that
+  collector's own resources need.
+
+`scripts/build_schema.py` checks `docs/credentials/<source>.md` for every
+registered source while generating docs: when the file exists, the
+generated `docs/index.md` entry gets a direct "Credentials" link straight
+to it, alongside the link to `docs/collectors/<source>.md`. That's the one
+place it's linked from — `docs/collectors/<source>.md` (the generated
+schema/env-var page) deliberately does not repeat it, since anyone landing
+there arrived from the index and already saw it. When the credentials doc
+doesn't exist (not every collector has one yet), the index entry just omits
+that link — a missing credentials doc is a documentation gap, never a
+build failure. Do not fabricate a
+credentials page's steps from guesswork the way `MANIFEST` caveats
+elsewhere in this file are sometimes tolerated (built from public docs, not
+live-verified) — a wrong click-path is actively misleading to someone
+provisioning real production access, worse than no page at all. Skip the
+page (leaving the collector unlinked) rather than invent one, until someone
+who actually knows the vendor's console (or a v3+ pass over its own admin
+API docs) can write it accurately.
+
 ## Observability
 
 - **Exceptions** (`exceptions.py`): `AuthenticationError`, `RateLimitExhausted`,
@@ -702,6 +797,41 @@ why something is built the way it is, not how to configure or call it.
   vulnerability-style findings in one feed (Cortex's own terminology) —
   there is no separate CVE-only endpoint in the surface explored here,
   unlike Crowdstrike/Qualys's split `vulnerabilities` resource.
+
+- **Kandji** — Apple-only MDM (macOS/iOS/iPadOS/tvOS), rebranded to "Iru";
+  existing tenant hosts still resolve at
+  `https://<subdomain>.api.kandji.io` (or `.api.eu.kandji.io` for EU
+  tenants), so `api_url` is required config (the full tenant host, no
+  cross-tenant discovery mechanism) rather than a bare subdomain — same
+  "no discovery, operator supplies the host" shape as `wiz.py`'s
+  `api_endpoint`. Auth is a static bearer token issued out-of-band in the
+  Kandji console, same "just set the header" shape as
+  AppOmni/Snyk/UpGuard. Raw `requests`, no vendor SDK. Two pagination
+  shapes coexist: `devices` returns a bare JSON list with no envelope at
+  all (limit/offset, stop on a short page — the same shape as AppOmni's
+  `monitored_services`); `blueprints` and `vulnerabilities` return a
+  DRF-style `{"count", "next", "previous", "results"}` envelope where
+  `next` is already a complete URL — the same cursor shape as AppOmni's
+  `policies`/`open_policy_issues`, despite `vulnerabilities` using
+  `page`/`size` rather than `limit`/`offset` for its own default params
+  (irrelevant once `next` takes over). `device_details` fans out one
+  `GET /devices/{id}/details` call per id via `Collector._resumable_fanout`
+  (ids read from `devices` internally unless a `device_ids` kwarg is
+  given) — the same per-item fan-out shape as `appomni.py`'s
+  `policy_risk_summary`.
+  **Caveat:** `MANIFEST` column paths were built from Kandji's public API
+  reference, a third-party Python wrapper (frefrik/python-kandji), and a
+  third-party MCP server built against this API, not a live schema
+  introspection against a real tenant — same caveat tier as `wiz.py`,
+  `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`,
+  `phriendly_phishing.py`, `vanta.py`, and `crowdstrike_identity.py`.
+  `device_details`'s security-posture field nesting (FileVault/firewall/
+  Gatekeeper/SIP) is a best-effort guess at naming conventions, not a
+  confirmed response shape. `vulnerabilities`' exact grain (a CVE catalog
+  vs. a per-device detection feed) is also unconfirmed, though the
+  endpoint path itself was independently corroborated by two sources.
+  Verify field names/nesting and the vulnerabilities grain against a real
+  tenant's response before relying on this collector.
 
 ## Version bumps
 

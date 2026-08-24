@@ -1,0 +1,9 @@
+[
+    {
+        "agentUuid": "uuid-1",
+        "agentComputerName": "WIN-1",
+        "name": "Chrome",
+        "version": "125.0",
+        "publisher": "Google LLC"
+    }
+]

@@ -1,0 +1,17 @@
+{
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": "vuln-1",
+            "cve_id": "CVE-2026-12345",
+            "device_id": "1",
+            "severity": "high",
+            "cvss_score": 8.1,
+            "status": "open",
+            "published_date": "2026-05-01T00:00:00Z",
+            "detected_date": "2026-06-01T00:00:00Z"
+        }
+    ]
+}

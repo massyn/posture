@@ -34,7 +34,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.15.1"
+__version__ = "0.15.2"
 
 __all__ = [
     "CCM",
@@ -69,6 +69,7 @@ def _register_sources() -> None:
     from posture.collectors.github import GithubCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
+    from posture.collectors.kandji import KandjiCollector
     from posture.collectors.knowbe4 import Knowbe4Collector
     from posture.collectors.mde import MdeCollector
     from posture.collectors.okta import OktaCollector
@@ -76,6 +77,7 @@ def _register_sources() -> None:
     from posture.collectors.qualys import QualysCollector
     from posture.collectors.sailpoint import SailpointCollector
     from posture.collectors.salesforce import SalesforceCollector
+    from posture.collectors.sentinelone import SentinelOneCollector
     from posture.collectors.servicenow import ServicenowCollector
     from posture.collectors.snyk import SnykCollector
     from posture.collectors.tenableio import TenableioCollector
@@ -97,6 +99,7 @@ def _register_sources() -> None:
     _SOURCES["github"] = GithubCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector
+    _SOURCES["kandji"] = KandjiCollector
     _SOURCES["knowbe4"] = Knowbe4Collector
     _SOURCES["mde"] = MdeCollector
     _SOURCES["okta"] = OktaCollector
@@ -104,6 +107,7 @@ def _register_sources() -> None:
     _SOURCES["qualys"] = QualysCollector
     _SOURCES["sailpoint"] = SailpointCollector
     _SOURCES["salesforce"] = SalesforceCollector
+    _SOURCES["sentinelone"] = SentinelOneCollector
     _SOURCES["servicenow"] = ServicenowCollector
     _SOURCES["snyk"] = SnykCollector
     _SOURCES["tenableio"] = TenableioCollector

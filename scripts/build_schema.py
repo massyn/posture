@@ -9,6 +9,13 @@ row per collector plus a storage backend section), ``docs/collectors/
 table) for each registered source, and ``docs/storage/<backend>.md`` (env
 vars and a write example) for each registered storage backend.
 
+Also checks ``docs/credentials/<source>.md`` for each registered source —
+these are hand-written (not generated; see ARCHITECTURE.md's "Credentials
+documentation" section) step-by-step guides for provisioning read-only
+credentials in a real admin console. When one exists, ``docs/index.md``
+links straight to it next to that source's entry; a source with no
+credentials doc yet still generates fine, just without that link.
+
     python scripts/build_schema.py
 """
 
@@ -21,6 +28,7 @@ from posture import catalog, storage_catalog
 _DOCS_DIR = Path("docs")
 _COLLECTORS_DIR = _DOCS_DIR / "collectors"
 _STORAGE_DIR = _DOCS_DIR / "storage"
+_CREDENTIALS_DIR = _DOCS_DIR / "credentials"
 
 _env = Environment(trim_blocks=True, lstrip_blocks=True)
 
@@ -29,6 +37,10 @@ _INDEX_TEMPLATE = _env.from_string("""\
 
 {% for source in sources %}\
 ## [{{ source.display_name }}](collectors/{{ source.name }}.md)
+{% if source.credentials_doc %}
+
+[Credentials](credentials/{{ source.name }}.md)
+{% endif %}
 
 {% for resource in source.resources %}\
 - [{{ resource.name }}](collectors/{{ source.name }}.md#{{ resource.name }})
@@ -190,6 +202,7 @@ def build() -> None:
                 "required_config": info["required_config"],
                 "optional_config": info["optional_config"],
                 "resources": resources,
+                "credentials_doc": (_CREDENTIALS_DIR / f"{name}.md").exists(),
             }
         )
     sources.sort(key=lambda s: s["display_name"].lower())
@@ -216,10 +229,17 @@ def build() -> None:
         page = _STORAGE_TEMPLATE.render(backend=backend)
         (_STORAGE_DIR / f"{backend['name']}.md").write_text(page, encoding="utf-8")
 
+    missing_credentials = [s["name"] for s in sources if not s["credentials_doc"]]
+    linked_credentials = len(sources) - len(missing_credentials)
     print(
         f"Wrote docs/index.md, {len(sources)} collector page(s) to docs/collectors/, "
-        f"and {len(backends)} storage backend page(s) to docs/storage/"
+        f"and {len(backends)} storage backend page(s) to docs/storage/ "
+        f"({linked_credentials}/{len(sources)} linked to a docs/credentials/ page)"
     )
+    if missing_credentials:
+        print(
+            f"Missing docs/credentials/<source>.md for: {', '.join(missing_credentials)}"
+        )
 
 
 if __name__ == "__main__":
