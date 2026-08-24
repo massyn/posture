@@ -27,6 +27,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "sentinelone",
         "servicenow",
         "snyk",
+        "sonarcloud",
         "tenableio",
         "tenablesc",
         "upguard",

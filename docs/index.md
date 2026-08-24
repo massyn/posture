@@ -207,6 +207,17 @@
 - [projects](collectors/snyk.md#projects)
 - [targets](collectors/snyk.md#targets)
 
+## [SonarCloud](collectors/sonarcloud.md)
+
+[Credentials](credentials/sonarcloud.md)
+
+- [hotspots](collectors/sonarcloud.md#hotspots)
+- [issues](collectors/sonarcloud.md#issues)
+- [measures](collectors/sonarcloud.md#measures)
+- [organizations](collectors/sonarcloud.md#organizations)
+- [projects](collectors/sonarcloud.md#projects)
+- [quality_gate_status](collectors/sonarcloud.md#quality_gate_status)
+
 ## [Tenable.io](collectors/tenableio.md)
 
 [Credentials](credentials/tenableio.md)

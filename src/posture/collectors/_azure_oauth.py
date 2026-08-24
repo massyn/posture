@@ -69,7 +69,9 @@ def fetch_azure_ad_token(
         )
     response.raise_for_status()
     body = response.json()
-    return AzureAdToken(access_token=body["access_token"], expires_in=int(body["expires_in"]))
+    return AzureAdToken(
+        access_token=body["access_token"], expires_in=int(body["expires_in"])
+    )
 
 
 def graph_get_json(

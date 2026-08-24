@@ -34,7 +34,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.15.2"
+__version__ = "0.16.0"
 
 __all__ = [
     "CCM",
@@ -80,6 +80,7 @@ def _register_sources() -> None:
     from posture.collectors.sentinelone import SentinelOneCollector
     from posture.collectors.servicenow import ServicenowCollector
     from posture.collectors.snyk import SnykCollector
+    from posture.collectors.sonarcloud import SonarcloudCollector
     from posture.collectors.tenableio import TenableioCollector
     from posture.collectors.tenablesc import TenablescCollector
     from posture.collectors.upguard import UpGuardCollector
@@ -110,6 +111,7 @@ def _register_sources() -> None:
     _SOURCES["sentinelone"] = SentinelOneCollector
     _SOURCES["servicenow"] = ServicenowCollector
     _SOURCES["snyk"] = SnykCollector
+    _SOURCES["sonarcloud"] = SonarcloudCollector
     _SOURCES["tenableio"] = TenableioCollector
     _SOURCES["tenablesc"] = TenablescCollector
     _SOURCES["upguard"] = UpGuardCollector

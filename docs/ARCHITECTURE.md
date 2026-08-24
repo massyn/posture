@@ -833,6 +833,31 @@ why something is built the way it is, not how to configure or call it.
   Verify field names/nesting and the vulnerabilities grain against a real
   tenant's response before relying on this collector.
 
+- **SonarCloud** — raw `requests` against SonarCloud's hosted Web API
+  (`https://sonarcloud.io/api`), no vendor SDK. This targets SonarCloud
+  (SaaS), not self-hosted SonarQube Server — a different API surface,
+  unverified here. Auth is a static user token
+  (`Authorization: Bearer <token>`), same "just set the header" shape as
+  Snyk/AppOmni/UpGuard. `organization` is required config: almost every
+  endpoint is scoped to one org key and SonarCloud has no cross-org
+  discovery, same no-discovery shape as Wiz's `api_endpoint`.
+  `organizations` and `projects` are real top-level resources, `p`/`ps`
+  paginated with a `paging.total` envelope, the same shape `issues` uses.
+  `hotspots`, `quality_gate_status`, and `measures` are all per-project —
+  SonarCloud has no org-wide endpoint for any of the three — so each fans
+  out one call per project key across a thread pool via
+  `Collector._resumable_fanout`, the same per-item fan-out shape as
+  `snyk.py`'s `members`/`projects`/`issues` (not `derived_from`, since each
+  project's data is its own network call). `measures` explodes to one row
+  per (project, metric) rather than one wide row per project, since grain
+  is sacred and SonarCloud's response nests a metric list per component.
+  **Live-verified against a real organization** (2026-08-24): all six
+  resources (`organizations`, `projects`, `issues`, `hotspots`,
+  `quality_gate_status`, `measures`) returned correctly-shaped data,
+  including the `hotspots` field set, which was the lower-confidence guess
+  at write time. `docs/credentials/sonarcloud.md` documents provisioning a
+  dedicated read-only organization member and generating its user token.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and
