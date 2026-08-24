@@ -144,13 +144,15 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "org_certification_id": ("org_certification_id", "str"),
             "place": ("place", "str"),
             "period": ("period", "str"),
-            # Day-first (DD/MM/YYYY), confirmed against the unambiguous
-            # day-month-name dates in "period" — an explicit format hint,
-            # not left to the generic parser: pandas' default assumes
-            # month-first, which would silently flip an ambiguous date
-            # (e.g. "01/07/2028", 1 July) to the wrong day (7 January).
-            "valid_from": ("valid_from", "datetime", {"format": "%d/%m/%Y"}),
-            "valid_to": ("valid_to", "datetime", {"format": "%d/%m/%Y"}),
+            # Kept as raw strings, deliberately not coerced to datetime:
+            # confirmed against a live pull that the D/M/Y vs M/D/Y
+            # convention varies per profile (not a single tenant-wide
+            # format), and for a genuinely ambiguous date (both parts <=12)
+            # there is no way to recover which convention that profile used
+            # without silently guessing. Consumers needing typed dates must
+            # resolve the convention themselves per profile_id.
+            "valid_from": ("valid_from", "str"),
+            "valid_to": ("valid_to", "str"),
         },
     },
     "profile_conferences": {

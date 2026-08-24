@@ -66,8 +66,8 @@ Derived from [`profiles`](#profiles) — no separate network call.
 | `org_certification_id` | `str` |
 | `place` | `str` |
 | `period` | `str` |
-| `valid_from` | `datetime` |
-| `valid_to` | `datetime` |
+| `valid_from` | `str` |
+| `valid_to` | `str` |
 
 ### profile_conferences
 

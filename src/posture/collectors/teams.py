@@ -328,9 +328,15 @@ class TeamsCollector(Collector):
 
     def _drain_per_team(self, resource: str, team_id: str) -> list[dict[str, Any]]:
         url = _GRAPH_BASE_URL + _ENDPOINTS[resource].format(id=team_id)
-        params: dict[str, Any] | None = {"$top": _PAGE_SIZE}
-        if resource == "installed_apps":
-            params["$expand"] = "teamsAppDefinition"
+        # channels/installedApps/members don't support $top — Graph rejects
+        # it outright ("Query option 'Top' is not allowed"). Only
+        # team_members actually paginates via @odata.nextLink; the others
+        # return their full (small) list in one response regardless.
+        params: dict[str, Any] | None = None
+        if resource == "team_members":
+            params = {"$top": _PAGE_SIZE}
+        elif resource == "installed_apps":
+            params = {"$expand": "teamsAppDefinition"}
 
         records: list[dict[str, Any]] = []
         while url:

@@ -1,4 +1,3 @@
-import pandas as pd
 import responses
 
 from posture import CCM
@@ -166,9 +165,10 @@ def test_derived_resources_carry_parent_profile_id_and_owner() -> None:
 
     certifications = ccm.collect("profile_certifications")
     assert certifications.loc[0, "org_certification_id"] == "288"
-    # Day-first "01/07/2008" must parse as 1 July 2008, not 7 January (the
-    # default month-first guess) — see the manifest's explicit format hint.
-    assert certifications.loc[0, "valid_from"] == pd.Timestamp("2008-07-01", tz="UTC")
+    # Kept as a raw string, not parsed to datetime: the D/M/Y vs M/D/Y
+    # convention varies per profile in real data, so it can't be resolved
+    # generically — see the manifest's comment on valid_from/valid_to.
+    assert certifications.loc[0, "valid_from"] == "01/07/2008"
 
 
 @responses.activate
