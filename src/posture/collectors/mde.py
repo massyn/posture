@@ -38,7 +38,12 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, ClassVar
 
-from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
+from posture.base import (
+    Collector,
+    PermissionDeniedSignal,
+    RateLimitedSignal,
+    UnauthorizedSignal,
+)
 from posture.collectors._azure_oauth import fetch_azure_ad_token
 
 logger = logging.getLogger("posture.collectors.mde")
@@ -353,8 +358,21 @@ class MdeCollector(Collector):
             raise RateLimitedSignal(
                 retry_after=float(retry_after) if retry_after else None
             )
-        if response.status_code in (401, 403):
+        if response.status_code == 401:
             raise UnauthorizedSignal()
+        if response.status_code == 403:
+            # A genuine permissions gap (e.g. the app registration lacks the
+            # required MDE API permission), not an expired token — retrying
+            # after re-auth can't fix it, so this fails fast with the
+            # response detail intact rather than being retried and then
+            # discarded into a bare, undiagnosable failure. Same split as
+            # Graph's 403 handling in _azure_oauth.py.
+            detail = response.text[:500]
+            logger.warning(
+                "permission denied (403)",
+                extra={"source": "mde", "url": url, "detail": detail},
+            )
+            raise PermissionDeniedSignal(f"403 Forbidden for {url}: {detail}")
         if response.status_code != 200:
             logger.warning(
                 "unexpected status code",

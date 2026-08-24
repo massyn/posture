@@ -21,7 +21,7 @@ from typing import Any, NamedTuple
 
 import requests
 
-from posture.base import RateLimitedSignal, UnauthorizedSignal
+from posture.base import PermissionDeniedSignal, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.azure_oauth")
@@ -81,13 +81,25 @@ def graph_get_json(
     retry-driving signals the base class's ``_request_with_retry`` catches.
     503 is Graph's throttling/service-unavailable status — Microsoft's own
     guidance is to retry it the same way as 429, honouring ``Retry-After``
-    when present."""
+    when present. 401 (expired/invalid token) is retried after
+    re-authenticating; 403 (the app registration genuinely lacks the Graph
+    permission, e.g. no TeamMember.Read.All) is not — retrying can't fix a
+    permissions gap, so it's raised as PermissionDeniedSignal with the
+    response detail intact rather than silently retried and then discarded
+    into a bare, undiagnosable failure."""
     response = session.get(url, params=params, timeout=60)
     if response.status_code in (429, 503):
         retry_after = response.headers.get("Retry-After")
         raise RateLimitedSignal(retry_after=float(retry_after) if retry_after else None)
-    if response.status_code in (401, 403):
+    if response.status_code == 401:
         raise UnauthorizedSignal()
+    if response.status_code == 403:
+        detail = response.text[:500]
+        logger.warning(
+            "permission denied (403)",
+            extra={"source": "azure_graph", "url": url, "detail": detail},
+        )
+        raise PermissionDeniedSignal(f"403 Forbidden for {url}: {detail}")
     if response.status_code != 200:
         logger.warning(
             "unexpected status code",

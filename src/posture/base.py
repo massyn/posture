@@ -483,6 +483,12 @@ class Collector(ABC):
                 report.retries += 1
                 self._authenticated = False
                 self._ensure_authenticated_with_retry(resource)
+            except PermissionDeniedSignal:
+                # A genuine 403, not an expired token — re-authenticating and
+                # retrying can't fix a permissions problem, so fail fast
+                # with the detail intact rather than burning _MAX_RETRIES
+                # attempts before surfacing an unhelpful error.
+                raise
             except _TRANSIENT_CONNECTION_ERRORS as exc:
                 connection_attempt += 1
                 if connection_attempt > _MAX_CONNECTION_RETRIES:
@@ -592,3 +598,10 @@ class RateLimitedSignal(Exception):
 
 class UnauthorizedSignal(Exception):
     pass
+
+
+class PermissionDeniedSignal(Exception):
+    """Raised for a 403 the caller has determined is a genuine permissions
+    failure, not an expired token — retrying it won't help, unlike
+    UnauthorizedSignal's 401. Carries the response detail so it survives
+    into the IncompleteCollection message unembellished."""
