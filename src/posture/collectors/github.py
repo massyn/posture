@@ -339,20 +339,27 @@ class GithubCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(repos)))
 
+        # A 404 here means the repo has the feature (code scanning) turned
+        # off, not a real failure — GitHub returns 404 rather than an empty
+        # list for repos where code scanning was never enabled.
+        allow_404 = resource == "code_scanning_alerts"
         all_records = self._resumable_fanout(
             resource,
             repos,
-            lambda repo: self._fetch_all_for_repo(path_template, repo[0], repo[1]),
+            lambda repo: self._fetch_all_for_repo(
+                path_template, repo[0], repo[1], allow_404=allow_404
+            ),
             workers,
         )
         return all_records, None
 
     def _fetch_all_for_repo(
-        self, path_template: str, org: str, full_name: str
+        self, path_template: str, org: str, full_name: str, *, allow_404: bool = False
     ) -> list[dict[str, Any]]:
         records = self._fetch_all_pages(
             path_template.format(full_name=full_name),
             params={"per_page": _PAGE_SIZE},
+            allow_404=allow_404,
         )
         repo_name = full_name.split("/", 1)[-1]
         for record in records:
@@ -391,11 +398,17 @@ class GithubCollector(Collector):
     def _fetch_branch_rules(
         self, org: str, repo: str, branch: str
     ) -> list[dict[str, Any]]:
+        # A 404 here means no rules apply to this branch (or rulesets aren't
+        # available on this repo/plan) — the absence of a policy, not a
+        # failure to fetch one.
         full_name = f"{org}/{repo}"
         response = self._get(
             self._base_url
-            + _BRANCH_RULES_PATH.format(full_name=full_name, branch=branch)
+            + _BRANCH_RULES_PATH.format(full_name=full_name, branch=branch),
+            allow_404=True,
         )
+        if response is None:
+            return []
         records = response.json() or []
         for record in records:
             record["_org"] = org
@@ -404,19 +417,27 @@ class GithubCollector(Collector):
         return records
 
     def _fetch_all_pages(
-        self, path: str, params: dict[str, Any]
+        self, path: str, params: dict[str, Any], *, allow_404: bool = False
     ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         next_url: str | None = self._base_url + path
         page_params: dict[str, Any] | None = params
         while next_url is not None:
-            response = self._get(next_url, params=page_params)
+            response = self._get(next_url, params=page_params, allow_404=allow_404)
+            if response is None:  # 404 treated as "no records", not fatal
+                break
             records.extend(response.json() or [])
             next_url = response.links.get("next", {}).get("url")
             page_params = None  # next_url already carries its own query string
         return records
 
-    def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
+    def _get(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        *,
+        allow_404: bool = False,
+    ) -> Any:
         response = self._session.get(url, params=params, timeout=30)
         if response.status_code == 429 or (
             response.status_code == 403
@@ -428,6 +449,8 @@ class GithubCollector(Collector):
             )
         if response.status_code in (401, 403):
             raise UnauthorizedSignal()
+        if allow_404 and response.status_code == 404:
+            return None
         if response.status_code != 200:
             logger.warning(
                 "unexpected status code",
