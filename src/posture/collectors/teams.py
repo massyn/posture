@@ -34,20 +34,42 @@ separate Teams PowerShell module (``MicrosoftTeams``), which isn't a
 client-credentials-compatible Graph API. There is no way to collect them
 through this collector.
 
+``user_activity`` is tenant-wide usage/licence activity, not a per-team
+fan-out — it comes from Graph's usage reports API
+(``GET /v1.0/reports/getTeamsUserActivityUserDetail(period='D90')``),
+fixed at a 90-day lookback the same as the legacy collector this replaces.
+Unlike every other resource here, Graph returns this report as CSV, not an
+OData ``value``/``@odata.nextLink`` envelope, so it can't reuse
+``odata_get_page``/``graph_get_json`` and gets its own fetch path
+(``_fetch_user_activity_page``). Requires the separate
+``Reports.Read.All`` Graph application permission (see
+``docs/credentials/teams.md``); note Microsoft de-identifies these reports
+(hashed user IDs/UPNs) unless the tenant has explicitly turned off
+"display concealed names in all reports" in the Microsoft 365 admin
+centre's org settings.
+
 Resources: ``teams``, ``team_settings`` (requires teams ids),
 ``channels`` (requires teams ids), ``installed_apps`` (requires teams
-ids), ``team_members`` (requires teams ids).
+ids), ``team_members`` (requires teams ids), ``user_activity``
+(tenant-wide, not derived from ``teams``).
 """
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, ClassVar
 
 import requests
 
-from posture.base import Collector
+from posture.base import (
+    Collector,
+    PermissionDeniedSignal,
+    RateLimitedSignal,
+    UnauthorizedSignal,
+)
 from posture.collectors._azure_oauth import (
     fetch_azure_ad_token,
     graph_get_json,
@@ -72,6 +94,7 @@ _ENDPOINTS = {
     "channels": "/v1.0/teams/{id}/channels",
     "installed_apps": "/v1.0/teams/{id}/installedApps",
     "team_members": "/v1.0/teams/{id}/members",
+    "user_activity": ("/v1.0/reports/getTeamsUserActivityUserDetail(period='D90')"),
 }
 
 _PER_TEAM_RESOURCES = ("channels", "installed_apps", "team_members")
@@ -206,6 +229,27 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "email": ("email", "str"),
         },
     },
+    "user_activity": {
+        # Tenant-wide usage report, not a per-team fan-out — no "requires".
+        # Fetched as CSV (see _fetch_user_activity_page), not JSON, so the
+        # column paths below are raw CSV headers, not Graph JSON field names.
+        "endpoint": _ENDPOINTS["user_activity"],
+        "columns": {
+            "report_refresh_date": ("Report Refresh Date", "datetime"),
+            "user_id": ("User Id", "str"),
+            "user_principal_name": ("User Principal Name", "str"),
+            "last_activity_date": ("Last Activity Date", "datetime"),
+            "is_deleted": ("Is Deleted", "bool"),
+            "deleted_date": ("Deleted Date", "datetime"),
+            "assigned_products": ("Assigned Products", "str"),
+            "team_chat_message_count": ("Team Chat Message Count", "int"),
+            "private_chat_message_count": ("Private Chat Message Count", "int"),
+            "call_count": ("Call Count", "int"),
+            "meeting_count": ("Meeting Count", "int"),
+            "has_other_action": ("Has Other Action", "bool"),
+            "report_period": ("Report Period", "str"),
+        },
+    },
 }
 
 
@@ -242,6 +286,8 @@ class TeamsCollector(Collector):
             return self._fetch_team_settings_page(kwargs, cursor)
         if resource in _PER_TEAM_RESOURCES:
             return self._fetch_per_team_fanout_page(resource, kwargs, cursor)
+        if resource == "user_activity":
+            return self._fetch_user_activity_page(kwargs, cursor)
         raise ValueError(f"Unsupported resource '{resource}'")
 
     def _fetch_teams_page(
@@ -347,3 +393,34 @@ class TeamsCollector(Collector):
             url = next_link
             params = None  # next_link is opaque and already carries params
         return records
+
+    def _fetch_user_activity_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
+        if cursor is not None:
+            return [], None  # single CSV response, no pagination
+
+        url = _GRAPH_BASE_URL + _ENDPOINTS["user_activity"]
+        response = self._session.get(url, params=kwargs or None, timeout=60)
+        if response.status_code in (429, 503):
+            retry_after = response.headers.get("Retry-After")
+            raise RateLimitedSignal(
+                retry_after=float(retry_after) if retry_after else None
+            )
+        if response.status_code == 401:
+            raise UnauthorizedSignal()
+        if response.status_code == 403:
+            detail = response.text[:500]
+            logger.warning(
+                "permission denied (403)",
+                extra={"source": self.env_prefix.lower(), "url": url, "detail": detail},
+            )
+            raise PermissionDeniedSignal(f"403 Forbidden for {url}: {detail}")
+        if response.status_code == 404:
+            # No activity in the D90 window yet (e.g. a brand-new tenant) —
+            # Graph returns 404 rather than an empty CSV body in this case.
+            return [], None
+        response.raise_for_status()
+
+        reader = csv.DictReader(io.StringIO(response.text))
+        return list(reader), None

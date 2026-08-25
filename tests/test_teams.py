@@ -178,3 +178,46 @@ def test_team_settings_404_skips_team_without_failing_collection() -> None:
     df = _ccm().collect("team_settings")
 
     assert len(df) == 0
+
+
+@responses.activate
+def test_user_activity_parses_csv_report() -> None:
+    _mock_token()
+    csv_body = (
+        "Report Refresh Date,User Id,User Principal Name,Last Activity Date,"
+        "Is Deleted,Deleted Date,Assigned Products,Team Chat Message Count,"
+        "Private Chat Message Count,Call Count,Meeting Count,Has Other Action,"
+        "Report Period\n"
+        "2026-08-24,u1,ada@example.com,2026-08-20,False,,"
+        "MICROSOFT 365 E5,10,5,2,1,True,90\n"
+    )
+    responses.add(
+        responses.GET,
+        "https://graph.microsoft.com/v1.0/reports/getTeamsUserActivityUserDetail(period='D90')",
+        body=csv_body,
+        status=200,
+        content_type="text/csv",
+    )
+
+    df = _ccm().collect("user_activity")
+
+    assert len(df) == 1
+    assert df.loc[0, "user_principal_name"] == "ada@example.com"
+    assert bool(df.loc[0, "is_deleted"]) is False
+    assert df.loc[0, "team_chat_message_count"] == 10
+    assert df.loc[0, "assigned_products"] == "MICROSOFT 365 E5"
+
+
+@responses.activate
+def test_user_activity_404_returns_empty() -> None:
+    _mock_token()
+    responses.add(
+        responses.GET,
+        "https://graph.microsoft.com/v1.0/reports/getTeamsUserActivityUserDetail(period='D90')",
+        json={"error": {"code": "NotFound"}},
+        status=404,
+    )
+
+    df = _ccm().collect("user_activity")
+
+    assert len(df) == 0

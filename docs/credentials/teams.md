@@ -47,8 +47,15 @@ permissions (not Delegated) under **Microsoft Graph**:
 | `ChannelSettings.Read.All` | `channels` |
 | `TeamsAppInstallation.Read.All` | `installed_apps` |
 | `TeamMember.Read.All` | `team_members` |
+| `Reports.Read.All` | `user_activity` |
 
 After adding permissions, select **Grant admin consent** and confirm.
+
+`user_activity` pulls Microsoft's usage report data, which is de-identified
+(hashed user IDs/UPNs) by default. To get real user principal names in this
+resource, an admin must turn off **Display concealed names in all reports**
+under **Settings** > **Org settings** > **Reports** in the [Microsoft 365
+admin centre](https://admin.microsoft.com).
 
 ## Record the credentials
 

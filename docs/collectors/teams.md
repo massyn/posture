@@ -22,6 +22,7 @@ df = ccm.collect("installed_apps")
 df = ccm.collect("team_members")
 df = ccm.collect("team_settings")
 df = ccm.collect("teams")
+df = ccm.collect("user_activity")
 ```
 
 ## Example: export every table to CSV
@@ -48,6 +49,7 @@ for table in ccm.tables():
 - [team_members](#team_members)
 - [team_settings](#team_settings)
 - [teams](#teams)
+- [user_activity](#user_activity)
 
 ### channels
 
@@ -119,4 +121,22 @@ for table in ccm.tables():
 | `visibility` | `str` |
 | `mail_enabled` | `bool` |
 | `created_date_time` | `datetime` |
+
+### user_activity
+
+| Column | Type |
+| --- | --- |
+| `report_refresh_date` | `datetime` |
+| `user_id` | `str` |
+| `user_principal_name` | `str` |
+| `last_activity_date` | `datetime` |
+| `is_deleted` | `bool` |
+| `deleted_date` | `datetime` |
+| `assigned_products` | `str` |
+| `team_chat_message_count` | `int` |
+| `private_chat_message_count` | `int` |
+| `call_count` | `int` |
+| `meeting_count` | `int` |
+| `has_other_action` | `bool` |
+| `report_period` | `str` |
 

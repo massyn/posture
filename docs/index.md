@@ -147,6 +147,7 @@
 - [team_members](collectors/teams.md#team_members)
 - [team_settings](collectors/teams.md#team_settings)
 - [teams](collectors/teams.md#teams)
+- [user_activity](collectors/teams.md#user_activity)
 
 ## [Nullify](collectors/nullify.md)
 
