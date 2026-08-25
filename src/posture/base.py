@@ -67,6 +67,23 @@ _TRANSIENT_CONNECTION_ERRORS = (
 )
 
 
+def _freeze(value: Any) -> Any:
+    """Recursively convert a kwarg value into something hashable, for use in
+    _iter_raw_pages' page-cache key. A collector's kwargs are the vendor
+    query dialect (e.g. a list-valued `types`/`device_ids`/`products` kwarg)
+    and are never restricted to hashable types by the locked kwargs contract
+    — only this cache key's own tuple() needs every value hashable, so that
+    requirement is handled here rather than pushed onto every collector.
+    Dict key order doesn't affect the resulting key: keys are sorted before
+    freezing, same as the top-level kwargs.items() sort this feeds into.
+    """
+    if isinstance(value, dict):
+        return tuple(sorted((k, _freeze(v)) for k, v in value.items()))
+    if isinstance(value, (list, tuple, set)):
+        return tuple(_freeze(v) for v in value)
+    return value
+
+
 @dataclass
 class _CollectionReport:
     resource: str
@@ -331,7 +348,10 @@ class Collector(ABC):
     def _iter_raw_pages(
         self, resource: str, kwargs: dict[str, Any]
     ) -> Iterator[list[dict[str, Any]]]:
-        cache_key = (resource, tuple(sorted(kwargs.items())))
+        cache_key = (
+            resource,
+            tuple(sorted((k, _freeze(v)) for k, v in kwargs.items())),
+        )
         cached = self._cache.get(cache_key)
         if cached is not None:
             yield from self._spill.read_pages(cached.path)

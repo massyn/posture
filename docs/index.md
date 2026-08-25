@@ -56,6 +56,12 @@
 
 - [domains](collectors/dnsimple.md#domains)
 
+## [endoflife.date](collectors/endoflife.md)
+
+[Credentials](credentials/endoflife.md)
+
+- [cycles](collectors/endoflife.md#cycles)
+
 ## [EntraID](collectors/azure_entra.md)
 
 [Credentials](credentials/azure_entra.md)
@@ -98,6 +104,13 @@
 - [departments](collectors/jamf.md#departments)
 - [mobile_devices](collectors/jamf.md#mobile_devices)
 - [policies](collectors/jamf.md#policies)
+
+## [Jira](collectors/jira.md)
+
+[Credentials](credentials/jira.md)
+
+- [issues](collectors/jira.md#issues)
+- [projects](collectors/jira.md#projects)
 
 ## [Kandji](collectors/kandji.md)
 
@@ -190,6 +203,14 @@
 
 - [clicks](collectors/phriendly_phishing.md#clicks)
 - [trainings](collectors/phriendly_phishing.md#trainings)
+
+## [Plerion](collectors/plerion.md)
+
+[Credentials](credentials/plerion.md)
+
+- [assets](collectors/plerion.md#assets)
+- [findings](collectors/plerion.md#findings)
+- [vulnerabilities](collectors/plerion.md#vulnerabilities)
 
 ## [Precise](collectors/precise.md)
 

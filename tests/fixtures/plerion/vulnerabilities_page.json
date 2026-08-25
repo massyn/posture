@@ -1,0 +1,97 @@
+[
+  {
+    "schemaVersion": "2022-06-09",
+    "assetId": "prn:assets:a",
+    "organizationId": "98ca8825-a65a-4b50-a6f0-4851c406aedc",
+    "tenantId": "98ca8825-a65a-4b50-a6f0-4851c406aedc",
+    "integrationId": "98ca8825-a65a-4b50-a6f0-4851c406aedc",
+    "vulnerabilityId": "CVE-2022-22965",
+    "provider": "AWS",
+    "assetType": "AWS::EC2::Instance",
+    "description": "A flaw was found in shadow-utils.",
+    "severityLevel": "HIGH",
+    "severityLevelValue": 4,
+    "firstObservedAt": "2023-10-27T04:54:37.830Z",
+    "lastObservedAt": "2023-10-27T04:54:37.830Z",
+    "publishedDate": "2023-10-27T04:54:37.830Z",
+    "executionId": "1678607803935",
+    "title": "Sample Vulnerability Title",
+    "targetName": "EcsTaskDefinition:15 > nginx:1.19.1-alpine-perl",
+    "severitySource": "redhat",
+    "primaryUrl": "https://nvd.nist.gov/vuln/detail/CVE-2022-22965",
+    "hasKev": true,
+    "hasExploit": false,
+    "hasVendorFix": true,
+    "packages": [
+      {
+        "packageName": "sample-package",
+        "targetName": "EcsTaskDefinition:15 > nginx:1.19.1-alpine-perl",
+        "targetType": "sample-target-type",
+        "targetPath": "ip-172-31-29-14.ap-southeast-2.compute.internal",
+        "targetClass": "os-pkgs",
+        "fixedVersion": "1.0.1",
+        "installedVersion": "1.0.0"
+      }
+    ],
+    "cwes": [
+      {
+        "id": "1",
+        "name": "CWE-123",
+        "cweId": "CWE-123",
+        "source": "MITRE",
+        "sourceUrl": "https://example.com/cwe/CWE-123",
+        "description": "This is a sample CWE description."
+      }
+    ],
+    "knownExploit": {
+      "cveID": "CVE-2022-22965",
+      "vulnerabilityName": "Spring Framework JDK 9+ Remote Code Execution Vulnerability",
+      "shortDescription": "Spring MVC or Spring WebFlux application running on JDK 9+ may be vulnerable to RCE via data binding.",
+      "vendorProject": "VMware",
+      "product": "Spring Framework",
+      "dateAdded": "2022-04-04",
+      "dueDate": "2022-04-25",
+      "requiredAction": "Apply updates per vendor instructions.",
+      "notes": ""
+    },
+    "exploits": [
+      {
+        "id": "1",
+        "title": "Sample Exploit Title",
+        "description": "This is a sample exploit description.",
+        "source": "MITRE",
+        "sourceUrl": "https://example.com/exploit/CVE-2023-12345"
+      }
+    ],
+    "exemptions": []
+  },
+  {
+    "schemaVersion": "2022-06-09",
+    "assetId": "prn:assets:b",
+    "organizationId": "98ca8825-a65a-4b50-a6f0-4851c406aedc",
+    "tenantId": "98ca8825-a65a-4b50-a6f0-4851c406aedc",
+    "integrationId": "98ca8825-a65a-4b50-a6f0-4851c406aedc",
+    "vulnerabilityId": "CVE-2024-00000",
+    "provider": "AWS",
+    "assetType": "AWS::Lambda::Function",
+    "description": "A minor issue.",
+    "severityLevel": "LOW",
+    "severityLevelValue": 1,
+    "firstObservedAt": "2024-01-01T00:00:00.000Z",
+    "lastObservedAt": "2024-01-01T00:00:00.000Z",
+    "publishedDate": "2024-01-01T00:00:00.000Z",
+    "executionId": "1678607803936",
+    "title": "Minor Vulnerability",
+    "targetName": null,
+    "severitySource": "nvd",
+    "primaryUrl": "https://nvd.nist.gov/vuln/detail/CVE-2024-00000",
+    "hasKev": false,
+    "hasExploit": false,
+    "hasVendorFix": false,
+    "packages": [],
+    "cwes": [],
+    "knownExploit": null,
+    "exploits": [],
+    "exemptions": []
+  }
+]

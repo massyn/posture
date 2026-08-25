@@ -1,0 +1,40 @@
+[
+  {
+    "name": "3.13",
+    "codename": null,
+    "label": "3.13",
+    "releaseDate": "2024-10-07",
+    "isLts": false,
+    "ltsFrom": null,
+    "isEoas": true,
+    "eoasFrom": "2026-10-01",
+    "isEol": false,
+    "eolFrom": "2029-10-31",
+    "isMaintained": true,
+    "latest": {
+      "name": "3.13.15",
+      "date": "2026-08-05",
+      "link": "https://www.python.org/downloads/release/python-31315/"
+    },
+    "custom": {
+      "pep": "PEP-0719"
+    },
+    "product": "python",
+    "product_label": "Python"
+  },
+  {
+    "name": "151",
+    "codename": null,
+    "label": "151",
+    "releaseDate": "2026-07-28",
+    "isLts": false,
+    "ltsFrom": null,
+    "isEol": false,
+    "eolFrom": "2026-08-25",
+    "isMaintained": true,
+    "latest": null,
+    "custom": null,
+    "product": "chrome",
+    "product_label": "Google Chrome"
+  }
+]

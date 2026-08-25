@@ -1,0 +1,68 @@
+[
+  {
+    "schemaVersion": "2022-06-09",
+    "id": "prn:assets:afeb4e5f-0370-4b43-8e37-7e4efc719358:aws:ec2:instance:ap-southeast-2:i-085a328dba59f229b",
+    "organizationId": "dc16d897-7f52-4b73-be57-96c7c9a853da",
+    "tenantId": "42749bc1-c99b-4c2c-a081-a6cda9370081",
+    "integrationId": "458511a1-9bc2-4fce-97a0-0e3139588e6e",
+    "executionId": "1675576960384",
+    "provider": "AWS",
+    "type": "AWS::EC2::Instance",
+    "name": "i-085a328dba59f229b",
+    "createdAt": "2023-02-04T06:07:09.092Z",
+    "firstObservedAt": "2023-02-04T06:02:40.594Z",
+    "lastObservedAt": "2023-02-05T06:02:40.384Z",
+    "updatedAt": "2023-02-05T06:07:02.959Z",
+    "tags": [
+      {
+        "Key": "Department",
+        "Value": "Finance"
+      }
+    ],
+    "isPubliclyExposed": false,
+    "isVulnerable": false,
+    "numberOfLowVulnerabilities": 85,
+    "numberOfMediumVulnerabilities": 60,
+    "numberOfHighVulnerabilities": 15,
+    "numberOfCriticalVulnerabilities": 5,
+    "vulnerabilityScore": "9",
+    "hasKev": false,
+    "hasExploit": false,
+    "isExploitable": false,
+    "isInVpc": false,
+    "lastScanId": "1679594910265",
+    "lastScannedAt": "2023-03-23T18:17:20.003Z",
+    "imageId": null,
+    "platform": null,
+    "hasAdminPrivileges": false,
+    "hasOverlyPermissivePrivileges": false,
+    "hasAuthorizer": false,
+    "hasTracingEnabled": false,
+    "policy": null,
+    "numberOfLowSecrets": 3,
+    "numberOfMediumSecrets": 1,
+    "numberOfHighSecrets": 0,
+    "numberOfCriticalSecrets": 2,
+    "lowSecrets": null,
+    "mediumSecrets": null,
+    "highSecrets": null,
+    "criticalSecrets": null,
+    "operatingSystem": null,
+    "riskScore": "9.36",
+    "operationalState": "active",
+    "region": "us-east-1",
+    "service": "AWS::EC2",
+    "resourceId": "i-085a328dba59f229b",
+    "resourceName": "test-instance",
+    "resourceTags": [
+      {
+        "Key": "Public",
+        "Value": "true"
+      }
+    ],
+    "resourceType": "AWS::EC2::Instance",
+    "fullResourceName": "arn:aws:iam::1111222233334444:policy/test-policy",
+    "providerAccountId": "123456789012",
+    "resourceURL": "https://us-east-1.console.aws.amazon.com/iam/home#/policies/arn:aws:iam::1111222233334444:policy/test-policy"
+  }
+]

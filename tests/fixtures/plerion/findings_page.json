@@ -1,0 +1,46 @@
+[
+  {
+    "schemaVersion": "2022-06-09",
+    "id": "prn:findings:458511a1-9bc2-4fce-97a0-0e3139588e6e:plerion-aws-16:arn:aws:iam::1111222233334444:policy/test-policy",
+    "organizationId": "dc16d897-7f52-4b73-be57-96c7c9a853da",
+    "tenantId": "42749bc1-c99b-4c2c-a081-a6cda9370081",
+    "integrationId": "458511a1-9bc2-4fce-97a0-0e3139588e6e",
+    "provider": "AWS",
+    "executionId": "1675576960384",
+    "assetId": "prn:assets:458511a1-9bc2-4fce-97a0-0e3139588e6e:aws:iam:policy:us-east-1:arn:aws:iam::1111222233334444:policy/test-policy",
+    "providerAccountId": "1111222233334444",
+    "resourceType": "AWS::IAM::Policy",
+    "detectionId": "PLERION-AWS-16",
+    "status": "FAILED",
+    "severityLevel": "HIGH",
+    "message": "Policy allows full administrative privileges is attached",
+    "firstObservedAt": "2023-02-04T06:02:40.594Z",
+    "createdAt": "2023-02-04T06:07:09.092Z",
+    "lastObservedAt": "2023-02-05T06:02:40.384Z",
+    "updatedAt": "2023-02-05T06:07:02.959Z",
+    "slaDueAt": "2023-02-11T06:02:40.594Z",
+    "slaWarnAt": "2023-02-09T06:02:40.594Z",
+    "slaId": "8f2c1b9a-4d3e-4a6b-9c8d-1e2f3a4b5c6d",
+    "parameters": [],
+    "tags": [],
+    "fullResourceName": "arn:aws:iam::1111222233334444:policy/test-policy",
+    "resourceId": "test-policy",
+    "providerFullResourceName": "arn:aws:iam::1111222233334444:policy/test-policy",
+    "region": "us-east-1",
+    "service": "IAM",
+    "likelihood": "3",
+    "impact": "5",
+    "calculatedSeverity": "2",
+    "modifiedSeverityLevel": "CRITICAL",
+    "attackPaths": null,
+    "isExempted": false,
+    "meta": {},
+    "resourceTags": [
+      {
+        "Key": "Public",
+        "Value": "true"
+      }
+    ],
+    "resourceURL": "https://us-east-1.console.aws.amazon.com/iam/home#/policies/arn:aws:iam::1111222233334444:policy/test-policy"
+  }
+]

@@ -35,7 +35,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.17.5"
+__version__ = "0.18.0"
 
 __all__ = [
     "CCM",
@@ -68,10 +68,12 @@ def _register_sources() -> None:
     from posture.collectors.crowdstrike_cspm import CrowdstrikeCspmCollector
     from posture.collectors.crowdstrike_identity import CrowdstrikeIdentityCollector
     from posture.collectors.dnsimple import DnsimpleCollector
+    from posture.collectors.endoflife import EndoflifeCollector
     from posture.collectors.github import GithubCollector
     from posture.collectors.google_workspace import GoogleWorkspaceCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
+    from posture.collectors.jira import JiraCollector
     from posture.collectors.kandji import KandjiCollector
     from posture.collectors.knowbe4 import Knowbe4Collector
     from posture.collectors.mde import MdeCollector
@@ -79,6 +81,7 @@ def _register_sources() -> None:
     from posture.collectors.obsidian import ObsidianCollector
     from posture.collectors.okta import OktaCollector
     from posture.collectors.phriendly_phishing import PhriendlyPhishingCollector
+    from posture.collectors.plerion import PlerionCollector
     from posture.collectors.precise import PreciseCollector
     from posture.collectors.qualys import QualysCollector
     from posture.collectors.runzero import RunzeroCollector
@@ -107,10 +110,12 @@ def _register_sources() -> None:
     _SOURCES["crowdstrike_cspm"] = CrowdstrikeCspmCollector
     _SOURCES["crowdstrike_identity"] = CrowdstrikeIdentityCollector
     _SOURCES["dnsimple"] = DnsimpleCollector
+    _SOURCES["endoflife"] = EndoflifeCollector
     _SOURCES["github"] = GithubCollector
     _SOURCES["google_workspace"] = GoogleWorkspaceCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector
+    _SOURCES["jira"] = JiraCollector
     _SOURCES["kandji"] = KandjiCollector
     _SOURCES["knowbe4"] = Knowbe4Collector
     _SOURCES["mde"] = MdeCollector
@@ -118,6 +123,7 @@ def _register_sources() -> None:
     _SOURCES["obsidian"] = ObsidianCollector
     _SOURCES["okta"] = OktaCollector
     _SOURCES["phriendly_phishing"] = PhriendlyPhishingCollector
+    _SOURCES["plerion"] = PlerionCollector
     _SOURCES["precise"] = PreciseCollector
     _SOURCES["qualys"] = QualysCollector
     _SOURCES["runzero"] = RunzeroCollector
