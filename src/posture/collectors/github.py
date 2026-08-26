@@ -463,14 +463,20 @@ class GithubCollector(Collector):
             except ValueError:
                 detail = ""
             if detail in (
-                "Advanced Security must be enabled for this repository "
-                "to use code scanning.",
-                "Code scanning is not enabled for this repository. "
-                "Please enable code scanning in the repository settings.",
+                (
+                    "Advanced Security must be enabled for this repository "
+                    "to use code scanning."
+                ),
+                (
+                    "Code scanning is not enabled for this repository. "
+                    "Please enable code scanning in the repository settings."
+                ),
                 "Dependabot alerts are disabled for this repository.",
                 "Dependabot alerts are not available for archived repositories.",
-                "Upgrade to GitHub Pro or make this repository public to "
-                "enable this feature.",
+                (
+                    "Upgrade to GitHub Pro or make this repository public to "
+                    "enable this feature."
+                ),
             ):
                 return None
         if response.status_code in (401, 403):
