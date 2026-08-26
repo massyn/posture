@@ -63,7 +63,9 @@ def test_write_storage_csv_truncate(tmp_path: Path) -> None:
     out = tmp_path / "default" / "hosts.csv"
     assert out.exists()
     assert not out.with_suffix(".csv.tmp").exists()
-    assert pd.read_csv(out).equals(_DF)
+    result = pd.read_csv(out)
+    assert result.drop(columns=["upload_timestamp"]).equals(_DF)
+    assert result["upload_timestamp"].notna().all()
 
 
 def test_write_storage_csv_truncate_overwrites(tmp_path: Path) -> None:
@@ -73,7 +75,8 @@ def test_write_storage_csv_truncate_overwrites(tmp_path: Path) -> None:
         smaller, "csv", "hosts", config={"path": str(tmp_path)}, mode="truncate"
     )
     out = tmp_path / "default" / "hosts.csv"
-    assert pd.read_csv(out).equals(smaller)
+    result = pd.read_csv(out)
+    assert result.drop(columns=["upload_timestamp"]).equals(smaller)
 
 
 def test_write_storage_csv_append_is_dated(tmp_path: Path) -> None:
@@ -89,7 +92,8 @@ def test_write_storage_csv_append_is_dated(tmp_path: Path) -> None:
         / "hosts.csv"
     )
     assert out.exists()
-    assert pd.read_csv(out).equals(_DF)
+    result = pd.read_csv(out)
+    assert result.drop(columns=["upload_timestamp"]).equals(_DF)
 
 
 def test_write_storage_csv_tenancy_env_var(
@@ -104,6 +108,8 @@ def test_write_storage_json(tmp_path: Path) -> None:
     write_storage(_DF, "json", "hosts", config={"path": str(tmp_path)}, mode="truncate")
     out = tmp_path / "default" / "hosts.json"
     records = json.loads(out.read_text())
+    for record in records:
+        del record["upload_timestamp"]
     assert records == [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
 
 
@@ -112,7 +118,8 @@ def test_write_storage_parquet(tmp_path: Path) -> None:
         _DF, "parquet", "hosts", config={"path": str(tmp_path)}, mode="truncate"
     )
     out = tmp_path / "default" / "hosts.parquet"
-    assert pd.read_parquet(out).equals(_DF)
+    result = pd.read_parquet(out)
+    assert result.drop(columns=["upload_timestamp"]).equals(_DF)
 
 
 def test_write_storage_invalid_mode(tmp_path: Path) -> None:
@@ -170,6 +177,15 @@ def test_write_page_truncate_clears_prior_run(tmp_path: Path) -> None:
     files = list((tmp_path / "default" / "hosts").iterdir())
     assert stale not in files
     assert len(files) == 1
+
+
+def test_upload_timestamp_constant_across_pages_within_run(tmp_path: Path) -> None:
+    store = CsvStorage({"path": str(tmp_path)})
+    store.write_page(_DF, "hosts", mode="truncate")
+    store.write_page(_DF, "hosts", mode="truncate")
+    files = list((tmp_path / "default" / "hosts").iterdir())
+    timestamps = {pd.read_csv(f)["upload_timestamp"].iloc[0] for f in files}
+    assert len(timestamps) == 1
 
 
 def test_write_page_truncate_accumulates_within_run(tmp_path: Path) -> None:

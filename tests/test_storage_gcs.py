@@ -62,7 +62,7 @@ def test_gcs_truncate_overwrites_same_blob(fake_gcs: _FakeClient) -> None:
     bucket = fake_gcs.buckets["my-bucket"]
     assert len(bucket.blobs) == 1
     out = pd.read_parquet(pd.io.common.BytesIO(bucket.blobs["hosts/default.parquet"]))
-    assert out.equals(smaller)
+    assert out.drop(columns=["upload_timestamp"]).equals(smaller)
 
 
 def test_gcs_append_is_dated(fake_gcs: _FakeClient) -> None:

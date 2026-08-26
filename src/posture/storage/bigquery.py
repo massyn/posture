@@ -1,7 +1,8 @@
 """BigQuery storage: one project/dataset, one table per name.
 
 Every row carries a "tenancy" column (see TableStorage) plus an
-"upload_timestamp". "truncate" is tenancy-scoped, not table-scoped: it
+"upload_timestamp" (see TableStorage._add_upload_timestamp). "truncate" is
+tenancy-scoped, not table-scoped: it
 deletes only that tenancy's existing rows before loading the fresh set,
 leaving other tenancies' rows in the same table untouched. "append" skips the
 delete and just loads on top of whatever's already there.
@@ -21,7 +22,6 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import timezone
 from typing import Any, ClassVar
 
 import pandas as pd
@@ -107,7 +107,6 @@ class BigQueryStorage(TableStorage):
             return
 
         df = self._add_tenancy_column(df)
-        df["upload_timestamp"] = pd.Timestamp.now(tz=timezone.utc).tz_localize(None)
         df = _coerce_for_load(df)
         self._warn_on_missing_columns(table_id, df.columns)
 

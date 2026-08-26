@@ -45,6 +45,7 @@ class S3Storage(Storage):
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
         self._tenancy = os.environ.get("TENANCY", "default")
+        self._upload_timestamp = pd.Timestamp.now(tz=timezone.utc).tz_localize(None)
         self._truncated_dirs: set[str] = set()
 
         try:

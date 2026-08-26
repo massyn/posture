@@ -45,7 +45,7 @@ def test_s3_truncate_overwrites_same_object(fake_s3: _FakeS3Client) -> None:
     out = pd.read_parquet(
         pd.io.common.BytesIO(fake_s3.objects["hosts/default.parquet"])
     )
-    assert out.equals(smaller)
+    assert out.drop(columns=["upload_timestamp"]).equals(smaller)
 
 
 def test_s3_append_is_hive_partitioned(fake_s3: _FakeS3Client) -> None:

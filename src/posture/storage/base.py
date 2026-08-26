@@ -117,6 +117,10 @@ class Storage(_ConfigResolverMixin, ABC):
         self._config = self._resolve_config(config or {})
         self._base_dir = Path(self._config["path"])
         self._tenancy = os.environ.get("TENANCY", "default")
+        # Captured once per instance (i.e. once per collection run) so every
+        # row/page written through this instance carries the same value,
+        # rather than the moment each individual file happens to be written.
+        self._upload_timestamp = pd.Timestamp.now(tz=timezone.utc).tz_localize(None)
         # Tracks which (name) directories have already been cleared for a
         # truncating paginated write this run, so only the first page of a
         # given name wipes prior contents — later pages just add to it.
@@ -125,9 +129,15 @@ class Storage(_ConfigResolverMixin, ABC):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(path={self._base_dir!s}, tenancy={self._tenancy!s})"
 
+    def _add_upload_timestamp(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df["upload_timestamp"] = self._upload_timestamp
+        return df
+
     def write(self, df: pd.DataFrame, name: str, *, mode: str = "truncate") -> None:
         """Write the whole of ``df`` as a single file."""
         _check_mode(mode, source=self.env_prefix.lower())
+        df = self._add_upload_timestamp(df)
         path = self._path_for(name, mode=mode, paginated=False)
         self._atomic_write(df, path)
 
@@ -142,6 +152,7 @@ class Storage(_ConfigResolverMixin, ABC):
         previous run before writing; append mode never clears anything.
         """
         _check_mode(mode, source=self.env_prefix.lower())
+        df = self._add_upload_timestamp(df)
         if mode == "truncate" and name not in self._truncated_dirs:
             self._clear_dir(self._page_dir(name, mode=mode))
             self._truncated_dirs.add(name)
@@ -222,6 +233,10 @@ class TableStorage(_ConfigResolverMixin, ABC):
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
         self._tenancy = os.environ.get("TENANCY", "default")
+        # Captured once per instance (i.e. once per collection run) so every
+        # row written through this instance carries the same value, rather
+        # than the moment each individual table load happens to run.
+        self._upload_timestamp = pd.Timestamp.now(tz=timezone.utc).tz_localize(None)
         # Tracks which tables this run has already recreated, so only the
         # first page of a truncating write_page() clears prior rows.
         self._truncated_tables: set[str] = set()
@@ -231,14 +246,21 @@ class TableStorage(_ConfigResolverMixin, ABC):
         df["tenancy"] = self._tenancy
         return df
 
+    def _add_upload_timestamp(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.copy()
+        df["upload_timestamp"] = self._upload_timestamp
+        return df
+
     def write(self, df: pd.DataFrame, name: str, *, mode: str = "truncate") -> None:
         _check_mode(mode, source=self.env_prefix.lower())
+        df = self._add_upload_timestamp(df)
         self._call_write_table(df, name, recreate=mode == "truncate")
 
     def write_page(
         self, df: pd.DataFrame, name: str, *, mode: str = "truncate"
     ) -> None:
         _check_mode(mode, source=self.env_prefix.lower())
+        df = self._add_upload_timestamp(df)
         if mode == "truncate" and name not in self._truncated_tables:
             self._call_write_table(df, name, recreate=True)
             self._truncated_tables.add(name)
