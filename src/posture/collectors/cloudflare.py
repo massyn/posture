@@ -203,6 +203,12 @@ _ACCOUNT_RESOURCE_PATHS: dict[str, str] = {
     "workers_scripts": _WORKERS_SCRIPTS_PATH,
 }
 
+# Pages' "List projects" endpoint is unpaginated and rejects page/per_page
+# outright (400, error 8000024 "Invalid list options") — confirmed against
+# a live tenant. Workers Scripts accepts (and ignores) the same params, so
+# it stays in the default paginated path.
+_UNPAGINATED_ACCOUNT_RESOURCES = {"pages_projects"}
+
 
 class CloudflareCollector(Collector):
     env_prefix = "CLOUDFLARE"
@@ -362,24 +368,29 @@ class CloudflareCollector(Collector):
         max_workers = kwargs.get("max_workers", _DEFAULT_ZONE_FANOUT_MAX_WORKERS)
         workers = max(1, min(max_workers, len(account_ids)))
 
+        paginated = resource not in _UNPAGINATED_ACCOUNT_RESOURCES
         all_records = self._resumable_fanout(
             resource,
             account_ids,
             lambda account_id: self._fetch_all_for_account(
-                path_template, account_id, account_names.get(account_id)
+                path_template, account_id, account_names.get(account_id), paginated
             ),
             workers,
         )
         return all_records, None
 
     def _fetch_all_for_account(
-        self, path_template: str, account_id: str, account_name: str | None
+        self,
+        path_template: str,
+        account_id: str,
+        account_name: str | None,
+        paginated: bool = True,
     ) -> list[dict[str, Any]]:
         path = path_template.format(account_id=account_id)
         records: list[dict[str, Any]] = []
         page = 1
         while True:
-            params = {"page": page, "per_page": _PAGE_SIZE}
+            params = {"page": page, "per_page": _PAGE_SIZE} if paginated else {}
             payload = self._get_json(_BASE_URL + path, params=params)
 
             page_records = payload.get("result", []) or []
@@ -387,6 +398,9 @@ class CloudflareCollector(Collector):
                 record["_account_id"] = account_id
                 record["_account_name"] = account_name
             records.extend(page_records)
+
+            if not paginated:
+                break
 
             result_info = payload.get("result_info") or {}
             if page >= result_info.get("total_pages", page):

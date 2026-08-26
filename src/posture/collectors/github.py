@@ -341,8 +341,10 @@ class GithubCollector(Collector):
 
         # A 404 here means the repo has the feature (code scanning) turned
         # off, not a real failure — GitHub returns 404 rather than an empty
-        # list for repos where code scanning was never enabled.
-        allow_404 = resource == "code_scanning_alerts"
+        # list for repos where code scanning was never enabled. Dependabot
+        # alerts has the same "feature is off" case, but signalled via 403
+        # (see the message check in _get()) rather than 404.
+        allow_404 = resource in ("code_scanning_alerts", "dependabot_alerts")
         all_records = self._resumable_fanout(
             resource,
             repos,
@@ -447,6 +449,30 @@ class GithubCollector(Collector):
             raise RateLimitedSignal(
                 retry_after=float(retry_after) if retry_after else None
             )
+        # GitHub answers code scanning's, Dependabot alerts', and branch
+        # rules' "feature is off/unavailable for this repo" case with 403
+        # (not 404) and one of these fixed messages — confirmed against a
+        # live tenant. Treated the same as allow_404's 404: no records, not
+        # an auth failure, so it must not fall through to the blanket
+        # 401/403 -> UnauthorizedSignal below (which would burn
+        # _MAX_RETRIES re-auth attempts per repo before failing with an
+        # empty message).
+        if allow_404 and response.status_code == 403:
+            try:
+                detail = response.json().get("message", "")
+            except ValueError:
+                detail = ""
+            if detail in (
+                "Advanced Security must be enabled for this repository "
+                "to use code scanning.",
+                "Code scanning is not enabled for this repository. "
+                "Please enable code scanning in the repository settings.",
+                "Dependabot alerts are disabled for this repository.",
+                "Dependabot alerts are not available for archived repositories.",
+                "Upgrade to GitHub Pro or make this repository public to "
+                "enable this feature.",
+            ):
+                return None
         if response.status_code in (401, 403):
             raise UnauthorizedSignal()
         if allow_404 and response.status_code == 404:

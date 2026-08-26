@@ -229,6 +229,8 @@ def _parse_iso(value: str) -> pd.Timestamp | None:
         ts = pd.Timestamp(value)
     except (ValueError, TypeError):
         return None
+    if pd.isna(ts):
+        return None
     if ts.tzinfo is None:
         return ts.tz_localize("UTC")
     return ts.tz_convert("UTC")
