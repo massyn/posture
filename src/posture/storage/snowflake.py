@@ -130,6 +130,11 @@ class SnowflakeStorage(TableStorage):
         if df.empty:
             return
 
+        # use_logical_type=True: without it, write_pandas() serialises
+        # datetime columns to Parquet using the raw physical INT64 type
+        # rather than a timestamp logical type, so COPY INTO tries to parse
+        # the raw epoch integer as a date string and every row fails with
+        # "Invalid date".
         success, _, _, _ = write_pandas(
             self._conn,
             df,
@@ -137,6 +142,7 @@ class SnowflakeStorage(TableStorage):
             database=self._database,
             schema=self._schema,
             quote_identifiers=False,
+            use_logical_type=True,
         )
         if not success:
             raise RuntimeError(
