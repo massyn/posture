@@ -11,11 +11,15 @@ import pytest
 
 from posture.exceptions import PostureError, StorageConfigError, StorageWriteError
 from posture.storage import (
+    BigQueryStorage,
     CsvStorage,
     DuckdbStorage,
+    GcsStorage,
     JsonStorage,
     ParquetStorage,
     PostgresStorage,
+    S3Storage,
+    SnowflakeStorage,
     SqliteStorage,
     Storage,
     StorageBackend,
@@ -35,6 +39,10 @@ _DF = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
         SqliteStorage,
         DuckdbStorage,
         PostgresStorage,
+        GcsStorage,
+        S3Storage,
+        BigQueryStorage,
+        SnowflakeStorage,
     ],
 )
 def test_backend_satisfies_storage_backend_protocol(backend_cls: type) -> None:
@@ -43,14 +51,16 @@ def test_backend_satisfies_storage_backend_protocol(backend_cls: type) -> None:
 
 def test_write_storage_default_mode_is_truncate(tmp_path: Path) -> None:
     write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)})
-    assert (tmp_path / "hosts.csv").exists()
+    assert (tmp_path / "default" / "hosts.csv").exists()
     today = datetime.now(timezone.utc).date()
-    assert not (tmp_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}").exists()
+    assert not (
+        tmp_path / "default" / "hosts" / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}"
+    ).exists()
 
 
 def test_write_storage_csv_truncate(tmp_path: Path) -> None:
     write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)}, mode="truncate")
-    out = tmp_path / "hosts.csv"
+    out = tmp_path / "default" / "hosts.csv"
     assert out.exists()
     assert not out.with_suffix(".csv.tmp").exists()
     assert pd.read_csv(out).equals(_DF)
@@ -62,21 +72,37 @@ def test_write_storage_csv_truncate_overwrites(tmp_path: Path) -> None:
     write_storage(
         smaller, "csv", "hosts", config={"path": str(tmp_path)}, mode="truncate"
     )
-    out = tmp_path / "hosts.csv"
+    out = tmp_path / "default" / "hosts.csv"
     assert pd.read_csv(out).equals(smaller)
 
 
 def test_write_storage_csv_append_is_dated(tmp_path: Path) -> None:
     write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)}, mode="append")
     today = datetime.now(timezone.utc).date()
-    out = tmp_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}" / "hosts.csv"
+    out = (
+        tmp_path
+        / "default"
+        / "hosts"
+        / f"{today:%Y}"
+        / f"{today:%m}"
+        / f"{today:%d}"
+        / "hosts.csv"
+    )
     assert out.exists()
     assert pd.read_csv(out).equals(_DF)
 
 
+def test_write_storage_csv_tenant_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TENANT", "acme")
+    write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)}, mode="truncate")
+    assert (tmp_path / "acme" / "hosts.csv").exists()
+
+
 def test_write_storage_json(tmp_path: Path) -> None:
     write_storage(_DF, "json", "hosts", config={"path": str(tmp_path)}, mode="truncate")
-    out = tmp_path / "hosts.json"
+    out = tmp_path / "default" / "hosts.json"
     records = json.loads(out.read_text())
     assert records == [{"a": 1, "b": "x"}, {"a": 2, "b": "y"}]
 
@@ -85,7 +111,7 @@ def test_write_storage_parquet(tmp_path: Path) -> None:
     write_storage(
         _DF, "parquet", "hosts", config={"path": str(tmp_path)}, mode="truncate"
     )
-    out = tmp_path / "hosts.parquet"
+    out = tmp_path / "default" / "hosts.parquet"
     assert pd.read_parquet(out).equals(_DF)
 
 
@@ -135,13 +161,13 @@ def test_write_failure_wrapped_as_storage_write_error(tmp_path: Path) -> None:
 def test_write_page_truncate_clears_prior_run(tmp_path: Path) -> None:
     store = CsvStorage({"path": str(tmp_path)})
     store.write_page(_DF, "hosts", mode="truncate")
-    stale = tmp_path / "hosts" / "stale-leftover.csv"
+    stale = tmp_path / "default" / "hosts" / "stale-leftover.csv"
     stale.write_text("leftover")
 
     # New run: fresh instance, first page for "hosts" should clear "stale".
     store2 = CsvStorage({"path": str(tmp_path)})
     store2.write_page(_DF, "hosts", mode="truncate")
-    files = list((tmp_path / "hosts").iterdir())
+    files = list((tmp_path / "default" / "hosts").iterdir())
     assert stale not in files
     assert len(files) == 1
 
@@ -150,7 +176,7 @@ def test_write_page_truncate_accumulates_within_run(tmp_path: Path) -> None:
     store = CsvStorage({"path": str(tmp_path)})
     store.write_page(_DF, "hosts", mode="truncate")
     store.write_page(_DF, "hosts", mode="truncate")
-    files = list((tmp_path / "hosts").iterdir())
+    files = list((tmp_path / "default" / "hosts").iterdir())
     assert len(files) == 2
 
 
@@ -158,12 +184,24 @@ def test_write_page_append_never_clears(tmp_path: Path) -> None:
     store = CsvStorage({"path": str(tmp_path)})
     store.write_page(_DF, "hosts", mode="append")
     today = datetime.now(timezone.utc).date()
-    page_dir = tmp_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}" / "hosts"
+    page_dir = (
+        tmp_path / "default" / "hosts" / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}"
+    )
     assert len(list(page_dir.iterdir())) == 1
 
     store2 = CsvStorage({"path": str(tmp_path)})
     store2.write_page(_DF, "hosts", mode="append")
     assert len(list(page_dir.iterdir())) == 2
+
+
+def test_write_page_tenant_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TENANT", "acme")
+    store = CsvStorage({"path": str(tmp_path)})
+    store.write_page(_DF, "hosts", mode="truncate")
+    files = list((tmp_path / "acme" / "hosts").iterdir())
+    assert len(files) == 1
 
 
 def test_sqlite_truncate_then_append(tmp_path: Path) -> None:
@@ -173,7 +211,11 @@ def test_sqlite_truncate_then_append(tmp_path: Path) -> None:
     )
     conn = sqlite3.connect(db_path)
     try:
-        assert pd.read_sql("SELECT * FROM hosts", conn).equals(_DF)
+        result = pd.read_sql("SELECT a, b FROM hosts", conn)
+        assert result.equals(_DF)
+        assert (
+            pd.read_sql("SELECT tenant FROM hosts", conn)["tenant"] == "default"
+        ).all()
     finally:
         conn.close()
 
@@ -185,6 +227,35 @@ def test_sqlite_truncate_then_append(tmp_path: Path) -> None:
     finally:
         conn.close()
     assert len(result) == 3
+
+
+def test_sqlite_truncate_only_clears_current_tenant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "posture.db"
+    monkeypatch.setenv("TENANT", "acme")
+    write_storage(
+        _DF, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    monkeypatch.setenv("TENANT", "other")
+    write_storage(
+        _DF, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    monkeypatch.setenv("TENANT", "acme")
+    smaller = pd.DataFrame({"a": [9], "b": ["z"]})
+    write_storage(
+        smaller, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    conn = sqlite3.connect(db_path)
+    try:
+        result = pd.read_sql("SELECT * FROM hosts ORDER BY tenant, a", conn)
+    finally:
+        conn.close()
+    assert len(result) == 3  # 1 "acme" row (replaced) + 2 "other" rows (untouched)
+    assert set(result["tenant"]) == {"acme", "other"}
 
 
 def test_sqlite_write_page_truncate_first_page_only(tmp_path: Path) -> None:
@@ -208,7 +279,10 @@ def test_duckdb_truncate_then_append(tmp_path: Path) -> None:
 
     conn = duckdb.connect(str(db_path))
     try:
-        assert conn.execute("SELECT * FROM hosts").df().equals(_DF)
+        result = conn.execute("SELECT a, b FROM hosts").df()
+        assert result.equals(_DF)
+        tenants = conn.execute("SELECT DISTINCT tenant FROM hosts").df()
+        assert list(tenants["tenant"]) == ["default"]
     finally:
         conn.close()
 
@@ -220,6 +294,35 @@ def test_duckdb_truncate_then_append(tmp_path: Path) -> None:
     finally:
         conn.close()
     assert len(result) == 3
+
+
+def test_duckdb_truncate_only_clears_current_tenant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "posture.duckdb"
+    monkeypatch.setenv("TENANT", "acme")
+    write_storage(
+        _DF, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    monkeypatch.setenv("TENANT", "other")
+    write_storage(
+        _DF, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    monkeypatch.setenv("TENANT", "acme")
+    smaller = pd.DataFrame({"a": [9], "b": ["z"]})
+    write_storage(
+        smaller, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    conn = duckdb.connect(str(db_path))
+    try:
+        result = conn.execute("SELECT * FROM hosts").df()
+    finally:
+        conn.close()
+    assert len(result) == 3  # 1 "acme" row (replaced) + 2 "other" rows (untouched)
+    assert set(result["tenant"]) == {"acme", "other"}
 
 
 def test_duckdb_write_page_truncate_first_page_only(tmp_path: Path) -> None:
@@ -245,7 +348,7 @@ def test_storage_factory_returns_matching_backend_instance(tmp_path: Path) -> No
     store = Storage("csv", {"path": str(tmp_path)})
     assert isinstance(store, CsvStorage)
     store.write(_DF, "hosts")
-    assert (tmp_path / "hosts.csv").exists()
+    assert (tmp_path / "default" / "hosts.csv").exists()
 
 
 def test_storage_factory_unknown_backend() -> None:
@@ -309,7 +412,18 @@ def test_postgres_missing_config_raises() -> None:
 
 def test_storage_catalog_lists_every_backend() -> None:
     catalog = storage_catalog()
-    assert set(catalog) == {"csv", "json", "parquet", "sqlite", "duckdb", "postgres"}
+    assert set(catalog) == {
+        "csv",
+        "json",
+        "parquet",
+        "sqlite",
+        "duckdb",
+        "postgres",
+        "gcs",
+        "s3",
+        "bigquery",
+        "snowflake",
+    }
 
 
 def test_storage_catalog_reports_required_config() -> None:

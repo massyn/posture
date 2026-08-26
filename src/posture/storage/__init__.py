@@ -38,11 +38,15 @@ from posture.exceptions import StorageConfigError
 from posture.storage.base import StorageBackend
 
 __all__ = [
+    "BigQueryStorage",
     "CsvStorage",
     "DuckdbStorage",
+    "GcsStorage",
     "JsonStorage",
     "ParquetStorage",
     "PostgresStorage",
+    "S3Storage",
+    "SnowflakeStorage",
     "SqliteStorage",
     "Storage",
     "StorageBackend",
@@ -52,11 +56,15 @@ __all__ = [
 
 # storage key (as passed to write_storage) -> (submodule, class name).
 _BACKENDS: dict[str, tuple[str, str]] = {
+    "bigquery": ("posture.storage.bigquery", "BigQueryStorage"),
     "csv": ("posture.storage.csv", "CsvStorage"),
     "duckdb": ("posture.storage.duckdb", "DuckdbStorage"),
+    "gcs": ("posture.storage.gcs", "GcsStorage"),
     "json": ("posture.storage.json", "JsonStorage"),
     "parquet": ("posture.storage.parquet", "ParquetStorage"),
     "postgres": ("posture.storage.postgres", "PostgresStorage"),
+    "s3": ("posture.storage.s3", "S3Storage"),
+    "snowflake": ("posture.storage.snowflake", "SnowflakeStorage"),
     "sqlite": ("posture.storage.sqlite", "SqliteStorage"),
 }
 
@@ -106,7 +114,8 @@ def Storage(storage: str, config: dict[str, Any] | None = None) -> StorageBacken
     several write() calls to the same target.
 
     ``storage`` is one of "csv", "json", "parquet", "sqlite", "duckdb",
-    "postgres" — same set write_storage() accepts.
+    "postgres", "gcs", "s3", "bigquery", "snowflake" — same set
+    write_storage() accepts.
     """
     return _backend_class(storage)(config)
 
@@ -122,7 +131,7 @@ def write_storage(
     """Write ``df`` as ``name`` to ``storage`` in one shot.
 
     ``storage`` is one of "csv", "json", "parquet", "sqlite", "duckdb",
-    "postgres". ``mode``:
+    "postgres", "gcs", "s3", "bigquery", "snowflake". ``mode``:
     "truncate" overwrites/replaces, "append" keeps a dated history. For
     per-page writes during a paginated collection, use Storage() to build an
     instance and call write_page() on it instead (see module docstring).

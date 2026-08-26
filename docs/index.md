@@ -383,9 +383,13 @@
 
 # Storage backends
 
+- [bigquery](storage/bigquery.md)
 - [csv](storage/csv.md)
 - [duckdb](storage/duckdb.md)
+- [gcs](storage/gcs.md)
 - [json](storage/json.md)
 - [parquet](storage/parquet.md)
 - [postgres](storage/postgres.md)
+- [s3](storage/s3.md)
+- [snowflake](storage/snowflake.md)
 - [sqlite](storage/sqlite.md)

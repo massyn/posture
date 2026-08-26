@@ -1,5 +1,10 @@
 """SQLite storage: one database file (config "path"), one table per name.
 
+Every row carries a "tenant" column (see TableStorage), so "truncate" means
+tenant-scoped: DELETE rows for the current tenant, then insert the fresh
+set, leaving other tenants' rows in the same table untouched. "append" just
+inserts.
+
 Atomicity comes from SQLite's own transactions rather than a tmp-file/
 rename: a failed write() rolls back and leaves the previously-committed
 table untouched.
@@ -29,14 +34,19 @@ class SqliteStorage(TableStorage):
 
     def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        df = self._add_tenant_column(df)
         conn = sqlite3.connect(self._path)
         try:
             with conn:
-                df.to_sql(
-                    name,
-                    conn,
-                    if_exists="replace" if recreate else "append",
-                    index=False,
-                )
+                if recreate:
+                    conn.execute(
+                        f'DELETE FROM "{name}" WHERE tenant = ?', (self._tenant,)
+                    )
+                df.to_sql(name, conn, if_exists="append", index=False)
+        except sqlite3.OperationalError:
+            # DELETE against a table that doesn't exist yet — the insert
+            # below creates it.
+            with conn:
+                df.to_sql(name, conn, if_exists="append", index=False)
         finally:
             conn.close()

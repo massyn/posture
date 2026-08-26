@@ -5,6 +5,11 @@ the same convention every Collector uses for its own credentials) or, for
 advanced connection options psycopg supports that discrete keys don't cover,
 a single "dsn" that's used verbatim and takes precedence when given.
 
+Every row carries a "tenant" column (see TableStorage), so "truncate" means
+tenant-scoped: DELETE rows for the current tenant, then insert the fresh
+set, leaving other tenants' rows in the same table untouched. "append" just
+inserts.
+
 Atomicity comes from a single Postgres transaction, not a tmp-file/rename: a
 failed write() rolls back and leaves the previously-committed table
 untouched.
@@ -84,10 +89,9 @@ class PostgresStorage(TableStorage):
         return "PostgresStorage(dsn=<redacted>)"
 
     def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+        df = self._add_tenant_column(df)
         table = sql.Identifier(name)
         with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
-            if recreate:
-                cur.execute(sql.SQL("DROP TABLE IF EXISTS {}").format(table))
             column_defs = sql.SQL(", ").join(
                 sql.SQL("{} {}").format(sql.Identifier(col), sql.SQL(_pg_type(df[col])))
                 for col in df.columns
@@ -95,6 +99,11 @@ class PostgresStorage(TableStorage):
             cur.execute(
                 sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(table, column_defs)
             )
+            if recreate:
+                cur.execute(
+                    sql.SQL("DELETE FROM {} WHERE tenant = %s").format(table),
+                    (self._tenant,),
+                )
             if df.empty:
                 return
             columns = sql.SQL(", ").join(sql.Identifier(col) for col in df.columns)

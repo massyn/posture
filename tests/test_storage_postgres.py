@@ -48,17 +48,39 @@ def test_write_storage_postgres_truncate(table_name: str) -> None:
     result = _read(table_name)
     assert list(result["a"]) == [1, 2]
     assert list(result["b"]) == ["x", "y"]
+    assert (result["tenant"] == "default").all()
 
 
-def test_write_storage_postgres_truncate_recreates_schema(table_name: str) -> None:
+def test_write_storage_postgres_truncate_replaces_current_tenant(
+    table_name: str,
+) -> None:
     write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
-    smaller = pd.DataFrame({"a": [9]})
+    smaller = pd.DataFrame({"a": [9], "b": ["z"]})
     write_storage(
         smaller, "postgres", table_name, config={"dsn": _DSN}, mode="truncate"
     )
     result = _read(table_name)
-    assert list(result.columns) == ["a"]
     assert list(result["a"]) == [9]
+
+
+def test_write_storage_postgres_truncate_only_clears_current_tenant(
+    table_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TENANT", "acme")
+    write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
+
+    monkeypatch.setenv("TENANT", "other")
+    write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
+
+    monkeypatch.setenv("TENANT", "acme")
+    smaller = pd.DataFrame({"a": [9], "b": ["z"]})
+    write_storage(
+        smaller, "postgres", table_name, config={"dsn": _DSN}, mode="truncate"
+    )
+
+    result = _read(table_name)
+    assert len(result) == 3  # 1 "acme" row (replaced) + 2 "other" rows (untouched)
+    assert set(result["tenant"]) == {"acme", "other"}
 
 
 def test_write_storage_postgres_append(table_name: str) -> None:

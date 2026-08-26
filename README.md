@@ -18,6 +18,16 @@ its tables.
 pip install posture
 ```
 
+A few storage backends have extra dependencies not installed by default — install them
+with the matching extra:
+
+```bash
+pip install posture[gcs]        # google-cloud-storage, for the "gcs" backend
+pip install posture[s3]         # boto3, for the "s3" backend
+pip install posture[bigquery]   # google-cloud-bigquery, for the "bigquery" backend
+pip install posture[snowflake]  # snowflake-connector-python, for the "snowflake" backend
+```
+
 `posture` loads a `.env` file from the current directory (or a parent) automatically
 on import — no code changes needed. Variables already set in the environment always
 take precedence over `.env` values. Each collector's required variables are listed
@@ -135,7 +145,7 @@ df = ccm.collect("hosts")
 
 write_storage(df, "json", "hosts", config={"path": "output"}, mode="truncate")
 
-print(f"Wrote {len(df)} hosts to output/hosts.json")
+print(f"Wrote {len(df)} hosts to output/default/hosts.json")
 ```
 
 ### Storage: writing a DataFrame somewhere durable
@@ -143,8 +153,8 @@ print(f"Wrote {len(df)} hosts to output/hosts.json")
 ```python
 from posture import write_storage
 
-write_storage(df, "csv", "hosts", config={"path": "output"})                 # output/hosts.csv
-write_storage(df, "parquet", "hosts", config={"path": "output"})             # output/hosts.parquet
+write_storage(df, "csv", "hosts", config={"path": "output"})                 # output/<tenant>/hosts.csv
+write_storage(df, "parquet", "hosts", config={"path": "output"})             # output/<tenant>/hosts.parquet
 write_storage(df, "sqlite", "hosts", config={"path": "output/posture.db"})   # table "hosts"
 write_storage(df, "duckdb", "hosts", config={"path": "output/posture.duckdb"})  # table "hosts"
 write_storage(df, "postgres", "hosts", config={"dsn": "postgresql://..."})   # table "hosts"
@@ -152,21 +162,62 @@ write_storage(                                                               # s
     df, "postgres", "hosts",
     config={"host": "...", "dbname": "...", "user": "...", "password": "..."},
 )
+write_storage(df, "gcs", "hosts", config={"bucket": "my-bucket"})            # gs://my-bucket/hosts/<tenant>.parquet
+write_storage(df, "s3", "hosts", config={"bucket": "my-bucket"})             # s3://my-bucket/hosts/<tenant>.parquet
+write_storage(df, "bigquery", "hosts", config={"project_id": "...", "dataset_id": "..."})  # table "hosts"
+write_storage(                                                               # snowflake
+    df, "snowflake", "hosts",
+    config={
+        "account": "...", "database": "...", "schema": "...",
+        "authenticator": "SNOWFLAKE", "user": "...", "password": "...",
+    },
+)
 ```
 
-`storage` is one of `"csv"`, `"json"`, `"parquet"`, `"sqlite"`, `"duckdb"`, `"postgres"`.
-Postgres accepts either a single `dsn` or discrete `host`/`port`/`dbname`/`user`/
-`password` keys (same convention every collector uses for its own credentials,
-resolved from `POSTURE_POSTGRES_HOST` etc. if not passed explicitly) — `dsn` takes
-precedence if both are given.
+`storage` is one of `"csv"`, `"json"`, `"parquet"`, `"sqlite"`, `"duckdb"`, `"postgres"`,
+`"gcs"`, `"s3"`, `"bigquery"`, `"snowflake"`. Postgres accepts either a single `dsn` or
+discrete `host`/`port`/`dbname`/`user`/`password` keys (same convention every collector
+uses for its own credentials, resolved from `POSTURE_POSTGRES_HOST` etc. if not passed
+explicitly) — `dsn` takes precedence if both are given.
 
-`mode` controls both overwrite behaviour and history:
+`gcs`, `s3`, `bigquery`, and `snowflake` each require an extra to install (`pip install
+posture[gcs]` / `posture[s3]` / `posture[bigquery]` / `posture[snowflake]` — see
+[Installation](#installation)) and authenticate the way their respective SDK always does
+(Application Default Credentials for `gcs`/`bigquery`; the standard boto3 credential
+chain for `s3`). `snowflake` has no default `authenticator` — every tenant states its own
+auth method (`"SNOWFLAKE"` for password, `"WORKLOAD_IDENTITY"` with a
+`workload_identity_provider`, key-pair via `private_key_file`, etc.) explicitly via config
+or `POSTURE_SNOWFLAKE_AUTHENTICATOR`; `role`/`warehouse` are optional with no
+tenant-specific default either — omit them to use the connecting user's own account
+defaults.
+
+`gcs`/`s3` own an opinionated object-key layout rather than taking a `path` prefix —
+`<name>/<tenant>.parquet` for `truncate`, where `tenant` comes from the `TENANT` env var
+(default `"default"`). For `append`:
+
+- `gcs` — `<name>/<tenant>/<YYYY-MM-DD>.parquet`
+- `s3` — `<name>/<tenant>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<name>.parquet`, Hive-style
+  partitioning so the output is directly queryable by Athena/Glue without a separate
+  partition-projection config.
+
+`mode` controls both overwrite behaviour and history. For the local file backends
+(`csv`/`json`/`parquet`), every path is rooted `<path>/<tenant>/<name>...` — tenant
+first, then table name, then date — from the `TENANT` env var (default `"default"`), so
+a query engine like DuckDB can glob/prune by tenant without touching other tenants'
+files:
 
 - `"truncate"` (the default — latest load is all posture cares about by default) —
-  overwrites/replaces in place: `output/hosts.csv`, or table `hosts` recreated.
-- `"append"` — keeps a dated snapshot per day: `output/2026/08/22/hosts.csv`, or rows
-  appended to the existing `hosts` table. Opt in deliberately — it has real storage
-  growth implications the default doesn't.
+  overwrites/replaces in place: `output/default/hosts.csv`, or `output/default/hosts.parquet`.
+- `"append"` — keeps a dated snapshot per day: `output/default/hosts/2026/08/22/hosts.csv`.
+
+For the database backends (`sqlite`/`duckdb`/`postgres`/`bigquery`/`snowflake`), every row also
+carries a `tenant` column (from the `TENANT` env var), so a table can be shared by
+several tenants without one tenant's write clobbering another's rows — `"truncate"` here
+means tenant-scoped, not table-scoped: it deletes only the current tenant's existing
+rows before inserting the fresh set, leaving other tenants' rows in the same table
+untouched. `"append"` just inserts on top of whatever's already there. Either way, opt
+into `"append"` deliberately — it has real storage growth implications the default
+doesn't.
 
 Every file write goes through a temp file and an atomic rename, so a failure partway
 through never leaves a broken file at the real path. For a paginated collection, use
