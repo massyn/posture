@@ -23,14 +23,14 @@ class S3Storage(Storage):
     the output is directly queryable by Athena/Glue without a separate
     partition-projection config.
 
-    - truncate, write():       <name>/<tenant>.parquet
-    - truncate, write_page():  <name>/<tenant>/<uuid>.parquet
-    - append,   write():       <name>/<tenant>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<name>.parquet
-    - append,   write_page():  <name>/<tenant>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<uuid>.parquet
+    - truncate, write():       <name>/<tenancy>.parquet
+    - truncate, write_page():  <name>/<tenancy>/<uuid>.parquet
+    - append,   write():       <name>/<tenancy>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<name>.parquet
+    - append,   write_page():  <name>/<tenancy>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<uuid>.parquet
 
-    ``tenant`` comes from the ``TENANT`` env var (default ``"default"``),
+    ``tenancy`` comes from the ``TENANCY`` env var (default ``"default"``),
     matching the convention posture's collectors already use to separate
-    multi-tenant output.
+    multi-tenancy output.
 
     S3 object uploads are atomic per-object (a failed upload never partially
     replaces an existing object), so this needs no tmp-file-then-rename
@@ -44,7 +44,7 @@ class S3Storage(Storage):
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
-        self._tenant = os.environ.get("TENANT", "default")
+        self._tenancy = os.environ.get("TENANCY", "default")
         self._truncated_dirs: set[str] = set()
 
         try:
@@ -68,7 +68,7 @@ class S3Storage(Storage):
         return Path(f"YEAR={today:%Y}") / f"MONTH={today:%m}" / f"DAY={today:%d}"
 
     def _page_dir(self, name: str, *, mode: str) -> Path:
-        root = Path(name) / self._tenant
+        root = Path(name) / self._tenancy
         return root / self._partition_dir() if mode == "append" else root
 
     def _path_for(self, name: str, *, mode: str, paginated: bool) -> Path:
@@ -76,11 +76,11 @@ class S3Storage(Storage):
             if mode == "append":
                 return (
                     Path(name)
-                    / self._tenant
+                    / self._tenancy
                     / self._partition_dir()
                     / f"{name}.parquet"
                 )
-            return Path(name) / f"{self._tenant}.parquet"
+            return Path(name) / f"{self._tenancy}.parquet"
         return self._page_dir(name, mode=mode) / f"{uuid.uuid4().hex}.parquet"
 
     def _dump(self, df: pd.DataFrame, path: Path) -> None:

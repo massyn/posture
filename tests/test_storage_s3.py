@@ -26,11 +26,11 @@ class _FakeS3Client:
 def fake_s3(monkeypatch: pytest.MonkeyPatch) -> _FakeS3Client:
     client = _FakeS3Client()
     monkeypatch.setattr("boto3.client", lambda service: client)
-    monkeypatch.delenv("TENANT", raising=False)
+    monkeypatch.delenv("TENANCY", raising=False)
     return client
 
 
-def test_s3_truncate_writes_name_tenant_path(fake_s3: _FakeS3Client) -> None:
+def test_s3_truncate_writes_name_tenancy_path(fake_s3: _FakeS3Client) -> None:
     store = S3Storage({"bucket": "my-bucket"})
     store.write(_DF, "hosts", mode="truncate")
     assert "hosts/default.parquet" in fake_s3.objects
@@ -58,10 +58,10 @@ def test_s3_append_is_hive_partitioned(fake_s3: _FakeS3Client) -> None:
     assert expected in fake_s3.objects
 
 
-def test_s3_tenant_env_var_used_in_path(
+def test_s3_tenancy_env_var_used_in_path(
     fake_s3: _FakeS3Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     store = S3Storage({"bucket": "my-bucket"})
     store.write(_DF, "hosts", mode="truncate")
     assert "hosts/acme.parquet" in fake_s3.objects

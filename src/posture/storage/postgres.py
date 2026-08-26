@@ -5,18 +5,25 @@ the same convention every Collector uses for its own credentials) or, for
 advanced connection options psycopg supports that discrete keys don't cover,
 a single "dsn" that's used verbatim and takes precedence when given.
 
-Every row carries a "tenant" column (see TableStorage), so "truncate" means
-tenant-scoped: DELETE rows for the current tenant, then insert the fresh
-set, leaving other tenants' rows in the same table untouched. "append" just
+Every row carries a "tenancy" column (see TableStorage), so "truncate" means
+tenancy-scoped: DELETE rows for the current tenancy, then insert the fresh
+set, leaving other tenancies' rows in the same table untouched. "append" just
 inserts.
 
 Atomicity comes from a single Postgres transaction, not a tmp-file/rename: a
 failed write() rolls back and leaves the previously-committed table
 untouched.
+
+Schema evolution: a column present in ``df`` but not yet in the table is
+added (``ALTER TABLE ADD COLUMN``); a column present in the table but
+missing from ``df`` is left untouched (never dropped) — just logged as a
+warning, since it usually means an upstream field disappeared rather than
+something this library should act on unasked.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 from urllib.parse import quote
 
@@ -26,6 +33,8 @@ from psycopg import sql
 
 from posture.exceptions import StorageConfigError
 from posture.storage.base import TableStorage
+
+logger = logging.getLogger("posture.storage.postgres")
 
 _DEFAULT_PORT = "5432"
 _REQUIRED_DISCRETE_KEYS = ("host", "dbname", "user", "password")
@@ -89,7 +98,7 @@ class PostgresStorage(TableStorage):
         return "PostgresStorage(dsn=<redacted>)"
 
     def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
-        df = self._add_tenant_column(df)
+        df = self._add_tenancy_column(df)
         table = sql.Identifier(name)
         with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
             column_defs = sql.SQL(", ").join(
@@ -99,10 +108,11 @@ class PostgresStorage(TableStorage):
             cur.execute(
                 sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(table, column_defs)
             )
+            self._sync_columns(cur, name, df)
             if recreate:
                 cur.execute(
-                    sql.SQL("DELETE FROM {} WHERE tenant = %s").format(table),
-                    (self._tenant,),
+                    sql.SQL("DELETE FROM {} WHERE tenancy = %s").format(table),
+                    (self._tenancy,),
                 )
             if df.empty:
                 return
@@ -111,3 +121,27 @@ class PostgresStorage(TableStorage):
             with cur.copy(copy_sql) as copy:
                 for row in df.itertuples(index=False, name=None):
                     copy.write_row(tuple(None if pd.isna(v) else v for v in row))
+
+    def _sync_columns(self, cur: psycopg.Cursor, name: str, df: pd.DataFrame) -> None:
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+            (name,),
+        )
+        existing = {row[0] for row in cur.fetchall()}
+        new_cols = [col for col in df.columns if col not in existing]
+        missing_cols = existing - set(df.columns)
+        for col in new_cols:
+            cur.execute(
+                sql.SQL("ALTER TABLE {} ADD COLUMN {} {}").format(
+                    sql.Identifier(name),
+                    sql.Identifier(col),
+                    sql.SQL(_pg_type(df[col])),
+                )
+            )
+        if missing_cols:
+            logger.warning(
+                "postgres table '%s' has column(s) %s not present in this write; "
+                "leaving them untouched",
+                name,
+                sorted(missing_cols),
+            )

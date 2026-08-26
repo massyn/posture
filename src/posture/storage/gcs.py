@@ -20,14 +20,14 @@ class GcsStorage(Storage):
     the developer points us at" to layer path/mode logic onto — so this
     backend owns an opinionated layout instead of taking a "path" prefix:
 
-    - truncate, write():       <name>/<tenant>.parquet
-    - truncate, write_page():  <name>/<tenant>/<uuid>.parquet
-    - append,   write():       <name>/<tenant>/<YYYY-MM-DD>.parquet
-    - append,   write_page():  <name>/<tenant>/<YYYY-MM-DD>/<uuid>.parquet
+    - truncate, write():       <name>/<tenancy>.parquet
+    - truncate, write_page():  <name>/<tenancy>/<uuid>.parquet
+    - append,   write():       <name>/<tenancy>/<YYYY-MM-DD>.parquet
+    - append,   write_page():  <name>/<tenancy>/<YYYY-MM-DD>/<uuid>.parquet
 
-    ``tenant`` comes from the ``TENANT`` env var (default ``"default"``),
+    ``tenancy`` comes from the ``TENANCY`` env var (default ``"default"``),
     matching the convention posture's collectors already use to separate
-    multi-tenant output.
+    multi-tenancy output.
 
     GCS object uploads are atomic per-blob (a failed upload never partially
     replaces an existing object), so this needs no tmp-file-then-rename
@@ -41,7 +41,7 @@ class GcsStorage(Storage):
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
-        self._tenant = os.environ.get("TENANT", "default")
+        self._tenancy = os.environ.get("TENANCY", "default")
         self._truncated_dirs: set[str] = set()
 
         try:
@@ -64,14 +64,14 @@ class GcsStorage(Storage):
         return f"{datetime.now(timezone.utc).date():%Y-%m-%d}"
 
     def _page_dir(self, name: str, *, mode: str) -> Path:
-        root = Path(name) / self._tenant
+        root = Path(name) / self._tenancy
         return root / self._today() if mode == "append" else root
 
     def _path_for(self, name: str, *, mode: str, paginated: bool) -> Path:
         if not paginated:
             if mode == "append":
-                return Path(name) / self._tenant / f"{self._today()}.parquet"
-            return Path(name) / f"{self._tenant}.parquet"
+                return Path(name) / self._tenancy / f"{self._today()}.parquet"
+            return Path(name) / f"{self._tenancy}.parquet"
         return self._page_dir(name, mode=mode) / f"{uuid.uuid4().hex}.parquet"
 
     def _dump(self, df: pd.DataFrame, path: Path) -> None:

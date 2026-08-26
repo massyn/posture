@@ -44,11 +44,11 @@ class _FakeClient:
 def fake_gcs(monkeypatch: pytest.MonkeyPatch) -> _FakeClient:
     client = _FakeClient()
     monkeypatch.setattr("google.cloud.storage.Client", lambda: client)
-    monkeypatch.delenv("TENANT", raising=False)
+    monkeypatch.delenv("TENANCY", raising=False)
     return client
 
 
-def test_gcs_truncate_writes_name_tenant_path(fake_gcs: _FakeClient) -> None:
+def test_gcs_truncate_writes_name_tenancy_path(fake_gcs: _FakeClient) -> None:
     store = GcsStorage({"bucket": "my-bucket"})
     store.write(_DF, "hosts", mode="truncate")
     assert "hosts/default.parquet" in fake_gcs.buckets["my-bucket"].blobs
@@ -73,10 +73,10 @@ def test_gcs_append_is_dated(fake_gcs: _FakeClient) -> None:
     assert expected in fake_gcs.buckets["my-bucket"].blobs
 
 
-def test_gcs_tenant_env_var_used_in_path(
+def test_gcs_tenancy_env_var_used_in_path(
     fake_gcs: _FakeClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     store = GcsStorage({"bucket": "my-bucket"})
     store.write(_DF, "hosts", mode="truncate")
     assert "hosts/acme.parquet" in fake_gcs.buckets["my-bucket"].blobs

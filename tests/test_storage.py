@@ -92,10 +92,10 @@ def test_write_storage_csv_append_is_dated(tmp_path: Path) -> None:
     assert pd.read_csv(out).equals(_DF)
 
 
-def test_write_storage_csv_tenant_env_var(
+def test_write_storage_csv_tenancy_env_var(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)}, mode="truncate")
     assert (tmp_path / "acme" / "hosts.csv").exists()
 
@@ -194,10 +194,10 @@ def test_write_page_append_never_clears(tmp_path: Path) -> None:
     assert len(list(page_dir.iterdir())) == 2
 
 
-def test_write_page_tenant_env_var(
+def test_write_page_tenancy_env_var(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     store = CsvStorage({"path": str(tmp_path)})
     store.write_page(_DF, "hosts", mode="truncate")
     files = list((tmp_path / "acme" / "hosts").iterdir())
@@ -214,7 +214,7 @@ def test_sqlite_truncate_then_append(tmp_path: Path) -> None:
         result = pd.read_sql("SELECT a, b FROM hosts", conn)
         assert result.equals(_DF)
         assert (
-            pd.read_sql("SELECT tenant FROM hosts", conn)["tenant"] == "default"
+            pd.read_sql("SELECT tenancy FROM hosts", conn)["tenancy"] == "default"
         ).all()
     finally:
         conn.close()
@@ -229,21 +229,21 @@ def test_sqlite_truncate_then_append(tmp_path: Path) -> None:
     assert len(result) == 3
 
 
-def test_sqlite_truncate_only_clears_current_tenant(
+def test_sqlite_truncate_only_clears_current_tenancy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db_path = tmp_path / "posture.db"
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     write_storage(
         _DF, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
     )
 
-    monkeypatch.setenv("TENANT", "other")
+    monkeypatch.setenv("TENANCY", "other")
     write_storage(
         _DF, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
     )
 
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     smaller = pd.DataFrame({"a": [9], "b": ["z"]})
     write_storage(
         smaller, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
@@ -251,11 +251,45 @@ def test_sqlite_truncate_only_clears_current_tenant(
 
     conn = sqlite3.connect(db_path)
     try:
-        result = pd.read_sql("SELECT * FROM hosts ORDER BY tenant, a", conn)
+        result = pd.read_sql("SELECT * FROM hosts ORDER BY tenancy, a", conn)
     finally:
         conn.close()
     assert len(result) == 3  # 1 "acme" row (replaced) + 2 "other" rows (untouched)
-    assert set(result["tenant"]) == {"acme", "other"}
+    assert set(result["tenancy"]) == {"acme", "other"}
+
+
+def test_sqlite_adds_new_column_to_existing_table(tmp_path: Path) -> None:
+    db_path = tmp_path / "posture.db"
+    write_storage(
+        _DF, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+    wider = _DF.copy()
+    wider["c"] = ["p", "q"]
+    write_storage(
+        wider, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    conn = sqlite3.connect(db_path)
+    try:
+        result = pd.read_sql("SELECT * FROM hosts WHERE c IS NOT NULL", conn)
+    finally:
+        conn.close()
+    assert list(result["c"]) == ["p", "q"]
+
+
+def test_sqlite_warns_on_missing_column(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    db_path = tmp_path / "posture.db"
+    write_storage(
+        _DF, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+    narrower = _DF[["a"]]
+    with caplog.at_level("WARNING"):
+        write_storage(
+            narrower, "sqlite", "hosts", config={"path": str(db_path)}, mode="truncate"
+        )
+    assert any("'b'" in record.getMessage() for record in caplog.records)
 
 
 def test_sqlite_write_page_truncate_first_page_only(tmp_path: Path) -> None:
@@ -281,8 +315,8 @@ def test_duckdb_truncate_then_append(tmp_path: Path) -> None:
     try:
         result = conn.execute("SELECT a, b FROM hosts").df()
         assert result.equals(_DF)
-        tenants = conn.execute("SELECT DISTINCT tenant FROM hosts").df()
-        assert list(tenants["tenant"]) == ["default"]
+        tenancies = conn.execute("SELECT DISTINCT tenancy FROM hosts").df()
+        assert list(tenancies["tenancy"]) == ["default"]
     finally:
         conn.close()
 
@@ -296,21 +330,21 @@ def test_duckdb_truncate_then_append(tmp_path: Path) -> None:
     assert len(result) == 3
 
 
-def test_duckdb_truncate_only_clears_current_tenant(
+def test_duckdb_truncate_only_clears_current_tenancy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db_path = tmp_path / "posture.duckdb"
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     write_storage(
         _DF, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
     )
 
-    monkeypatch.setenv("TENANT", "other")
+    monkeypatch.setenv("TENANCY", "other")
     write_storage(
         _DF, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
     )
 
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     smaller = pd.DataFrame({"a": [9], "b": ["z"]})
     write_storage(
         smaller, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
@@ -322,7 +356,41 @@ def test_duckdb_truncate_only_clears_current_tenant(
     finally:
         conn.close()
     assert len(result) == 3  # 1 "acme" row (replaced) + 2 "other" rows (untouched)
-    assert set(result["tenant"]) == {"acme", "other"}
+    assert set(result["tenancy"]) == {"acme", "other"}
+
+
+def test_duckdb_adds_new_column_to_existing_table(tmp_path: Path) -> None:
+    db_path = tmp_path / "posture.duckdb"
+    write_storage(
+        _DF, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+    wider = _DF.copy()
+    wider["c"] = ["p", "q"]
+    write_storage(
+        wider, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    conn = duckdb.connect(str(db_path))
+    try:
+        result = conn.execute("SELECT * FROM hosts WHERE c IS NOT NULL").df()
+    finally:
+        conn.close()
+    assert list(result["c"]) == ["p", "q"]
+
+
+def test_duckdb_warns_on_missing_column(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    db_path = tmp_path / "posture.duckdb"
+    write_storage(
+        _DF, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+    narrower = _DF[["a"]]
+    with caplog.at_level("WARNING"):
+        write_storage(
+            narrower, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+        )
+    assert any("'b'" in record.getMessage() for record in caplog.records)
 
 
 def test_duckdb_write_page_truncate_first_page_only(tmp_path: Path) -> None:

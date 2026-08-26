@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pandas as pd
 import pytest
 
@@ -17,13 +19,42 @@ _BASE_CONFIG = {
     "password": "secret",
 }
 
+_CREATE_RE = re.compile(r"CREATE TABLE IF NOT EXISTS (\S+) \((.+)\)$")
+_SELECT_RE = re.compile(r"SELECT \* FROM (\S+) LIMIT 0$")
+_ALTER_RE = re.compile(r"ALTER TABLE (\S+) ADD COLUMN (\S+) \S+$")
+
 
 class _FakeCursor:
+    """Tracks a fake per-table column registry on the connection, so
+    _sync_columns's "SELECT * FROM table LIMIT 0" / ALTER TABLE round-trip
+    behaves like a real Snowflake schema instead of a no-op stub."""
+
     def __init__(self, conn: _FakeConnection) -> None:
         self.conn = conn
+        self.description: list[tuple[str]] = []
 
     def execute(self, query: str, params=None) -> None:
         self.conn.executed.append((query, params))
+        self.description = []
+
+        create_match = _CREATE_RE.match(query)
+        if create_match:
+            table, columns_sql = create_match.groups()
+            self.conn.tables.setdefault(
+                table, [c.strip().split(" ")[0] for c in columns_sql.split(",")]
+            )
+            return
+
+        select_match = _SELECT_RE.match(query)
+        if select_match:
+            table = select_match.group(1)
+            self.description = [(col,) for col in self.conn.tables.get(table, [])]
+            return
+
+        alter_match = _ALTER_RE.match(query)
+        if alter_match:
+            table, col = alter_match.groups()
+            self.conn.tables.setdefault(table, []).append(col)
 
     def close(self) -> None:
         pass
@@ -32,6 +63,7 @@ class _FakeCursor:
 class _FakeConnection:
     def __init__(self) -> None:
         self.executed: list[tuple[str, object]] = []
+        self.tables: dict[str, list[str]] = {}
 
     def cursor(self) -> _FakeCursor:
         return _FakeCursor(self)
@@ -56,7 +88,7 @@ def fake_snowflake(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         "snowflake.connector.pandas_tools.write_pandas", fake_write_pandas
     )
-    monkeypatch.delenv("TENANT", raising=False)
+    monkeypatch.delenv("TENANCY", raising=False)
     return conn, connect_calls, write_pandas_calls
 
 
@@ -104,7 +136,7 @@ def test_snowflake_workload_identity_auth_passthrough(fake_snowflake) -> None:
     assert "password" not in kwargs
 
 
-def test_snowflake_truncate_creates_table_and_deletes_tenant_rows(
+def test_snowflake_truncate_creates_table_and_deletes_tenancy_rows(
     fake_snowflake,
 ) -> None:
     conn, _, write_pandas_calls = fake_snowflake
@@ -116,13 +148,13 @@ def test_snowflake_truncate_creates_table_and_deletes_tenant_rows(
     assert len(create_stmts) == 1
     assert "DB.SCHEMA.HOSTS" in create_stmts[0]
     assert delete_stmts == [
-        ("DELETE FROM DB.SCHEMA.HOSTS WHERE TENANT = %s", ("default",))
+        ("DELETE FROM DB.SCHEMA.HOSTS WHERE TENANCY = %s", ("default",))
     ]
 
     assert len(write_pandas_calls) == 1
     call = write_pandas_calls[0]
     assert call["table_name"] == "HOSTS"
-    assert (call["df"]["tenant"] == "default").all()
+    assert (call["df"]["tenancy"] == "default").all()
 
 
 def test_snowflake_append_skips_delete(fake_snowflake) -> None:
@@ -135,17 +167,17 @@ def test_snowflake_append_skips_delete(fake_snowflake) -> None:
     assert len(write_pandas_calls) == 1
 
 
-def test_snowflake_tenant_env_var_used(fake_snowflake, monkeypatch) -> None:
+def test_snowflake_tenancy_env_var_used(fake_snowflake, monkeypatch) -> None:
     conn, _, write_pandas_calls = fake_snowflake
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     store = SnowflakeStorage(_BASE_CONFIG)
     store.write(_DF, "hosts", mode="truncate")
 
     delete_stmts = [(q, p) for q, p in conn.executed if q.startswith("DELETE")]
     assert delete_stmts == [
-        ("DELETE FROM DB.SCHEMA.HOSTS WHERE TENANT = %s", ("acme",))
+        ("DELETE FROM DB.SCHEMA.HOSTS WHERE TENANCY = %s", ("acme",))
     ]
-    assert (write_pandas_calls[0]["df"]["tenant"] == "acme").all()
+    assert (write_pandas_calls[0]["df"]["tenancy"] == "acme").all()
 
 
 def test_snowflake_empty_dataframe_skips_write_pandas(fake_snowflake) -> None:
@@ -153,3 +185,29 @@ def test_snowflake_empty_dataframe_skips_write_pandas(fake_snowflake) -> None:
     store = SnowflakeStorage(_BASE_CONFIG)
     store.write(pd.DataFrame({"a": [], "b": []}), "hosts", mode="truncate")
     assert write_pandas_calls == []
+
+
+def test_snowflake_adds_new_column_to_existing_table(fake_snowflake) -> None:
+    conn, _, _ = fake_snowflake
+    store = SnowflakeStorage(_BASE_CONFIG)
+    store.write(_DF, "hosts", mode="truncate")
+
+    wider = _DF.copy()
+    wider["c"] = ["p", "q"]
+    store.write(wider, "hosts", mode="truncate")
+
+    alter_stmts = [q for q, _ in conn.executed if q.startswith("ALTER TABLE")]
+    assert any("ADD COLUMN C " in q for q in alter_stmts)
+
+
+def test_snowflake_warns_on_missing_column(
+    fake_snowflake, caplog: pytest.LogCaptureFixture
+) -> None:
+    store = SnowflakeStorage(_BASE_CONFIG)
+    store.write(_DF, "hosts", mode="truncate")
+
+    narrower = _DF[["a"]]
+    with caplog.at_level("WARNING"):
+        store.write(narrower, "hosts", mode="truncate")
+
+    assert any("'B'" in record.getMessage() for record in caplog.records)

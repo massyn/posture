@@ -1,13 +1,20 @@
 """BigQuery storage: one project/dataset, one table per name.
 
-Every row carries a "tenant" column (see TableStorage) plus an
-"upload_timestamp". "truncate" is tenant-scoped, not table-scoped: it
-deletes only that tenant's existing rows before loading the fresh set,
-leaving other tenants' rows in the same table untouched. "append" skips the
+Every row carries a "tenancy" column (see TableStorage) plus an
+"upload_timestamp". "truncate" is tenancy-scoped, not table-scoped: it
+deletes only that tenancy's existing rows before loading the fresh set,
+leaving other tenancies' rows in the same table untouched. "append" skips the
 delete and just loads on top of whatever's already there.
 
 No tmp-table/rename dance for atomicity — a load job is one BigQuery
 operation; a failed load doesn't touch the table's existing rows.
+
+Schema evolution: a column present in ``df`` but not yet in the table is
+added automatically by the load job itself (``ALLOW_FIELD_ADDITION``); a
+column present in the table but missing from ``df`` is left untouched
+(BigQuery never drops it — a load just leaves that column NULL for the new
+rows) — logged as a warning so a disappearing upstream field doesn't go
+unnoticed.
 """
 
 from __future__ import annotations
@@ -99,12 +106,13 @@ class BigQueryStorage(TableStorage):
         if df.empty:
             return
 
-        df = self._add_tenant_column(df)
+        df = self._add_tenancy_column(df)
         df["upload_timestamp"] = pd.Timestamp.now(tz=timezone.utc).tz_localize(None)
         df = _coerce_for_load(df)
+        self._warn_on_missing_columns(table_id, df.columns)
 
         if recreate:
-            self._delete_tenant_rows(table_id, self._tenant)
+            self._delete_tenancy_rows(table_id, self._tenancy)
 
         schema = [bigquery.SchemaField(col, _bq_type(df[col])) for col in df.columns]
         job_config = bigquery.LoadJobConfig(
@@ -117,16 +125,35 @@ class BigQueryStorage(TableStorage):
         )
         self._load_with_retry(df, table_id, job_config)
 
-    def _delete_tenant_rows(self, table_id: str, tenant: str) -> None:
+    def _warn_on_missing_columns(self, table_id: str, df_columns: Any) -> None:
+        from google.api_core.exceptions import NotFound
+
+        try:
+            table = self._client.get_table(table_id)
+        except NotFound:
+            return  # table doesn't exist yet — the load below creates it
+
+        missing_cols = {field.name for field in table.schema} - set(df_columns)
+        if missing_cols:
+            logger.warning(
+                "BigQuery table '%s' has column(s) %s not present in this write; "
+                "leaving them untouched",
+                table_id,
+                sorted(missing_cols),
+            )
+
+    def _delete_tenancy_rows(self, table_id: str, tenancy: str) -> None:
         from google.api_core.exceptions import NotFound
 
         bigquery = self._bigquery
         delete_config = bigquery.QueryJobConfig(
-            query_parameters=[bigquery.ScalarQueryParameter("tenant", "STRING", tenant)]
+            query_parameters=[
+                bigquery.ScalarQueryParameter("tenancy", "STRING", tenancy)
+            ]
         )
         try:
             self._client.query(
-                f"DELETE FROM `{table_id}` WHERE tenant = @tenant",
+                f"DELETE FROM `{table_id}` WHERE tenancy = @tenancy",
                 job_config=delete_config,
             ).result()
         except NotFound:

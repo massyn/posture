@@ -153,8 +153,8 @@ print(f"Wrote {len(df)} hosts to output/default/hosts.json")
 ```python
 from posture import write_storage
 
-write_storage(df, "csv", "hosts", config={"path": "output"})                 # output/<tenant>/hosts.csv
-write_storage(df, "parquet", "hosts", config={"path": "output"})             # output/<tenant>/hosts.parquet
+write_storage(df, "csv", "hosts", config={"path": "output"})                 # output/<tenancy>/hosts.csv
+write_storage(df, "parquet", "hosts", config={"path": "output"})             # output/<tenancy>/hosts.parquet
 write_storage(df, "sqlite", "hosts", config={"path": "output/posture.db"})   # table "hosts"
 write_storage(df, "duckdb", "hosts", config={"path": "output/posture.duckdb"})  # table "hosts"
 write_storage(df, "postgres", "hosts", config={"dsn": "postgresql://..."})   # table "hosts"
@@ -162,8 +162,8 @@ write_storage(                                                               # s
     df, "postgres", "hosts",
     config={"host": "...", "dbname": "...", "user": "...", "password": "..."},
 )
-write_storage(df, "gcs", "hosts", config={"bucket": "my-bucket"})            # gs://my-bucket/hosts/<tenant>.parquet
-write_storage(df, "s3", "hosts", config={"bucket": "my-bucket"})             # s3://my-bucket/hosts/<tenant>.parquet
+write_storage(df, "gcs", "hosts", config={"bucket": "my-bucket"})            # gs://my-bucket/hosts/<tenancy>.parquet
+write_storage(df, "s3", "hosts", config={"bucket": "my-bucket"})             # s3://my-bucket/hosts/<tenancy>.parquet
 write_storage(df, "bigquery", "hosts", config={"project_id": "...", "dataset_id": "..."})  # table "hosts"
 write_storage(                                                               # snowflake
     df, "snowflake", "hosts",
@@ -184,26 +184,26 @@ explicitly) — `dsn` takes precedence if both are given.
 posture[gcs]` / `posture[s3]` / `posture[bigquery]` / `posture[snowflake]` — see
 [Installation](#installation)) and authenticate the way their respective SDK always does
 (Application Default Credentials for `gcs`/`bigquery`; the standard boto3 credential
-chain for `s3`). `snowflake` has no default `authenticator` — every tenant states its own
+chain for `s3`). `snowflake` has no default `authenticator` — every tenancy states its own
 auth method (`"SNOWFLAKE"` for password, `"WORKLOAD_IDENTITY"` with a
 `workload_identity_provider`, key-pair via `private_key_file`, etc.) explicitly via config
 or `POSTURE_SNOWFLAKE_AUTHENTICATOR`; `role`/`warehouse` are optional with no
-tenant-specific default either — omit them to use the connecting user's own account
+tenancy-specific default either — omit them to use the connecting user's own account
 defaults.
 
 `gcs`/`s3` own an opinionated object-key layout rather than taking a `path` prefix —
-`<name>/<tenant>.parquet` for `truncate`, where `tenant` comes from the `TENANT` env var
+`<name>/<tenancy>.parquet` for `truncate`, where `tenancy` comes from the `TENANCY` env var
 (default `"default"`). For `append`:
 
-- `gcs` — `<name>/<tenant>/<YYYY-MM-DD>.parquet`
-- `s3` — `<name>/<tenant>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<name>.parquet`, Hive-style
+- `gcs` — `<name>/<tenancy>/<YYYY-MM-DD>.parquet`
+- `s3` — `<name>/<tenancy>/YEAR=<yyyy>/MONTH=<mm>/DAY=<dd>/<name>.parquet`, Hive-style
   partitioning so the output is directly queryable by Athena/Glue without a separate
   partition-projection config.
 
 `mode` controls both overwrite behaviour and history. For the local file backends
-(`csv`/`json`/`parquet`), every path is rooted `<path>/<tenant>/<name>...` — tenant
-first, then table name, then date — from the `TENANT` env var (default `"default"`), so
-a query engine like DuckDB can glob/prune by tenant without touching other tenants'
+(`csv`/`json`/`parquet`), every path is rooted `<path>/<tenancy>/<name>...` — tenancy
+first, then table name, then date — from the `TENANCY` env var (default `"default"`), so
+a query engine like DuckDB can glob/prune by tenancy without touching other tenancies'
 files:
 
 - `"truncate"` (the default — latest load is all posture cares about by default) —
@@ -211,13 +211,20 @@ files:
 - `"append"` — keeps a dated snapshot per day: `output/default/hosts/2026/08/22/hosts.csv`.
 
 For the database backends (`sqlite`/`duckdb`/`postgres`/`bigquery`/`snowflake`), every row also
-carries a `tenant` column (from the `TENANT` env var), so a table can be shared by
-several tenants without one tenant's write clobbering another's rows — `"truncate"` here
-means tenant-scoped, not table-scoped: it deletes only the current tenant's existing
-rows before inserting the fresh set, leaving other tenants' rows in the same table
+carries a `tenancy` column (from the `TENANCY` env var), so a table can be shared by
+several tenancies without one tenancy's write clobbering another's rows — `"truncate"` here
+means tenancy-scoped, not table-scoped: it deletes only the current tenancy's existing
+rows before inserting the fresh set, leaving other tenancies' rows in the same table
 untouched. `"append"` just inserts on top of whatever's already there. Either way, opt
 into `"append"` deliberately — it has real storage growth implications the default
 doesn't.
+
+The database backends also evolve the table's schema across runs rather than requiring
+it to stay fixed: a column present in the DataFrame but not yet in the table is added
+(`ALTER TABLE ADD COLUMN`, or BigQuery's own `ALLOW_FIELD_ADDITION` load option); a
+column present in the table but missing from the current DataFrame is left untouched —
+never dropped — just logged as a warning, since a disappearing column usually means an
+upstream field went away rather than something this library should act on unasked.
 
 Every file write goes through a temp file and an atomic rename, so a failure partway
 through never leaves a broken file at the real path. For a paginated collection, use

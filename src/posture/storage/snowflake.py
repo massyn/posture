@@ -3,32 +3,41 @@
 Every credential and connection setting is resolved from config/env vars —
 none of it is hardcoded. In particular ``authenticator`` (password,
 key-pair, workload identity, OAuth, ...) has no default: a generic library
-can't assume a tenant's auth method, so it must be stated explicitly, either
+can't assume a tenancy's auth method, so it must be stated explicitly, either
 via config or ``POSTURE_SNOWFLAKE_AUTHENTICATOR``. ``role``/``warehouse``
 are optional with no default — if unset, Snowflake falls back to the
 connecting user's own account defaults rather than this library guessing a
-tenant-specific name. ``schema`` IS required (unlike role/warehouse) because
+tenancy-specific name. ``schema`` IS required (unlike role/warehouse) because
 this backend's own generated SQL (CREATE TABLE/DELETE) has to fully qualify
 `database.schema.table` itself — there's no "session default" to fall back
 to for statements this class builds.
 
-Every row carries a "tenant" column (see TableStorage), so "truncate" means
-tenant-scoped: DELETE rows for the current tenant, then insert the fresh
-set, leaving other tenants' rows in the same table untouched. "append" just
+Every row carries a "tenancy" column (see TableStorage), so "truncate" means
+tenancy-scoped: DELETE rows for the current tenancy, then insert the fresh
+set, leaving other tenancies' rows in the same table untouched. "append" just
 inserts.
 
 No tmp-table/rename dance for atomicity — write_pandas() is Snowflake's own
 bulk-load primitive; a failed load doesn't touch the table's existing rows.
+
+Schema evolution: a column present in ``df`` but not yet in the table is
+added (``ALTER TABLE ADD COLUMN``); a column present in the table but
+missing from ``df`` is left untouched (never dropped) — just logged as a
+warning, since it usually means an upstream field disappeared rather than
+something this library should act on unasked.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 
 import pandas as pd
 
 from posture.exceptions import StorageConfigError
 from posture.storage.base import TableStorage
+
+logger = logging.getLogger("posture.storage.snowflake")
 
 # Optional connect() kwargs, resolved from config/env if present and passed
 # through verbatim — covers password auth (user/password), key-pair auth
@@ -111,12 +120,13 @@ class SnowflakeStorage(TableStorage):
     def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
         from snowflake.connector.pandas_tools import write_pandas
 
-        df = self._add_tenant_column(df)
+        df = self._add_tenancy_column(df)
         table_name = name.upper()
 
         self._create_table_if_missing(table_name, df)
+        self._sync_columns(table_name, df)
         if recreate:
-            self._delete_tenant_rows(table_name)
+            self._delete_tenancy_rows(table_name)
         if df.empty:
             return
 
@@ -146,12 +156,48 @@ class SnowflakeStorage(TableStorage):
         finally:
             cur.close()
 
-    def _delete_tenant_rows(self, table_name: str) -> None:
+    def _sync_columns(self, table_name: str, df: pd.DataFrame) -> None:
+        cur = self._conn.cursor()
+        try:
+            cur.execute(f"SELECT * FROM {self._table_ref(table_name)} LIMIT 0")
+            existing = {desc[0] for desc in cur.description}
+        finally:
+            cur.close()
+
+        # Snowflake normalises unquoted identifiers to uppercase, so compare
+        # (and add) against df's uppercased names, matching what
+        # _create_table_if_missing already created them as.
+        df_cols_upper = {col.upper(): col for col in df.columns}
+        new_cols = [
+            orig for upper, orig in df_cols_upper.items() if upper not in existing
+        ]
+        missing_cols = existing - set(df_cols_upper)
+
+        if new_cols:
+            cur = self._conn.cursor()
+            try:
+                for col in new_cols:
+                    cur.execute(
+                        f"ALTER TABLE {self._table_ref(table_name)} "
+                        f"ADD COLUMN {col.upper()} {_sf_type(df[col])}"
+                    )
+            finally:
+                cur.close()
+
+        if missing_cols:
+            logger.warning(
+                "snowflake table '%s' has column(s) %s not present in this write; "
+                "leaving them untouched",
+                table_name,
+                sorted(missing_cols),
+            )
+
+    def _delete_tenancy_rows(self, table_name: str) -> None:
         cur = self._conn.cursor()
         try:
             cur.execute(
-                f"DELETE FROM {self._table_ref(table_name)} WHERE TENANT = %s",
-                (self._tenant,),
+                f"DELETE FROM {self._table_ref(table_name)} WHERE TENANCY = %s",
+                (self._tenancy,),
             )
         finally:
             cur.close()

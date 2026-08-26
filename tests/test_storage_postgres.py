@@ -48,10 +48,10 @@ def test_write_storage_postgres_truncate(table_name: str) -> None:
     result = _read(table_name)
     assert list(result["a"]) == [1, 2]
     assert list(result["b"]) == ["x", "y"]
-    assert (result["tenant"] == "default").all()
+    assert (result["tenancy"] == "default").all()
 
 
-def test_write_storage_postgres_truncate_replaces_current_tenant(
+def test_write_storage_postgres_truncate_replaces_current_tenancy(
     table_name: str,
 ) -> None:
     write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
@@ -63,16 +63,16 @@ def test_write_storage_postgres_truncate_replaces_current_tenant(
     assert list(result["a"]) == [9]
 
 
-def test_write_storage_postgres_truncate_only_clears_current_tenant(
+def test_write_storage_postgres_truncate_only_clears_current_tenancy(
     table_name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
 
-    monkeypatch.setenv("TENANT", "other")
+    monkeypatch.setenv("TENANCY", "other")
     write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
 
-    monkeypatch.setenv("TENANT", "acme")
+    monkeypatch.setenv("TENANCY", "acme")
     smaller = pd.DataFrame({"a": [9], "b": ["z"]})
     write_storage(
         smaller, "postgres", table_name, config={"dsn": _DSN}, mode="truncate"
@@ -80,7 +80,7 @@ def test_write_storage_postgres_truncate_only_clears_current_tenant(
 
     result = _read(table_name)
     assert len(result) == 3  # 1 "acme" row (replaced) + 2 "other" rows (untouched)
-    assert set(result["tenant"]) == {"acme", "other"}
+    assert set(result["tenancy"]) == {"acme", "other"}
 
 
 def test_write_storage_postgres_append(table_name: str) -> None:
@@ -89,6 +89,27 @@ def test_write_storage_postgres_append(table_name: str) -> None:
     write_storage(more, "postgres", table_name, config={"dsn": _DSN}, mode="append")
     result = _read(table_name)
     assert len(result) == 3
+
+
+def test_postgres_adds_new_column_to_existing_table(table_name: str) -> None:
+    write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
+    wider = _DF.copy()
+    wider["c"] = ["p", "q"]
+    write_storage(wider, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
+    result = _read(table_name)
+    assert list(result["c"]) == ["p", "q"]
+
+
+def test_postgres_warns_on_missing_column(
+    table_name: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    write_storage(_DF, "postgres", table_name, config={"dsn": _DSN}, mode="truncate")
+    narrower = _DF[["a"]]
+    with caplog.at_level("WARNING"):
+        write_storage(
+            narrower, "postgres", table_name, config={"dsn": _DSN}, mode="truncate"
+        )
+    assert any("'b'" in record.getMessage() for record in caplog.records)
 
 
 def test_write_page_truncate_first_page_only(table_name: str) -> None:

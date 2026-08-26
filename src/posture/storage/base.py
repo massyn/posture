@@ -3,7 +3,7 @@ by every local file-backed storage backend (csv/json/parquet).
 
 One Storage instance = one target location (a base directory, or — for
 sqlite — one database file), matching Collector's "one instance = one
-tenant" convention.
+tenancy" convention.
 
 Two write methods, mirroring Collector.collect()/collect_page():
 
@@ -14,15 +14,15 @@ Two write methods, mirroring Collector.collect()/collect_page():
   holding a whole resource in memory. Each call writes its own
   uniquely-named file under a per-``name`` directory.
 
-Path layout, driven by ``mode`` and the ``TENANT`` env var (default
-"default") — tenant first, then table name, then date, so a DuckDB query
-over ``<path>/<tenant>/<name>/**/*.<ext>`` can prune on tenant without
-touching other tenants' files:
+Path layout, driven by ``mode`` and the ``TENANCY`` env var (default
+"default") — tenancy first, then table name, then date, so a DuckDB query
+over ``<path>/<tenancy>/<name>/**/*.<ext>`` can prune on tenancy without
+touching other tenancies' files:
 
-- truncate, write():       <path>/<tenant>/<name>.<ext>                              (overwritten every run)
-- truncate, write_page():  <path>/<tenant>/<name>/<uuid>.<ext>                        (directory cleared on the run's first page)
-- append,   write():       <path>/<tenant>/<name>/<YYYY>/<MM>/<DD>/<name>.<ext>       (one snapshot per day)
-- append,   write_page():  <path>/<tenant>/<name>/<YYYY>/<MM>/<DD>/<uuid>.<ext>       (history is never cleared)
+- truncate, write():       <path>/<tenancy>/<name>.<ext>                              (overwritten every run)
+- truncate, write_page():  <path>/<tenancy>/<name>/<uuid>.<ext>                        (directory cleared on the run's first page)
+- append,   write():       <path>/<tenancy>/<name>/<YYYY>/<MM>/<DD>/<name>.<ext>       (one snapshot per day)
+- append,   write_page():  <path>/<tenancy>/<name>/<YYYY>/<MM>/<DD>/<uuid>.<ext>       (history is never cleared)
 
 Errors: a missing/invalid config value or `mode` raises StorageConfigError
 (also a ValueError, for backward compatibility); anything that goes wrong
@@ -116,14 +116,14 @@ class Storage(_ConfigResolverMixin, ABC):
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
         self._base_dir = Path(self._config["path"])
-        self._tenant = os.environ.get("TENANT", "default")
+        self._tenancy = os.environ.get("TENANCY", "default")
         # Tracks which (name) directories have already been cleared for a
         # truncating paginated write this run, so only the first page of a
         # given name wipes prior contents — later pages just add to it.
         self._truncated_dirs: set[str] = set()
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(path={self._base_dir!s}, tenant={self._tenant!s})"
+        return f"{self.__class__.__name__}(path={self._base_dir!s}, tenancy={self._tenancy!s})"
 
     def write(self, df: pd.DataFrame, name: str, *, mode: str = "truncate") -> None:
         """Write the whole of ``df`` as a single file."""
@@ -148,25 +148,25 @@ class Storage(_ConfigResolverMixin, ABC):
         path = self._path_for(name, mode=mode, paginated=True)
         self._atomic_write(df, path)
 
-    def _tenant_name_dir(self, name: str) -> Path:
-        return self._base_dir / self._tenant / name
+    def _tenancy_name_dir(self, name: str) -> Path:
+        return self._base_dir / self._tenancy / name
 
     def _dated_dir(self, name: str) -> Path:
         today = datetime.now(timezone.utc).date()
         return (
-            self._tenant_name_dir(name) / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}"
+            self._tenancy_name_dir(name) / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}"
         )
 
     def _page_dir(self, name: str, *, mode: str) -> Path:
         return (
-            self._dated_dir(name) if mode == "append" else self._tenant_name_dir(name)
+            self._dated_dir(name) if mode == "append" else self._tenancy_name_dir(name)
         )
 
     def _path_for(self, name: str, *, mode: str, paginated: bool) -> Path:
         if not paginated:
             if mode == "append":
                 return self._dated_dir(name) / f"{name}.{self.extension}"
-            return self._base_dir / self._tenant / f"{name}.{self.extension}"
+            return self._base_dir / self._tenancy / f"{name}.{self.extension}"
         return self._page_dir(name, mode=mode) / f"{uuid.uuid4().hex}.{self.extension}"
 
     @staticmethod
@@ -206,29 +206,29 @@ class TableStorage(_ConfigResolverMixin, ABC):
     use Storage's directory/pagination path layout — but they share the
     exact same truncate-on-first-page tracking Storage.write_page() uses.
 
-    Every table written through this base carries a "tenant" column (from
-    the TENANT env var, default "default") — so a table can be shared by
-    several tenants without one tenant's write clobbering another's rows.
-    Because of that, "truncate" here means tenant-scoped, not table-scoped:
+    Every table written through this base carries a "tenancy" column (from
+    the TENANCY env var, default "default") — so a table can be shared by
+    several tenancies without one tenancy's write clobbering another's rows.
+    Because of that, "truncate" here means tenancy-scoped, not table-scoped:
     subclasses implement ``_write_table(df, name, recreate=...)`` such that
-    ``recreate=True`` deletes only the current tenant's existing rows before
-    inserting the fresh set (table structure/other tenants' rows untouched);
+    ``recreate=True`` deletes only the current tenancy's existing rows before
+    inserting the fresh set (table structure/other tenancies' rows untouched);
     ``recreate=False`` just inserts on top of whatever's already there. Use
-    ``self._tenant`` and ``self._add_tenant_column(df)`` from subclasses
+    ``self._tenancy`` and ``self._add_tenancy_column(df)`` from subclasses
     rather than reading the env var directly, so the convention stays in one
     place.
     """
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self._config = self._resolve_config(config or {})
-        self._tenant = os.environ.get("TENANT", "default")
+        self._tenancy = os.environ.get("TENANCY", "default")
         # Tracks which tables this run has already recreated, so only the
         # first page of a truncating write_page() clears prior rows.
         self._truncated_tables: set[str] = set()
 
-    def _add_tenant_column(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _add_tenancy_column(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
-        df["tenant"] = self._tenant
+        df["tenancy"] = self._tenancy
         return df
 
     def write(self, df: pd.DataFrame, name: str, *, mode: str = "truncate") -> None:
