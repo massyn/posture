@@ -78,6 +78,24 @@ into one DataFrame — so both share the same all-or-nothing guarantee: if colle
 fails partway through, an exception propagates and no partial data is left for the
 caller to mistake for a complete snapshot.
 
+`write_page()` writes each page as its own file. For parquet specifically, use
+`write_stream()` instead to append every page as a row group of one single output
+file rather than one file per page:
+
+```python
+from posture import Storage
+
+store = Storage("parquet", {"path": "output"})
+with store.write_stream("machine_vulnerabilities") as stream:
+    for df in ccm.collect_page("machine_vulnerabilities"):
+        stream.write(df)
+```
+
+The file is only finalised (renamed into place) when the `with` block exits without
+an exception — same atomic-write guarantee as every other backend. `write_stream()`
+is parquet-only; every other backend keeps `write_page()`'s one-file-per-page
+behaviour.
+
 ### Discovering what's available
 
 ```python

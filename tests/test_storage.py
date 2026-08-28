@@ -122,6 +122,79 @@ def test_write_storage_parquet(tmp_path: Path) -> None:
     assert result.drop(columns=["upload_timestamp"]).equals(_DF)
 
 
+def test_parquet_write_stream_truncate(tmp_path: Path) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    page1 = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+    page2 = pd.DataFrame({"a": [3], "b": ["z"]})
+    with store.write_stream("hosts") as stream:
+        stream.write(page1)
+        stream.write(page2)
+    out = tmp_path / "default" / "hosts.parquet"
+    assert out.exists()
+    assert not out.with_suffix(".parquet.tmp").exists()
+    result = pd.read_parquet(out)
+    assert (
+        result.drop(columns=["upload_timestamp"])
+        .reset_index(drop=True)
+        .equals(pd.concat([page1, page2], ignore_index=True))
+    )
+    assert result["upload_timestamp"].notna().all()
+
+
+def test_parquet_write_stream_truncate_overwrites(tmp_path: Path) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    with store.write_stream("hosts") as stream:
+        stream.write(pd.DataFrame({"a": [1, 2], "b": ["x", "y"]}))
+    smaller = pd.DataFrame({"a": [9], "b": ["z"]})
+    with store.write_stream("hosts") as stream:
+        stream.write(smaller)
+    out = tmp_path / "default" / "hosts.parquet"
+    result = pd.read_parquet(out)
+    assert result.drop(columns=["upload_timestamp"]).equals(smaller)
+
+
+def test_parquet_write_stream_append_is_dated(tmp_path: Path) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    with store.write_stream("hosts", mode="append") as stream:
+        stream.write(_DF)
+    today = datetime.now(timezone.utc).date()
+    out = (
+        tmp_path
+        / "default"
+        / "hosts"
+        / f"{today:%Y}"
+        / f"{today:%m}"
+        / f"{today:%d}"
+        / "hosts.parquet"
+    )
+    assert out.exists()
+    result = pd.read_parquet(out)
+    assert result.drop(columns=["upload_timestamp"]).equals(_DF)
+
+
+def test_parquet_write_stream_aborts_on_exception(tmp_path: Path) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    with pytest.raises(RuntimeError), store.write_stream("hosts") as stream:
+        stream.write(_DF)
+        raise RuntimeError("boom")
+    out = tmp_path / "default" / "hosts.parquet"
+    assert not out.exists()
+
+
+def test_parquet_write_stream_empty_writes_nothing(tmp_path: Path) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    with store.write_stream("hosts"):
+        pass
+    out = tmp_path / "default" / "hosts.parquet"
+    assert not out.exists()
+
+
+def test_parquet_write_stream_invalid_mode(tmp_path: Path) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    with pytest.raises(StorageConfigError, match="Invalid mode"):
+        store.write_stream("hosts", mode="bogus")
+
+
 def test_write_storage_invalid_mode(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Invalid mode"):
         write_storage(_DF, "csv", "hosts", config={"path": str(tmp_path)}, mode="bogus")
@@ -196,7 +269,20 @@ def test_write_page_truncate_accumulates_within_run(tmp_path: Path) -> None:
     assert len(files) == 2
 
 
-def test_write_page_append_never_clears(tmp_path: Path) -> None:
+def test_write_page_append_accumulates_within_a_run(tmp_path: Path) -> None:
+    store = CsvStorage({"path": str(tmp_path)})
+    store.write_page(_DF, "hosts", mode="append")
+    today = datetime.now(timezone.utc).date()
+    page_dir = (
+        tmp_path / "default" / "hosts" / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}"
+    )
+    assert len(list(page_dir.iterdir())) == 1
+
+    store.write_page(_DF, "hosts", mode="append")
+    assert len(list(page_dir.iterdir())) == 2
+
+
+def test_write_page_append_clears_todays_dir_on_new_run(tmp_path: Path) -> None:
     store = CsvStorage({"path": str(tmp_path)})
     store.write_page(_DF, "hosts", mode="append")
     today = datetime.now(timezone.utc).date()
@@ -207,7 +293,7 @@ def test_write_page_append_never_clears(tmp_path: Path) -> None:
 
     store2 = CsvStorage({"path": str(tmp_path)})
     store2.write_page(_DF, "hosts", mode="append")
-    assert len(list(page_dir.iterdir())) == 2
+    assert len(list(page_dir.iterdir())) == 1
 
 
 def test_write_page_tenancy_env_var(

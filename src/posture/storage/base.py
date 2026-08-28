@@ -22,7 +22,7 @@ touching other tenancies' files:
 - truncate, write():       <path>/<tenancy>/<name>.<ext>                              (overwritten every run)
 - truncate, write_page():  <path>/<tenancy>/<name>/<uuid>.<ext>                        (directory cleared on the run's first page)
 - append,   write():       <path>/<tenancy>/<name>/<YYYY>/<MM>/<DD>/<name>.<ext>       (one snapshot per day)
-- append,   write_page():  <path>/<tenancy>/<name>/<YYYY>/<MM>/<DD>/<uuid>.<ext>       (history is never cleared)
+- append,   write_page():  <path>/<tenancy>/<name>/<YYYY>/<MM>/<DD>/<uuid>.<ext>       (that day's dir cleared on the run's first page)
 
 Errors: a missing/invalid config value or `mode` raises StorageConfigError
 (also a ValueError, for backward compatibility); anything that goes wrong
@@ -121,9 +121,10 @@ class Storage(_ConfigResolverMixin, ABC):
         # row/page written through this instance carries the same value,
         # rather than the moment each individual file happens to be written.
         self._upload_timestamp = pd.Timestamp.now(tz=timezone.utc).tz_localize(None)
-        # Tracks which (name) directories have already been cleared for a
-        # truncating paginated write this run, so only the first page of a
-        # given name wipes prior contents — later pages just add to it.
+        # Tracks which (name) page directories have already been cleared this
+        # run, so only the first page of a given name wipes prior contents —
+        # later pages just add to it. Applies to both modes: truncate clears
+        # the whole <name> dir, append clears just today's dated subdir.
         self._truncated_dirs: set[str] = set()
 
     def __repr__(self) -> str:
@@ -147,13 +148,16 @@ class Storage(_ConfigResolverMixin, ABC):
         """Write one page of ``name`` as its own uniquely-named file.
 
         Call once per page from a loop over Collector.collect_page() rather
-        than materialising the whole resource first. On a truncating run,
-        the first page for a given ``name`` clears out any files left by a
-        previous run before writing; append mode never clears anything.
+        than materialising the whole resource first. The first page for a
+        given ``name`` clears out any files already in its target directory
+        before writing — the whole ``<name>`` directory in truncate mode, or
+        just that day's ``<YYYY>/<MM>/<DD>`` directory in append mode — so
+        re-running the same day doesn't accumulate duplicate uuid-named
+        files; later pages in the same run just add to it.
         """
         _check_mode(mode, source=self.env_prefix.lower())
         df = self._add_upload_timestamp(df)
-        if mode == "truncate" and name not in self._truncated_dirs:
+        if name not in self._truncated_dirs:
             self._clear_dir(self._page_dir(name, mode=mode))
             self._truncated_dirs.add(name)
         path = self._path_for(name, mode=mode, paginated=True)

@@ -22,6 +22,11 @@ an explicit type is more useful than a string:
 
     csv_store = CsvStorage({"path": "./data"})
 
+``ParquetStorage`` additionally exposes ``write_stream()``, which appends each
+page as a row group of one output file instead of writing one file per page
+(see its docstring) — parquet-only, not part of the common ``StorageBackend``
+interface every other backend satisfies.
+
 No backend module is imported until it's actually used — same lazy-import
 convention as ``posture.CCM``/``catalog()`` use for collectors — so
 ``import posture`` never pays for ``psycopg``/``duckdb``/``pyarrow`` unless
