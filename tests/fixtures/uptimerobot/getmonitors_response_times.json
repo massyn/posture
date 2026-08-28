@@ -1,0 +1,19 @@
+{
+  "stat": "ok",
+  "pagination": { "offset": 0, "limit": 50, "total": 2 },
+  "monitors": [
+    {
+      "id": 803132719,
+      "friendly_name": "bouts.co.za",
+      "response_times": [
+        { "datetime": 1787860500, "value": 1330 },
+        { "datetime": 1787860200, "value": 1353 }
+      ]
+    },
+    {
+      "id": 803853842,
+      "friendly_name": "budget.massyn.net",
+      "response_times": [{ "datetime": 1787860500, "value": 210 }]
+    }
+  ]
+}

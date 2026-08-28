@@ -93,6 +93,13 @@
 - [roles](collectors/google_workspace.md#roles)
 - [users](collectors/google_workspace.md#users)
 
+## [Healthchecks.io](collectors/healthchecks.md)
+
+[Credentials](credentials/healthchecks.md)
+
+- [checks](collectors/healthchecks.md#checks)
+- [flips](collectors/healthchecks.md#flips)
+
 ## [Jamf](collectors/jamf.md)
 
 [Credentials](credentials/jamf.md)
@@ -161,6 +168,18 @@
 - [team_settings](collectors/teams.md#team_settings)
 - [teams](collectors/teams.md#teams)
 - [user_activity](collectors/teams.md#user_activity)
+
+## [Miro](collectors/miro.md)
+
+[Credentials](credentials/miro.md)
+
+- [audit_logs](collectors/miro.md#audit_logs)
+- [board_classifications](collectors/miro.md#board_classifications)
+- [board_members](collectors/miro.md#board_members)
+- [boards](collectors/miro.md#boards)
+- [org_members](collectors/miro.md#org_members)
+- [team_members](collectors/miro.md#team_members)
+- [teams](collectors/miro.md#teams)
 
 ## [Nullify](collectors/nullify.md)
 
@@ -342,6 +361,16 @@
 - [questionnaire_risks](collectors/upguard.md#questionnaire_risks)
 - [vendor_risks](collectors/upguard.md#vendor_risks)
 - [vendors](collectors/upguard.md#vendors)
+
+## [UptimeRobot](collectors/uptimerobot.md)
+
+[Credentials](credentials/uptimerobot.md)
+
+- [account](collectors/uptimerobot.md#account)
+- [alert_contacts](collectors/uptimerobot.md#alert_contacts)
+- [monitor_logs](collectors/uptimerobot.md#monitor_logs)
+- [monitor_response_times](collectors/uptimerobot.md#monitor_response_times)
+- [monitors](collectors/uptimerobot.md#monitors)
 
 ## [Vanta](collectors/vanta.md)
 

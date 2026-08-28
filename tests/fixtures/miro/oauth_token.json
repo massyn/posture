@@ -1,0 +1,7 @@
+{
+  "type": "oAuthToken",
+  "organization": { "type": "organization", "name": "Cloud", "id": "3458764558980462983" },
+  "scopes": ["boards:read", "identity:read", "team:read"],
+  "user": { "type": "user", "name": "Phil Massyn", "id": "3458764531002469347" },
+  "team": { "type": "team", "name": "Cloud", "id": "3458764531002529096" }
+}

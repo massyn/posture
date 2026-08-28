@@ -1,0 +1,11 @@
+{
+  "type": "cursor-list", "limit": 50, "size": 2, "cursor": "",
+  "data": [
+    { "id": "3458764531002469347", "type": "team-member", "role": "admin",
+      "createdAt": "2022-08-10T10:23:00Z", "createdBy": "3458764531002469347",
+      "modifiedAt": "2022-08-10T10:23:00Z", "modifiedBy": "3458764531002469347" },
+    { "id": "3458764599999999999", "type": "team-member", "role": "member",
+      "createdAt": "2025-03-01T00:00:00Z", "createdBy": "3458764531002469347",
+      "modifiedAt": "2025-03-01T00:00:00Z", "modifiedBy": "3458764531002469347" }
+  ]
+}

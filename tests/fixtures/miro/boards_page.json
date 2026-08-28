@@ -1,0 +1,68 @@
+{
+  "size": 2,
+  "offset": 0,
+  "limit": 50,
+  "total": 2,
+  "data": [
+    {
+      "id": "uXjVL8UdkRI=",
+      "type": "board",
+      "name": "CCM",
+      "description": "",
+      "createdAt": "2024-12-04T07:47:31Z",
+      "createdBy": { "id": "3458764531002469347", "type": "user", "name": "Phil Massyn" },
+      "lastOpenedAt": "2026-07-27T19:40:29Z",
+      "modifiedAt": "2026-07-25T20:48:41Z",
+      "modifiedBy": { "id": "3458764531002469347", "type": "user", "name": "Phil Massyn" },
+      "owner": { "id": "3458764531002469347", "type": "user", "name": "Phil Massyn" },
+      "policy": {
+        "permissionsPolicy": {
+          "collaborationToolsStartAccess": "all_editors",
+          "copyAccess": "anyone",
+          "sharingAccess": "team_members_with_editing_rights"
+        },
+        "sharingPolicy": {
+          "access": "private",
+          "accessPasswordRequired": false,
+          "inviteToAccountAndBoardLinkAccess": "editor",
+          "organizationAccess": "private",
+          "teamAccess": "edit"
+        }
+      },
+      "sharingPolicy": {
+        "access": "private",
+        "organizationAccess": "private",
+        "teamAccess": "edit"
+      },
+      "team": { "id": "3458764531002529096", "type": "team", "name": "Cloud" },
+      "viewLink": "https://miro.com/app/board/uXjVL8UdkRI="
+    },
+    {
+      "id": "uXjVKr2ggek=",
+      "type": "board",
+      "name": "public-roadmap",
+      "description": "shared widely",
+      "createdAt": "2025-02-01T09:00:00Z",
+      "createdBy": { "id": "3458764531002469347", "type": "user", "name": "Phil Massyn" },
+      "modifiedAt": "2026-06-10T12:00:00Z",
+      "owner": { "id": "3458764531002469347", "type": "user", "name": "Phil Massyn" },
+      "project": { "id": "proj_123", "type": "project", "name": "Roadmaps" },
+      "policy": {
+        "permissionsPolicy": {
+          "collaborationToolsStartAccess": "all_editors",
+          "copyAccess": "anyone",
+          "sharingAccess": "anyone"
+        },
+        "sharingPolicy": {
+          "access": "view",
+          "accessPasswordRequired": false,
+          "inviteToAccountAndBoardLinkAccess": "viewer",
+          "organizationAccess": "comment",
+          "teamAccess": "edit"
+        }
+      },
+      "team": { "id": "3458764531002529096", "type": "team", "name": "Cloud" },
+      "viewLink": "https://miro.com/app/board/uXjVKr2ggek="
+    }
+  ]
+}

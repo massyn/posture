@@ -970,6 +970,93 @@ why something is built the way it is, not how to configure or call it.
   every column name as a guess and verify against a real tenant's response
   before relying on this collector.
 
+- **UptimeRobot** — raw `requests` against API v2
+  (`https://api.uptimerobot.com/v2/<method>`), no vendor SDK. Every method
+  is an HTTP `POST` with a form-encoded body; the API key is an `api_key`
+  body field, not a header, so `_authenticate` establishes no session
+  state and a bad key surfaces as `UnauthorizedSignal` from `_post` on the
+  first call (a `stat: fail` body with HTTP 200 — the status code can't be
+  trusted). One fixed base URL, no tenant host, no OAuth. A read-only key
+  (`ur…` prefix) is preferred over a main key (`u…`, read + write) but both
+  work. `monitors`, `monitor_logs`, and `monitor_response_times` all hit
+  the single `getMonitors` endpoint with different expansion params —
+  `monitors` requests `custom_uptime_ratios=1-7-30-90` +
+  `all_time_uptime_ratio` and splits the dash-joined ratio/`custom_down_durations`
+  strings into `uptime_ratio_<n>d`/`down_duration_<n>d` columns at fetch
+  time (the `qualys.py`/`cortex_cloud.py` "reshape before parse.py" shape);
+  `monitor_logs`/`monitor_response_times` explode each monitor's nested
+  `logs`/`response_times` array into their own grain in `_fetch_page`
+  rather than via a `derived_from` manifest, since each needs its own
+  `getMonitors` call with its own params. `monitor_logs` is **time-window
+  scoped** because the log feed is noisy/unbounded: bare `collect()`
+  returns the trailing 48 h, overridable with a synthetic
+  `logs_window_hours` kwarg (popped before the request, never sent) or the
+  native `logs_start_date`/`logs_end_date` epoch params — the latter lets a
+  caller build a delta extractor. The two window kwargs are mutually
+  exclusive (`ValueError`). This is kwarg-driven query scoping, not
+  stateful incremental sync — no checkpoint is stored; each run is still a
+  full point-in-time pull of whatever window is asked for. `account`
+  (`getAccountDetails`, one row) and `alert_contacts` (`getAlertContacts`,
+  offset/limit on a top-level `total`) are separate simple endpoints.
+  **Live-verified** against a real account (2026-08-29): all five
+  resources' envelopes, field names, and the `stat: fail` error shape.
+
+- **Healthchecks.io** — raw `requests` against the Management API v3
+  (`https://healthchecks.io/api/v3/`), no vendor SDK. Auth is a static
+  per-project key in the `X-Api-Key` header; the collector targets the
+  **read-only** key (`hcr_` prefix), which can list checks and read flips
+  but not channels or ping detail. `api_url` is optional config
+  (default `https://healthchecks.io`, normalised) for self-hosted
+  instances — the DNSimple `endpoint` shape. `checks` is one unpaginated
+  `GET /checks/` (`{"checks": [...]}`, no envelope pagination), with
+  optional server-side `slug`/`tag` filters. `flips` (the recorded up/down
+  history, `up` = 1 recovered / 0 down) is a per-check fan-out via
+  `Collector._resumable_fanout` (`requires: "checks"`, not `derived_from` —
+  each check's flips are their own `GET /checks/<id>/flips/` call), keyed
+  by `uuid or unique_key` since the flips endpoint accepts either;
+  `_check_key`/`_check_name` injected client-side. `flips` is time-window
+  scoped (default trailing 90 days) via exactly one of `flips_window_hours`
+  (synthetic → native `seconds`), `seconds`, or `start`/`end` (the
+  since-instant / delta-extractor form). The native `seconds` param is
+  capped at 365 days server-side, so a computed lookback above that raises
+  `ValueError` rather than 400ing mid-fan-out — `start`/`end` (uncapped)
+  is the path for longer ranges. Both `uuid` and `unique_key` are declared
+  in `MANIFEST` so the collector also works with a read-write key.
+  **Live-verified** against a real project with a read-only key
+  (2026-08-29): `checks`, `flips` (`unique_key` addressing, the window
+  params, and the 365-day `seconds` cap).
+
+- **Miro** — raw `requests` against REST API v2 (`https://api.miro.com`),
+  no vendor SDK. Miro has **no client-credentials grant** (the token
+  endpoint 401s `Unsupported grant type`), so auth is a static
+  `authorization_code`-minted access token supplied as `access_token`
+  config (`MIRO_ACCESS_TOKEN`) — the app's `client_id`/`client_secret`
+  are unused. The org id every `/v2/orgs/{org_id}/...` endpoint needs is
+  discovered via a one-time `GET /v1/oauth-token` in `_authenticate`
+  (cached on the instance), the DNSimple/Crowdstrike "discover then route"
+  shape. Two pagination shapes: offset/limit with a `total` envelope
+  (`boards`, `board_members`) and Miro's `cursor`-list (`org_members`,
+  `teams`, `team_members`, `audit_logs`). Three per-item fan-outs via
+  `Collector._resumable_fanout`: `board_members` and `board_classifications`
+  over boards (`requires: "boards"`; `board_classifications` takes each
+  board's `team.id` for its path and treats a 404 as "no label" → absent
+  row), `team_members` over teams (`requires: "teams"`). `boards` flattens
+  the board object's `policy.sharingPolicy`/`policy.permissionsPolicy`
+  into `sharing_*`/`perm_*` columns — the exposure signal. `audit_logs`
+  is time-window scoped (the endpoint requires `createdAfter`/
+  `createdBefore`): default trailing 30 days, overridable with
+  `window_hours` (synthetic) or `created_after`/`created_before`
+  (epoch/ISO, mutually exclusive with `window_hours`). A 403
+  `insufficientPermissions` raises `PermissionDeniedSignal` (fail fast,
+  message kept) since it means a missing scope or non-Enterprise plan, not
+  a transient error.
+  **Partly live-verified** (2026-08-29): `boards` and `board_members`
+  against a non-Enterprise team. `org_members`, `teams`, `team_members`,
+  `audit_logs`, `board_classifications` were built from Miro's published
+  OpenAPI reference only — the test token lacked the Enterprise scopes —
+  same caveat tier as `wiz.py`/`appomni.py`. Verify field names/nesting
+  against a real Enterprise tenant before relying on those five.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

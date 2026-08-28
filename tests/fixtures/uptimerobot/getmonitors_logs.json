@@ -1,0 +1,29 @@
+{
+  "stat": "ok",
+  "pagination": { "offset": 0, "limit": 50, "total": 2 },
+  "monitors": [
+    {
+      "id": 803132719,
+      "friendly_name": "bouts.co.za",
+      "logs": [
+        {
+          "type": 2,
+          "datetime": 1787911378,
+          "duration": 34959,
+          "reason": { "code": "200", "detail": "OK" }
+        },
+        {
+          "type": 1,
+          "datetime": 1787909541,
+          "duration": 1837,
+          "reason": { "code": "502", "detail": "Bad Gateway" }
+        }
+      ]
+    },
+    {
+      "id": 803853842,
+      "friendly_name": "budget.massyn.net",
+      "logs": []
+    }
+  ]
+}
