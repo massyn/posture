@@ -1,9 +1,9 @@
 """Manual smoke test for a single collector: walk every resource in its
 manifest, capped at 20 raw records each, with debug logging on.
 
-    python scripts/extract_collector.py crowdstrike_cspm
-    python scripts/extract_collector.py wiz
-    python scripts/extract_collector.py crowdstrike_cspm.vulnerabilities
+    python examples/extract_collector.py crowdstrike_cspm
+    python examples/extract_collector.py wiz
+    python examples/extract_collector.py crowdstrike_cspm.vulnerabilities
 """
 
 import argparse

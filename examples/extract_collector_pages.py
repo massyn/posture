@@ -5,9 +5,9 @@ Uses collect_page() rather than collect() — each page is written to its own
 uuid'ed file inside a per-resource folder as it arrives, so nothing here
 accumulates a whole resource in memory.
 
-    python scripts/extract_collector.py crowdstrike_cspm
-    python scripts/extract_collector.py wiz
-    python scripts/extract_collector.py crowdstrike_cspm.vulnerabilities
+    python examples/extract_collector_pages.py crowdstrike_cspm
+    python examples/extract_collector_pages.py wiz
+    python examples/extract_collector_pages.py crowdstrike_cspm.vulnerabilities
 """
 
 import argparse

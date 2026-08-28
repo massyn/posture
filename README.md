@@ -249,6 +249,14 @@ through never leaves a broken file at the real path. For a paginated collection,
 `write_page()` on a backend instance instead of `write_storage()` — see
 [Paginated retrieval](#paginated-retrieval-for-large-resources) above.
 
+### A full extraction script to copy
+
+[`examples/extract_template.py`](examples/extract_template.py) is a heavily commented starting point —
+copy it into your own project and delete what you don't need. It shows the three
+scopes (`extract_all`, `extract_collector`, `extract_table`), a `store()` you point
+at Parquet, CSV, or Postgres, and a CLI entrypoint with commented Airflow-DAG and
+Databricks blocks to swap in.
+
 ## Supported sources
 
 See [`docs/index.md`](docs/index.md) for the full list of collectors, each with
