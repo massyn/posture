@@ -1,0 +1,46 @@
+{
+  "stat": "ok",
+  "pagination": { "offset": 0, "limit": 50, "total": 2 },
+  "monitors": [
+    {
+      "id": 803132719,
+      "friendly_name": "bouts.co.za",
+      "url": "https://bouts.co.za",
+      "type": 1,
+      "sub_type": "",
+      "keyword_type": 0,
+      "keyword_value": "",
+      "http_username": "svc-check",
+      "http_password": "sup3r-s3cret",
+      "port": "",
+      "interval": 300,
+      "timeout": 30,
+      "status": 2,
+      "create_datetime": 1779487202,
+      "all_time_uptime_ratio": "100.000",
+      "custom_uptime_ratio": "97.874-99.696-99.929-99.976",
+      "custom_down_durations": "1837-1837-1837-1837",
+      "response_times": [{ "datetime": 1787860500, "value": 1330 }],
+      "average_response_time": "1341.500"
+    },
+    {
+      "id": 803853842,
+      "friendly_name": "budget.massyn.net",
+      "url": "https://budget.massyn.net",
+      "type": 1,
+      "sub_type": "",
+      "keyword_type": 0,
+      "keyword_value": "",
+      "port": "",
+      "interval": 300,
+      "timeout": 30,
+      "status": 9,
+      "create_datetime": 1787947592,
+      "all_time_uptime_ratio": "99.500",
+      "custom_uptime_ratio": "100.000-100.000-99.800-99.900",
+      "custom_down_durations": "0-0-600-600",
+      "response_times": [{ "datetime": 1787860500, "value": 210 }],
+      "average_response_time": "215.000"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "stat": "ok",
+  "account": {
+    "email": "ops@example.com",
+    "user_id": 2681388,
+    "firstname": "Ops Team",
+    "sms_credits": 0,
+    "payment_period": null,
+    "subscription_expiry_date": null,
+    "monitor_limit": 50,
+    "monitor_interval": 5,
+    "up_monitors": 8,
+    "down_monitors": 1,
+    "paused_monitors": 0,
+    "total_monitors_count": 9,
+    "active_subscription": null,
+    "registered_at": "2024-09-18T09:58:40.000Z"
+  }
+}

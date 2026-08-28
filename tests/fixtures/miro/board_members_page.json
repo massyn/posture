@@ -1,0 +1,8 @@
+{
+  "size": 2, "offset": 0, "limit": 50, "total": 2,
+  "type": "list",
+  "data": [
+    { "id": "3458764531002469347", "type": "board_member", "name": "Phil Massyn", "role": "owner" },
+    { "id": "3458764599999999999", "type": "board_member", "name": "Guest User", "role": "commenter" }
+  ]
+}

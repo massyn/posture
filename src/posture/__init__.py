@@ -35,7 +35,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.19.5"
+__version__ = "0.20.0"
 
 __all__ = [
     "CCM",
@@ -71,12 +71,14 @@ def _register_sources() -> None:
     from posture.collectors.endoflife import EndoflifeCollector
     from posture.collectors.github import GithubCollector
     from posture.collectors.google_workspace import GoogleWorkspaceCollector
+    from posture.collectors.healthchecks import HealthchecksCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
     from posture.collectors.jira import JiraCollector
     from posture.collectors.kandji import KandjiCollector
     from posture.collectors.knowbe4 import Knowbe4Collector
     from posture.collectors.mde import MdeCollector
+    from posture.collectors.miro import MiroCollector
     from posture.collectors.nullify import NullifyCollector
     from posture.collectors.obsidian import ObsidianCollector
     from posture.collectors.okta import OktaCollector
@@ -97,6 +99,7 @@ def _register_sources() -> None:
     from posture.collectors.tenableio import TenableioCollector
     from posture.collectors.tenablesc import TenablescCollector
     from posture.collectors.upguard import UpGuardCollector
+    from posture.collectors.uptimerobot import UptimeRobotCollector
     from posture.collectors.vanta import VantaCollector
     from posture.collectors.whistic import WhisticCollector
     from posture.collectors.wiz import WizCollector
@@ -113,12 +116,14 @@ def _register_sources() -> None:
     _SOURCES["endoflife"] = EndoflifeCollector
     _SOURCES["github"] = GithubCollector
     _SOURCES["google_workspace"] = GoogleWorkspaceCollector
+    _SOURCES["healthchecks"] = HealthchecksCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector
     _SOURCES["jira"] = JiraCollector
     _SOURCES["kandji"] = KandjiCollector
     _SOURCES["knowbe4"] = Knowbe4Collector
     _SOURCES["mde"] = MdeCollector
+    _SOURCES["miro"] = MiroCollector
     _SOURCES["nullify"] = NullifyCollector
     _SOURCES["obsidian"] = ObsidianCollector
     _SOURCES["okta"] = OktaCollector
@@ -139,6 +144,7 @@ def _register_sources() -> None:
     _SOURCES["tenableio"] = TenableioCollector
     _SOURCES["tenablesc"] = TenablescCollector
     _SOURCES["upguard"] = UpGuardCollector
+    _SOURCES["uptimerobot"] = UptimeRobotCollector
     _SOURCES["vanta"] = VantaCollector
     _SOURCES["whistic"] = WhisticCollector
     _SOURCES["wiz"] = WizCollector

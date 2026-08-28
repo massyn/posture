@@ -1,0 +1,9 @@
+{
+  "type": "board-data-classification-label",
+  "id": "3000457366756290996",
+  "name": "internal",
+  "color": "blue",
+  "description": "Board could not be shared publicly",
+  "sharingRecommendation": "ONLY_WITHIN_ORGANIZATION",
+  "guidelineUrl": "https://miro.com"
+}

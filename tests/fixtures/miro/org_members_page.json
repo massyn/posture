@@ -1,0 +1,12 @@
+{
+  "type": "cursor-list", "limit": 50, "size": 2, "cursor": "",
+  "data": [
+    { "id": "3458764531002469347", "type": "organization-member", "email": "phil.massyn@icloud.com",
+      "active": true, "license": "full", "role": "organization_internal_admin",
+      "lastActivityAt": "2026-08-28T19:40:29Z", "licenseAssignedAt": "2022-08-10T10:22:52Z",
+      "adminRoles": ["COMPANY_ADMIN"] },
+    { "id": "3458764599999999999", "type": "organization-member", "email": "ext@partner.example",
+      "active": false, "license": "free_restricted", "role": "organization_external_user",
+      "lastActivityAt": "2025-01-03T08:00:00Z", "adminRoles": [] }
+  ]
+}

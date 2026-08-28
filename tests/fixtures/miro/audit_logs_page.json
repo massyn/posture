@@ -1,0 +1,17 @@
+{
+  "type": "cursor-list", "limit": 100, "size": 2, "cursor": "",
+  "data": [
+    { "id": "evt_1", "event": "board_shared", "category": "boards",
+      "createdAt": "2026-08-20T14:03:11.000Z",
+      "createdBy": { "type": "user", "id": "3458764531002469347", "name": "Phil Massyn", "email": "phil.massyn@icloud.com" },
+      "context": { "ip": "203.0.113.9", "team": { "id": "3458764531002529096", "name": "Cloud" },
+                   "organization": { "id": "3458764558980462983", "name": "Cloud" } },
+      "object": { "id": "uXjVKr2ggek=", "name": "public-roadmap" },
+      "details": { "newAccess": "view" } },
+    { "id": "evt_2", "event": "user_login", "category": "security",
+      "createdAt": "2026-08-21T06:12:00.000Z",
+      "createdBy": { "type": "user", "id": "3458764531002469347", "name": "Phil Massyn", "email": "phil.massyn@icloud.com" },
+      "context": { "ip": "203.0.113.10", "organization": { "id": "3458764558980462983", "name": "Cloud" } },
+      "object": {}, "details": {} }
+  ]
+}

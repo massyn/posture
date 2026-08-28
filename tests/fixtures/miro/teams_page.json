@@ -1,0 +1,7 @@
+{
+  "type": "cursor-list", "limit": 50, "size": 2, "cursor": "",
+  "data": [
+    { "id": "3458764531002529096", "type": "team", "name": "Cloud" },
+    { "id": "3458764511111111111", "type": "team", "name": "Design" }
+  ]
+}

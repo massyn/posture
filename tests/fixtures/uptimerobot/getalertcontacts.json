@@ -1,0 +1,22 @@
+{
+  "stat": "ok",
+  "offset": 0,
+  "limit": 50,
+  "total": 2,
+  "alert_contacts": [
+    {
+      "id": "6632892",
+      "friendly_name": "Ops email",
+      "type": 2,
+      "status": 1,
+      "value": "ops@example.com"
+    },
+    {
+      "id": "6632999",
+      "friendly_name": "PagerDuty",
+      "type": 5,
+      "status": 2,
+      "value": "https://events.pagerduty.com/integration/abc/enqueue"
+    }
+  ]
+}
