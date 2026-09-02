@@ -21,6 +21,7 @@ from posture import CCM
 
 ccm = CCM("dnsimple")  # credentials from DNSIMPLE_TOKEN
 df = ccm.collect("domains")
+df = ccm.collect("zone_records")
 ```
 
 ## Example: export every table to CSV
@@ -43,6 +44,7 @@ for table in ccm.tables():
 ## Tables
 
 - [domains](#domains)
+- [zone_records](#zone_records)
 
 ### domains
 
@@ -58,6 +60,24 @@ for table in ccm.tables():
 | `private_whois` | `bool` |
 | `expires_on` | `datetime` |
 | `expires_at` | `datetime` |
+| `created_at` | `datetime` |
+| `updated_at` | `datetime` |
+
+### zone_records
+
+| Column | Type |
+| --- | --- |
+| `zone` | `str` |
+| `id` | `str` |
+| `zone_id` | `str` |
+| `parent_id` | `str` |
+| `name` | `str` |
+| `content` | `str` |
+| `type` | `str` |
+| `ttl` | `int` |
+| `priority` | `int` |
+| `regions` | `str` |
+| `system_record` | `bool` |
 | `created_at` | `datetime` |
 | `updated_at` | `datetime` |
 

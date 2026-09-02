@@ -7,6 +7,64 @@ on:
     branches: [main]
 
 jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check version is aligned and bumped
+        run: |
+          pip install -q packaging
+          python - <<'EOF'
+          import re
+          import sys
+          import tomllib
+          import urllib.request
+          from pathlib import Path
+
+          from packaging.version import Version
+
+          with open("pyproject.toml", "rb") as fh:
+              pyproject = Version(tomllib.load(fh)["project"]["version"])
+
+          init = Version(
+              re.search(
+                  r'__version__ = "([^"]+)"',
+                  Path("src/posture/__init__.py").read_text(),
+              ).group(1)
+          )
+
+          test = Version(
+              re.search(
+                  r'posture\.__version__ == "([^"]+)"',
+                  Path("tests/test_posture.py").read_text(),
+              ).group(1)
+          )
+
+          locations = {"pyproject.toml": pyproject, "__init__.py": init, "test_posture.py": test}
+          if len({str(v) for v in locations.values()}) != 1:
+              print("Version mismatch across locations:")
+              for name, value in locations.items():
+                  print(f"  {name}: {value}")
+              sys.exit(1)
+
+          local = pyproject
+          with urllib.request.urlopen("https://pypi.org/pypi/posture/json") as resp:
+              import json
+
+              published = Version(json.load(resp)["info"]["version"])
+
+          print(f"local={local}  published={published}")
+          if local <= published:
+              print(f"Local version {local} must be greater than published {published} — bump it.")
+              sys.exit(1)
+          EOF
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -49,7 +107,7 @@ jobs:
         run: pytest
 
   publish:
-    needs: test
+    needs: [version-check, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
@@ -80,14 +138,14 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
   notify:
-    needs: [test, publish]
+    needs: [version-check, test, publish]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Determine status
         id: status
         run: |
-          if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.publish.result }}" != "failure" ]; then
+          if [ "${{ needs.version-check.result }}" = "success" ] && [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.publish.result }}" != "failure" ]; then
             echo "emoji=:white_check_mark:" >> "$GITHUB_OUTPUT"
             if [ "${{ needs.publish.result }}" = "success" ]; then
               echo "text=Build succeeded — published v${{ needs.publish.outputs.version }} to PyPI" >> "$GITHUB_OUTPUT"

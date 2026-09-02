@@ -55,6 +55,7 @@
 [Credentials](credentials/dnsimple.md)
 
 - [domains](collectors/dnsimple.md#domains)
+- [zone_records](collectors/dnsimple.md#zone_records)
 
 ## [endoflife.date](collectors/endoflife.md)
 

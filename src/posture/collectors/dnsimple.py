@@ -11,7 +11,26 @@ The API base URL defaults to DNSimple's production endpoint
 (``https://api.dnsimple.com/v2/``) but is overridable via ``endpoint``
 config, since DNSimple also runs a sandbox environment at a different host.
 
-Resources: ``domains``.
+Resources:
+
+- ``domains`` — one row per domain. page/per_page with a ``pagination``
+  envelope (``total_pages``), the same shape as ``cloudflare.py``'s ``zones``.
+- ``zone_records`` — one row per DNS record. DNSimple has no "all zones'
+  records" endpoint, so this fans out one paginated
+  ``GET /{account}/zones/{zone}/records`` call per zone across a thread pool
+  — the same per-item fan-out shape as ``cloudflare.py``'s ``dns_records``.
+  The zone name is the domain name; zone names are read from ``domains``
+  internally (``requires``, not ``derived_from``: each zone's records are
+  their own network call, not data nested in the domain list response)
+  unless a ``zones`` kwarg (list of zone names) is given. A domain with no
+  hosted zone (registration-only, DNS elsewhere) 404s and contributes no
+  rows. ``_zone`` is injected client-side into every record.
+
+The reference implementation this collector was ported from also did live
+DNS resolution (MX/TXT/DMARC/DKIM lookups against a hardcoded public
+resolver) per domain; that was deliberately left out here since it requires
+a new dependency (``dnspython``) outside posture's approved dependency list
+and isn't a DNSimple API response at all.
 
 **Caveat:** ``MANIFEST`` column paths below were built from DNSimple's
 public API reference, not a live schema introspection against a real
@@ -34,7 +53,9 @@ logger = logging.getLogger("posture.collectors.dnsimple")
 _DEFAULT_BASE_URL = "https://api.dnsimple.com/v2/"
 _WHOAMI_PATH = "whoami"
 _DOMAINS_PATH = "{account_id}/domains"
+_ZONE_RECORDS_PATH = "{account_id}/zones/{zone}/records"
 _PAGE_SIZE = 100
+_DEFAULT_ZONE_FANOUT_MAX_WORKERS = 10
 
 MANIFEST: dict[str, dict[str, Any]] = {
     "domains": {
@@ -50,6 +71,30 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "private_whois": ("private_whois", "bool"),
             "expires_on": ("expires_on", "datetime"),
             "expires_at": ("expires_at", "datetime"),
+            "created_at": ("created_at", "datetime"),
+            "updated_at": ("updated_at", "datetime"),
+        },
+    },
+    "zone_records": {
+        # Not derived_from "domains": each zone's records are their own
+        # network call, fanned out across a thread pool (see
+        # _fetch_zone_records_fanout_page). requires="domains" so the domain
+        # list's raw records are cached for the fan-out to read zone names
+        # from. _zone is injected client-side.
+        "requires": "domains",
+        "endpoint": _ZONE_RECORDS_PATH,
+        "columns": {
+            "zone": ("_zone", "str"),
+            "id": ("id", "str"),
+            "zone_id": ("zone_id", "str"),
+            "parent_id": ("parent_id", "str"),
+            "name": ("name", "str"),
+            "content": ("content", "str"),
+            "type": ("type", "str"),
+            "ttl": ("ttl", "int"),
+            "priority": ("priority", "int"),
+            "regions": ("regions", "str"),
+            "system_record": ("system_record", "bool"),
             "created_at": ("created_at", "datetime"),
             "updated_at": ("updated_at", "datetime"),
         },
@@ -103,14 +148,85 @@ class DnsimpleCollector(Collector):
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
+        if resource == "domains":
+            return self._fetch_domains_page(kwargs, cursor)
+        return self._fetch_zone_records_fanout_page(kwargs, cursor)
+
+    def _fetch_domains_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
         page = cursor if cursor is not None else 1
         path = _DOMAINS_PATH.format(account_id=self._account_id)
         params: dict[str, Any] = {"page": page, "per_page": _PAGE_SIZE}
         params.update(kwargs)
 
-        response = self._session.get(
-            f"{self._base_url}/{path}", params=params, timeout=30
+        payload = self._get(f"{self._base_url}/{path}", params=params).json()
+
+        records = payload.get("data", []) or []
+        pagination = payload.get("pagination") or {}
+        next_cursor = page + 1 if page < pagination.get("total_pages", page) else None
+        return records, next_cursor
+
+    def _fetch_zone_records_fanout_page(
+        self, kwargs: dict[str, Any], cursor: Any
+    ) -> tuple[list[dict[str, Any]], Any]:
+        if cursor is not None:
+            return [], None  # entire fan-out already completed on first call
+
+        zones = kwargs.get("zones")
+        if zones is None:
+            zones = [
+                domain["name"]
+                for domain in self._get_raw("domains", {})
+                if domain.get("name")
+            ]
+        zones = [zone for zone in zones if zone]
+        if not zones:
+            return [], None
+
+        max_workers = kwargs.get("max_workers", _DEFAULT_ZONE_FANOUT_MAX_WORKERS)
+        workers = max(1, min(max_workers, len(zones)))
+
+        records = self._resumable_fanout(
+            "zone_records",
+            zones,
+            self._fetch_records_for_zone,
+            workers,
         )
+        return records, None
+
+    def _fetch_records_for_zone(self, zone: str) -> list[dict[str, Any]]:
+        path = _ZONE_RECORDS_PATH.format(account_id=self._account_id, zone=zone)
+        records: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            params = {"page": page, "per_page": _PAGE_SIZE}
+            response = self._get(
+                f"{self._base_url}/{path}", params=params, allow_404=True
+            )
+            if response.status_code == 404:
+                return []  # domain has no hosted zone (DNS managed elsewhere)
+            payload = response.json()
+
+            page_records = payload.get("data", []) or []
+            for record in page_records:
+                record["_zone"] = zone
+            records.extend(page_records)
+
+            pagination = payload.get("pagination") or {}
+            if page >= pagination.get("total_pages", page):
+                break
+            page += 1
+        return records
+
+    def _get(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        *,
+        allow_404: bool = False,
+    ) -> Any:
+        response = self._session.get(url, params=params, timeout=30)
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             raise RateLimitedSignal(
@@ -118,15 +234,12 @@ class DnsimpleCollector(Collector):
             )
         if response.status_code in (401, 403):
             raise UnauthorizedSignal()
+        if allow_404 and response.status_code == 404:
+            return response
         if response.status_code != 200:
             logger.warning(
                 "unexpected status code",
                 extra={"source": "dnsimple", "status_code": response.status_code},
             )
         response.raise_for_status()
-        payload = response.json()
-
-        records = payload.get("data", []) or []
-        pagination = payload.get("pagination") or {}
-        next_cursor = page + 1 if page < pagination.get("total_pages", page) else None
-        return records, next_cursor
+        return response

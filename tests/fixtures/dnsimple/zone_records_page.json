@@ -1,0 +1,44 @@
+[
+    {
+        "id": 5178,
+        "zone_id": "example.com",
+        "parent_id": null,
+        "name": "",
+        "content": "ns1.dnsimple.com admin.dnsimple.com 1458642070 86400 7200 604800 300",
+        "ttl": 3600,
+        "priority": null,
+        "type": "SOA",
+        "regions": ["global"],
+        "system_record": true,
+        "created_at": "2016-03-22T10:20:53Z",
+        "updated_at": "2016-10-05T09:26:38Z"
+    },
+    {
+        "id": 5183,
+        "zone_id": "example.com",
+        "parent_id": null,
+        "name": "www",
+        "content": "example.com",
+        "ttl": 3600,
+        "priority": null,
+        "type": "CNAME",
+        "regions": ["global"],
+        "system_record": false,
+        "created_at": "2016-03-22T10:20:54Z",
+        "updated_at": "2016-03-22T10:20:54Z"
+    },
+    {
+        "id": 5187,
+        "zone_id": "example.com",
+        "parent_id": null,
+        "name": "",
+        "content": "20 mail.example.com",
+        "ttl": 3600,
+        "priority": 20,
+        "type": "MX",
+        "regions": ["global"],
+        "system_record": false,
+        "created_at": "2016-03-22T10:45:00Z",
+        "updated_at": "2016-03-22T10:45:00Z"
+    }
+]

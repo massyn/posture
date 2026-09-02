@@ -667,8 +667,13 @@ why something is built the way it is, not how to configure or call it.
   lookup, just an account id instead of a base URL. Base URL defaults to
   DNSimple's production endpoint but is overridable via `endpoint` config
   (DNSimple also runs a sandbox environment at a different host).
-  `domains` is the only resource — page/per_page with a `pagination`
-  envelope (`total_pages`), the same shape as `cloudflare.py`'s `zones`.
+  `domains` is page/per_page with a `pagination` envelope (`total_pages`),
+  the same shape as `cloudflare.py`'s `zones`. `zone_records` has no
+  "all zones' records" endpoint, so it fans out one paginated
+  `GET /{account}/zones/{zone}/records` call per zone across a thread pool
+  (`requires="domains"`, zone name = domain name), the same per-item
+  fan-out shape as `cloudflare.py`'s `dns_records`; a domain with no hosted
+  zone 404s and contributes no rows, and `_zone` is injected client-side.
   The reference implementation this collector was ported from also did
   live DNS resolution (MX/TXT/DMARC/DKIM lookups against a hardcoded public
   resolver) per domain; that was deliberately left out here since it
