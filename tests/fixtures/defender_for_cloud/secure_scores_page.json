@@ -1,0 +1,12 @@
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/secureScores/ascScore",
+    "name": "ascScore",
+    "type": "Microsoft.Security/secureScores",
+    "properties": {
+      "displayName": "ASC score",
+      "score": {"current": 28.0, "max": 55, "percentage": 0.5091},
+      "weight": 5459
+    }
+  }
+]

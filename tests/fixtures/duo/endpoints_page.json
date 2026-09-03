@@ -1,0 +1,24 @@
+[
+  {
+    "epkey": "EP18JX1A10AB102M2T2X",
+    "username": "jsmith",
+    "email": "jsmith@example.com",
+    "computer_name": "JSMITH-MBP",
+    "model": "MacBookPro18,3",
+    "type": "MAC",
+    "os_family": "Mac OS X",
+    "os_version": "14.1.2",
+    "os_build": "23B92",
+    "device_identifier": "C02XXXXXXXXX",
+    "device_udid": "00008103-000000000000001E",
+    "hardware_uuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "disk_encryption_status": "On",
+    "firewall_status": "On",
+    "password_status": "Set",
+    "trusted_endpoint": "yes",
+    "health_app_client_version": "2.36.0.0",
+    "security_agents": [{"name": "CrowdStrike", "version": "7.10"}],
+    "browsers": [{"browser_family": "Safari", "browser_version": "17.1"}],
+    "last_updated": 1701432123
+  }
+]

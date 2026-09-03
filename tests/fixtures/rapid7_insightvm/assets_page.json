@@ -1,0 +1,25 @@
+[
+  {
+    "id": "a1b2c3d4-0000-1111-2222-333344445555",
+    "ip": "10.4.2.17",
+    "mac": "00:0C:29:1A:2B:3C",
+    "host_name": "web-prod-01",
+    "os_name": "Ubuntu Linux",
+    "os_version": "22.04",
+    "os_type": "Linux",
+    "os_vendor": "Ubuntu",
+    "assessed_for_vulnerabilities": true,
+    "assessed_for_policies": false,
+    "risk_score": 12843.7,
+    "critical_vulnerabilities": 3,
+    "severe_vulnerabilities": 21,
+    "moderate_vulnerabilities": 8,
+    "vulnerabilities": 32,
+    "exploits": 2,
+    "malware_kits": 0,
+    "last_assessed_for_vulnerabilities": "2024-05-10T02:14:55Z",
+    "tags": [{"name": "prod", "type": "location"}],
+    "addresses": [{"ip": "10.4.2.17", "mac": "00:0C:29:1A:2B:3C"}],
+    "host_names": [{"name": "web-prod-01", "source": "dns"}]
+  }
+]

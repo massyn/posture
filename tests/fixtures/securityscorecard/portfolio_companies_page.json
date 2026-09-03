@@ -1,0 +1,28 @@
+[
+  {
+    "_portfolio_id": "60c0e4f9a0b1c20010a1b2c3",
+    "domain": "example.com",
+    "name": "Example Inc",
+    "score": 88,
+    "grade": "B",
+    "grade_url": "https://cdn.securityscorecard.io/grade/b.svg",
+    "industry": "technology",
+    "size": "size_more_than_10000",
+    "last30day_score_change": -2,
+    "total_issue_count": 143,
+    "created_at": "2021-06-09T12:00:00.000Z"
+  },
+  {
+    "_portfolio_id": "60c0e4f9a0b1c20010a1b2c3",
+    "domain": "vendor.example.net",
+    "name": "Vendor Net",
+    "score": 74,
+    "grade": "C",
+    "grade_url": "https://cdn.securityscorecard.io/grade/c.svg",
+    "industry": "financial_services",
+    "size": "size_1001_to_10000",
+    "last30day_score_change": 1,
+    "total_issue_count": 512,
+    "created_at": "2022-01-15T00:00:00.000Z"
+  }
+]

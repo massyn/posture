@@ -1062,6 +1062,104 @@ why something is built the way it is, not how to configure or call it.
   same caveat tier as `wiz.py`/`appomni.py`. Verify field names/nesting
   against a real Enterprise tenant before relying on those five.
 
+- **Cisco Duo** — raw `requests` against the Duo Admin API
+  (`https://api-XXXXXXXX.duosecurity.com/admin/v1/...`), no vendor SDK.
+  Unlike every other collector here there is no token to cache: each
+  request is individually signed with an HMAC-SHA1 over a canonical string
+  (RFC-2822 date, method, host, path, sorted+url-encoded query params)
+  keyed by the integration's secret key, sent as HTTP Basic auth
+  (integration key = username, hex signature = password). The exact query
+  string that is signed has to be the exact query string that is sent, so
+  `_signed_get` builds it once and passes it through verbatim rather than
+  letting `requests` re-encode a params dict. `_authenticate` is only a
+  cheap signed `users?limit=1` probe to fail fast on bad creds. Pagination
+  is one `offset`/`limit` scheme shared by every list endpoint, envelope
+  `{"stat": "OK", "response": [...], "metadata": {"next_offset": N}}`.
+  Duo timestamps are epoch seconds — `parse.py`'s magnitude cascade, no
+  `format` hint. `api_hostname` is a `url_config_key`.
+  **Caveat:** `MANIFEST` built from Duo's public Admin API reference, not a
+  live tenant — same tier as `wiz.py`/`appomni.py`.
+
+- **Drata** — raw `requests` against Drata's Public API
+  (`https://public-api.drata.com`), no vendor SDK, static bearer token.
+  `endpoint` is optional config (EU tenant at `public-api.eu.drata.com`),
+  a `url_config_key` with a default set/normalized in an overridden
+  `_resolve_config` the same way `dnsimple.py` handles its optional
+  `endpoint`. Every resource is a real top-level `page`/`limit` paginated
+  endpoint (`{"data": [...], "total": N}`), no fan-out, no `derived_from` —
+  same shape as `vanta.py`.
+  **Caveat:** `MANIFEST` built from Drata's public API reference, not a
+  live tenant — same tier as `wiz.py`/`appomni.py`.
+
+- **SecurityScorecard** — raw `requests` against
+  `https://api.securityscorecard.io`, no vendor SDK, static token auth with
+  the `Authorization: Token <token>` scheme (not `Bearer`, same as
+  `select_star.py`). `portfolios` is the one top-level resource (bare
+  `{"entries": [...]}`, no pagination). `portfolio_companies`
+  (`requires: "portfolios"`) fans out one `offset`/`limit` call per
+  portfolio id; `company_factors` (`requires: "portfolio_companies"`) fans
+  out one call per company domain — both via `Collector._resumable_fanout`,
+  the same per-item fan-out shape as `cloudflare.py`'s `dns_records`.
+  `_portfolio_id`/`_domain` are injected client-side; a 404 (no computed
+  scorecard yet) is treated as a confirmed-empty result for that id.
+  **Caveat:** `MANIFEST` built from SecurityScorecard's public API
+  reference, not a live tenant — same tier as `wiz.py`/`appomni.py`.
+
+- **Rapid7 InsightVM** — raw `requests` against the Insight **cloud**
+  platform's VM v4 integration API
+  (`https://<region>.api.insight.rapid7.com/vm/v4/integration/...`), not
+  the on-prem Security Console API v3 (basic auth, different surface).
+  Static `X-Api-Key` header, no token exchange. `region` selects the API
+  host (a key is region-bound), with an explicit `endpoint`
+  (`url_config_key`) override; the base URL is built in `__init__`.
+  `assets` is a `POST` search (empty body = all) paginated by an opaque
+  `metadata.cursor`; `vulnerabilities` is a `GET` paginated by `page`
+  number against `metadata.totalPages` — two shapes, one
+  `{"data": [...], "metadata": {...}}` envelope.
+  **Caveat — stronger than `wiz.py`'s:** the v4 integration API's envelope
+  and field casing are only partly documented; verify both field
+  names/nesting *and* that pagination terminates against a real tenant.
+
+- **Microsoft Defender for Cloud** — raw `requests` against Azure Resource
+  Manager (`https://management.azure.com/subscriptions/{id}/providers/
+  Microsoft.Security/...`). Auth is Azure AD client-credentials via the
+  shared `_azure_oauth.py` (`fetch_azure_ad_token` + `graph_get_json`),
+  just against the ARM scope instead of Graph's. `subscription_id` is
+  required alongside the tenant/client/secret triad — one instance = one
+  subscription snapshot. Pagination is ARM's `{"value": [...],
+  "nextLink": "<url>"}` where `nextLink` is a complete URL fetched verbatim
+  (its own `api-version` + `$skipToken`), same "cursor is the next URL"
+  idea as `appomni.py`. Each resource pins the `api-version` its endpoint
+  requires (there is no single version covering all of
+  `Microsoft.Security`). Resources: `secure_scores`,
+  `secure_score_controls`, `assessments`, `sub_assessments`, `alerts`,
+  `regulatory_compliance_standards`.
+  **Caveat:** `MANIFEST` built from the public Azure REST reference, not a
+  live subscription — same tier as `wiz.py`/`azure_entra.py`.
+
+- **GCP Security Command Center** — raw `requests` against SCC REST v1
+  (`https://securitycenter.googleapis.com/v1/organizations/{org}/...`).
+  Auth is a service-account JWT-bearer exchange **without** domain-wide
+  delegation — the service account acts as itself; access comes from an
+  org-level IAM role (`roles/securitycenter.adminViewer`). `_google_oauth.py`
+  was refactored to factor the JWT signing + token exchange into
+  `_sign_and_exchange`, with the existing `fetch_google_workspace_token`
+  (impersonating `sub=admin_email`) and the new
+  `fetch_google_service_account_token` (`sub` omitted) both delegating to
+  it — promoted per the anti-overfitting rule now that a second Google
+  collector needs the signing but not the impersonation. `cryptography` is
+  the same optional dep as Google Workspace
+  (`posture[gcp_security_command_center]`). `organization_id` is required
+  (SCC is org-level). Pagination is Google's `pageSize`/`pageToken`/
+  `nextPageToken`. `findings`/`assets` wrap each row in a result envelope
+  (`listFindingsResults[].finding` + sibling `resource`,
+  `listAssetsResults[].asset`) — the manifest reads straight through via
+  dotted paths, no fetch-time reshaping. `assets` uses the legacy asset
+  inventory endpoint (see `docs/BACKLOG.md` for the v2 resource API
+  follow-up).
+  **Caveat:** `MANIFEST` built from the public SCC v1 reference, not a
+  live org — same tier as `wiz.py`/`appomni.py`.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

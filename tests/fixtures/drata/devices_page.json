@@ -1,0 +1,22 @@
+[
+  {
+    "id": 5001,
+    "name": "jsmith-mbp",
+    "serialNumber": "C02XX",
+    "model": "MacBookPro18,3",
+    "osVersion": "14.1.2",
+    "macAddress": "aa:bb:cc:dd:ee:ff",
+    "sourceType": "JAMF",
+    "agentVersion": "1.4.0",
+    "complianceStatus": "COMPLIANT",
+    "personnelId": 42,
+    "personnel": {"email": "jsmith@example.com"},
+    "isEncrypted": true,
+    "isPasswordManagerInstalled": true,
+    "isAntivirusInstalled": true,
+    "isScreenLockEnabled": true,
+    "lastCheckedAt": "2024-05-01T08:00:00.000Z",
+    "createdAt": "2023-06-01T00:00:00.000Z",
+    "updatedAt": "2024-05-01T08:00:00.000Z"
+  }
+]

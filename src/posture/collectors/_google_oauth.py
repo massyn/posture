@@ -63,21 +63,30 @@ def _b64url(data: bytes) -> bytes:
     return base64.urlsafe_b64encode(data).rstrip(b"=")
 
 
-def fetch_google_workspace_token(
+def _sign_and_exchange(
     session: requests.Session,
     *,
     service_account_json_path: str,
-    admin_email: str,
     scopes: list[str],
     source: str,
+    subject: str | None,
+    hint: str,
 ) -> GoogleWorkspaceToken:
+    """Build an RS256-signed JWT assertion for the service account and
+    exchange it for an access token.
+
+    ``subject`` set = domain-wide delegation (the assertion impersonates
+    that user); ``subject`` None = the service account acts as itself, which
+    is what resource-scoped APIs like Security Command Center use.
+    """
     try:
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import padding
     except ImportError as exc:
         raise ImportError(
-            "cryptography is required for the Google Workspace collector. "
-            'Install it with: pip install "posture[google_workspace]"'
+            "cryptography is required for Google service-account auth. "
+            'Install it with: pip install "posture[google_workspace]" (or '
+            '"posture[gcp_security_command_center]")'
         ) from exc
 
     key_data = json.loads(Path(service_account_json_path).read_text())
@@ -90,12 +99,13 @@ def fetch_google_workspace_token(
     header = {"alg": "RS256", "typ": "JWT"}
     claims = {
         "iss": key_data["client_email"],
-        "sub": admin_email,
         "scope": " ".join(scopes),
         "aud": token_uri,
         "iat": now,
         "exp": now + _JWT_LIFETIME_SECONDS,
     }
+    if subject is not None:
+        claims["sub"] = subject
     signing_input = b".".join(
         _b64url(json.dumps(part, separators=(",", ":")).encode())
         for part in (header, claims)
@@ -113,20 +123,60 @@ def fetch_google_workspace_token(
     )
     if response.status_code != 200:
         # Google's OAuth token errors (invalid_grant — commonly an
-        # un-authorized scope in the domain-wide delegation config, or an
-        # admin_email outside the domain) come back as 400, not 401.
+        # un-authorized scope, or an admin_email outside the domain) come
+        # back as 400, not 401.
         raise AuthenticationError(
-            f"{source} rejected the service account/domain-wide delegation "
-            f"request: {response.text}",
+            f"{source} rejected the service account token request: {response.text}",
             source=source.lower(),
-            hint=f"check {source.upper()}_SERVICE_ACCOUNT_JSON_PATH / "
-            f"{source.upper()}_ADMIN_EMAIL, and that every requested scope "
-            "is authorized for this client ID in the Admin console's "
-            "domain-wide delegation settings",
+            hint=hint,
         )
     body = response.json()
     return GoogleWorkspaceToken(
         access_token=body["access_token"], expires_in=int(body["expires_in"])
+    )
+
+
+def fetch_google_workspace_token(
+    session: requests.Session,
+    *,
+    service_account_json_path: str,
+    admin_email: str,
+    scopes: list[str],
+    source: str,
+) -> GoogleWorkspaceToken:
+    return _sign_and_exchange(
+        session,
+        service_account_json_path=service_account_json_path,
+        scopes=scopes,
+        source=source,
+        subject=admin_email,
+        hint=f"check {source.upper()}_SERVICE_ACCOUNT_JSON_PATH / "
+        f"{source.upper()}_ADMIN_EMAIL, and that every requested scope "
+        "is authorized for this client ID in the Admin console's "
+        "domain-wide delegation settings",
+    )
+
+
+def fetch_google_service_account_token(
+    session: requests.Session,
+    *,
+    service_account_json_path: str,
+    scopes: list[str],
+    source: str,
+) -> GoogleWorkspaceToken:
+    """Token for the service account acting as itself (no impersonation) —
+    for GCP resource APIs (e.g. Security Command Center) where access is
+    granted by an IAM role binding on the org/project, not domain-wide
+    delegation."""
+    return _sign_and_exchange(
+        session,
+        service_account_json_path=service_account_json_path,
+        scopes=scopes,
+        source=source,
+        subject=None,
+        hint=f"check {source.upper()}_SERVICE_ACCOUNT_JSON_PATH and that the "
+        "service account has the required Security Command Center IAM role "
+        "on the organization",
     )
 
 

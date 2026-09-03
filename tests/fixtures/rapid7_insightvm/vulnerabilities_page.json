@@ -1,0 +1,23 @@
+[
+  {
+    "id": "ubuntu-cve-2024-0001",
+    "title": "Ubuntu: (CVE-2024-0001) openssl vulnerability",
+    "description": "A flaw was found in openssl.",
+    "severity": "Critical",
+    "severity_score": 10,
+    "risk_score": 884.12,
+    "cvss_v2_score": 7.5,
+    "cvss_v2_vector": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+    "cvss_v3_score": 9.8,
+    "cvss_v3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+    "denial_of_service": false,
+    "exploits": 1,
+    "malware_kits": 0,
+    "published": "2024-01-02T00:00:00Z",
+    "added": "2024-01-03T11:00:00Z",
+    "modified": "2024-02-01T09:00:00Z",
+    "categories": ["Ubuntu", "OpenSSL"],
+    "cves": ["CVE-2024-0001"],
+    "references": [{"source": "URL", "reference": "https://ubuntu.com/security/CVE-2024-0001"}]
+  }
+]

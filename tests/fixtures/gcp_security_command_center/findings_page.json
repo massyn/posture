@@ -1,0 +1,51 @@
+[
+  {
+    "finding": {
+      "name": "organizations/123/sources/456/findings/abcdef",
+      "canonicalName": "projects/789/sources/456/findings/abcdef",
+      "parent": "organizations/123/sources/456",
+      "resourceName": "//compute.googleapis.com/projects/p/zones/z/instances/i",
+      "state": "ACTIVE",
+      "category": "PUBLIC_IP_ADDRESS",
+      "externalUri": "https://console.cloud.google.com/...",
+      "severity": "HIGH",
+      "findingClass": "MISCONFIGURATION",
+      "mute": "UNMUTED",
+      "description": "Instance has a public IP address.",
+      "eventTime": "2024-05-01T10:00:00Z",
+      "createTime": "2024-04-20T08:30:00Z",
+      "sourceProperties": {"Recommendation": "Remove the external IP.", "ExceptionInstructions": "x"},
+      "vulnerability": {"cve": {"id": "CVE-2024-1234", "cvssv3": {"baseScore": 8.1}}}
+    },
+    "resource": {
+      "name": "//compute.googleapis.com/projects/p/zones/z/instances/i",
+      "displayName": "instance-1",
+      "type": "google.compute.Instance",
+      "projectDisplayName": "my-project",
+      "parentDisplayName": "my-folder"
+    }
+  },
+  {
+    "finding": {
+      "name": "organizations/123/sources/456/findings/ghijkl",
+      "parent": "organizations/123/sources/456",
+      "resourceName": "//storage.googleapis.com/buckets/b",
+      "state": "INACTIVE",
+      "category": "BUCKET_POLICY_ONLY_DISABLED",
+      "severity": "MEDIUM",
+      "findingClass": "MISCONFIGURATION",
+      "mute": "UNMUTED",
+      "description": "Uniform bucket-level access is disabled.",
+      "eventTime": "2024-05-02T11:00:00Z",
+      "createTime": "2024-04-21T09:00:00Z",
+      "sourceProperties": {}
+    },
+    "resource": {
+      "name": "//storage.googleapis.com/buckets/b",
+      "displayName": "b",
+      "type": "google.cloud.storage.Bucket",
+      "projectDisplayName": "my-project",
+      "parentDisplayName": "my-folder"
+    }
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "user_id": "DU3RP9I2WOC59VZX672N",
+    "username": "jsmith",
+    "realname": "Joe Smith",
+    "email": "jsmith@example.com",
+    "status": "active",
+    "firstname": "Joe",
+    "lastname": "Smith",
+    "is_enrolled": true,
+    "created": 1489612729,
+    "last_login": 1701432000,
+    "last_directory_sync": 1701430000,
+    "notes": "",
+    "aliases": {"alias1": "j.smith"},
+    "groups": [{"group_id": "DGXXX", "name": "Engineering"}],
+    "phones": [{"phone_id": "DPFZRS9FB0D46QFTM899", "number": "+15551234567"}],
+    "tokens": [],
+    "webauthncredentials": []
+  },
+  {
+    "user_id": "DUUB1QF6KX8QY0PDR9M2",
+    "username": "adminbot",
+    "realname": "",
+    "email": "adminbot@example.com",
+    "status": "disabled",
+    "firstname": null,
+    "lastname": null,
+    "is_enrolled": false,
+    "created": 1500000000,
+    "last_login": null,
+    "last_directory_sync": null,
+    "notes": "service account",
+    "aliases": {},
+    "groups": [],
+    "phones": [],
+    "tokens": [],
+    "webauthncredentials": []
+  }
+]

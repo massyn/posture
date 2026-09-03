@@ -137,6 +137,35 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
+      - name: Announce on Mastodon
+        env:
+          API_ENDPOINT: ${{ secrets.MASTODON_API_ENDPOINT }}
+          ACCESS_TOKEN: ${{ secrets.MASTODON_ACCESS_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          STATUS=$(cat <<EOF
+          📦 posture v${VERSION} is now on PyPI
+
+          Continuous Compliance Monitoring — collect posture data from your cloud and SaaS estate, parse it into a consistent schema, and store it wherever you like.
+
+          Install / upgrade:
+              pip install --upgrade posture
+
+          🔖 Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}
+          🐍 PyPI: https://pypi.org/project/posture/${VERSION}/
+
+          #posture #compliance #python #devsecops
+          EOF
+          )
+
+          curl --silent --show-error --fail \
+              -X POST "${API_ENDPOINT%/}/api/v1/statuses" \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              --data-urlencode "status=${STATUS}" \
+              --data-urlencode "visibility=public" \
+              | { command -v jq >/dev/null 2>&1 && jq -r '"Posted: \(.url)"' || cat; }
+
   notify:
     needs: [version-check, test, publish]
     if: always()

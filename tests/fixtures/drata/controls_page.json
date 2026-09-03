@@ -1,0 +1,30 @@
+[
+  {
+    "id": 101,
+    "code": "DCC-1",
+    "name": "Access Control Policy",
+    "description": "The company maintains an access control policy.",
+    "question": "Does the company have an access control policy?",
+    "activity": "Review the access control policy annually.",
+    "isMonitored": true,
+    "hasEvidence": true,
+    "isReady": true,
+    "archivedAt": null,
+    "createdAt": "2023-01-04T12:00:00.000Z",
+    "updatedAt": "2024-02-01T09:30:00.000Z"
+  },
+  {
+    "id": 102,
+    "code": "DCC-2",
+    "name": "Encryption at Rest",
+    "description": "Production data is encrypted at rest.",
+    "question": "Is production data encrypted at rest?",
+    "activity": "",
+    "isMonitored": true,
+    "hasEvidence": false,
+    "isReady": false,
+    "archivedAt": "2024-03-01T00:00:00.000Z",
+    "createdAt": "2023-01-04T12:00:00.000Z",
+    "updatedAt": "2024-03-01T00:00:00.000Z"
+  }
+]

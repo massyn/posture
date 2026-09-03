@@ -1,0 +1,42 @@
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/assessments/1195afff-c881-495e-9bc5-1486211ae03f",
+    "name": "1195afff-c881-495e-9bc5-1486211ae03f",
+    "type": "Microsoft.Security/assessments",
+    "properties": {
+      "displayName": "Machines should have a vulnerability assessment solution",
+      "status": {
+        "code": "Unhealthy",
+        "cause": "",
+        "description": "No vulnerability assessment solution found"
+      },
+      "resourceDetails": {
+        "id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-prod/providers/Microsoft.Compute/virtualMachines/vm-web-1",
+        "source": "Azure"
+      },
+      "metadata": {
+        "severity": "Medium",
+        "assessmentType": "BuiltIn",
+        "description": "Install a supported vulnerability assessment solution.",
+        "remediationDescription": "Enable the integrated vulnerability scanner.",
+        "categories": ["Compute"]
+      }
+    }
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/assessments/abc",
+    "name": "abc",
+    "type": "Microsoft.Security/assessments",
+    "properties": {
+      "displayName": "Storage accounts should restrict network access",
+      "status": {"code": "Healthy"},
+      "resourceDetails": {"id": "/subscriptions/x/sa1", "source": "Azure"},
+      "metadata": {
+        "severity": "Low",
+        "assessmentType": "BuiltIn",
+        "description": "Restrict network access to your storage account.",
+        "categories": ["Data"]
+      }
+    }
+  }
+]

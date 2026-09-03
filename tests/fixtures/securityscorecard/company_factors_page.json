@@ -1,0 +1,21 @@
+[
+  {
+    "_domain": "example.com",
+    "name": "network_security",
+    "score": 92,
+    "grade": "A",
+    "issue_summary": [
+      {"type": "tlscert_expired", "count": 0, "severity": "high"},
+      {"type": "open_ports", "count": 4, "severity": "low"}
+    ]
+  },
+  {
+    "_domain": "example.com",
+    "name": "patching_cadence",
+    "score": 70,
+    "grade": "C",
+    "issue_summary": [
+      {"type": "patching_analysis_high", "count": 12, "severity": "high"}
+    ]
+  }
+]

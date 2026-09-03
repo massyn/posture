@@ -35,7 +35,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.21.0"
+__version__ = "0.22.0"
 
 __all__ = [
     "CCM",
@@ -67,8 +67,14 @@ def _register_sources() -> None:
     from posture.collectors.crowdstrike import CrowdstrikeCollector
     from posture.collectors.crowdstrike_cspm import CrowdstrikeCspmCollector
     from posture.collectors.crowdstrike_identity import CrowdstrikeIdentityCollector
+    from posture.collectors.defender_for_cloud import DefenderForCloudCollector
     from posture.collectors.dnsimple import DnsimpleCollector
+    from posture.collectors.drata import DrataCollector
+    from posture.collectors.duo import DuoCollector
     from posture.collectors.endoflife import EndoflifeCollector
+    from posture.collectors.gcp_security_command_center import (
+        GcpSecurityCommandCenterCollector,
+    )
     from posture.collectors.github import GithubCollector
     from posture.collectors.google_workspace import GoogleWorkspaceCollector
     from posture.collectors.healthchecks import HealthchecksCollector
@@ -86,9 +92,11 @@ def _register_sources() -> None:
     from posture.collectors.plerion import PlerionCollector
     from posture.collectors.precise import PreciseCollector
     from posture.collectors.qualys import QualysCollector
+    from posture.collectors.rapid7_insightvm import Rapid7InsightVMCollector
     from posture.collectors.runzero import RunzeroCollector
     from posture.collectors.sailpoint import SailpointCollector
     from posture.collectors.salesforce import SalesforceCollector
+    from posture.collectors.securityscorecard import SecurityScorecardCollector
     from posture.collectors.select_star import SelectStarCollector
     from posture.collectors.sentinelone import SentinelOneCollector
     from posture.collectors.servicenow import ServicenowCollector
@@ -112,8 +120,12 @@ def _register_sources() -> None:
     _SOURCES["crowdstrike"] = CrowdstrikeCollector
     _SOURCES["crowdstrike_cspm"] = CrowdstrikeCspmCollector
     _SOURCES["crowdstrike_identity"] = CrowdstrikeIdentityCollector
+    _SOURCES["defender_for_cloud"] = DefenderForCloudCollector
     _SOURCES["dnsimple"] = DnsimpleCollector
+    _SOURCES["drata"] = DrataCollector
+    _SOURCES["duo"] = DuoCollector
     _SOURCES["endoflife"] = EndoflifeCollector
+    _SOURCES["gcp_security_command_center"] = GcpSecurityCommandCenterCollector
     _SOURCES["github"] = GithubCollector
     _SOURCES["google_workspace"] = GoogleWorkspaceCollector
     _SOURCES["healthchecks"] = HealthchecksCollector
@@ -131,9 +143,11 @@ def _register_sources() -> None:
     _SOURCES["plerion"] = PlerionCollector
     _SOURCES["precise"] = PreciseCollector
     _SOURCES["qualys"] = QualysCollector
+    _SOURCES["rapid7_insightvm"] = Rapid7InsightVMCollector
     _SOURCES["runzero"] = RunzeroCollector
     _SOURCES["sailpoint"] = SailpointCollector
     _SOURCES["salesforce"] = SalesforceCollector
+    _SOURCES["securityscorecard"] = SecurityScorecardCollector
     _SOURCES["select_star"] = SelectStarCollector
     _SOURCES["sentinelone"] = SentinelOneCollector
     _SOURCES["servicenow"] = ServicenowCollector

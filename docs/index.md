@@ -11,6 +11,15 @@
 - [posture_policies](collectors/appomni.md#posture_policies)
 - [unified_identities](collectors/appomni.md#unified_identities)
 
+## [Cisco Duo](collectors/duo.md)
+
+- [admins](collectors/duo.md#admins)
+- [endpoints](collectors/duo.md#endpoints)
+- [groups](collectors/duo.md#groups)
+- [integrations](collectors/duo.md#integrations)
+- [phones](collectors/duo.md#phones)
+- [users](collectors/duo.md#users)
+
 ## [Cloudflare](collectors/cloudflare.md)
 
 [Credentials](credentials/cloudflare.md)
@@ -57,6 +66,17 @@
 - [domains](collectors/dnsimple.md#domains)
 - [zone_records](collectors/dnsimple.md#zone_records)
 
+## [Drata](collectors/drata.md)
+
+- [assets](collectors/drata.md#assets)
+- [controls](collectors/drata.md#controls)
+- [devices](collectors/drata.md#devices)
+- [frameworks](collectors/drata.md#frameworks)
+- [monitors](collectors/drata.md#monitors)
+- [personnel](collectors/drata.md#personnel)
+- [policies](collectors/drata.md#policies)
+- [vendors](collectors/drata.md#vendors)
+
 ## [endoflife.date](collectors/endoflife.md)
 
 [Credentials](credentials/endoflife.md)
@@ -70,6 +90,12 @@
 - [audit_logs](collectors/azure_entra.md#audit_logs)
 - [signins](collectors/azure_entra.md#signins)
 - [users](collectors/azure_entra.md#users)
+
+## [GCP Security Command Center](collectors/gcp_security_command_center.md)
+
+- [assets](collectors/gcp_security_command_center.md#assets)
+- [findings](collectors/gcp_security_command_center.md#findings)
+- [sources](collectors/gcp_security_command_center.md#sources)
 
 ## [GitHub](collectors/github.md)
 
@@ -136,6 +162,15 @@
 - [pst_recipients](collectors/knowbe4.md#pst_recipients)
 - [psts](collectors/knowbe4.md#psts)
 - [training_enrollments](collectors/knowbe4.md#training_enrollments)
+
+## [Microsoft Defender for Cloud](collectors/defender_for_cloud.md)
+
+- [alerts](collectors/defender_for_cloud.md#alerts)
+- [assessments](collectors/defender_for_cloud.md#assessments)
+- [regulatory_compliance_standards](collectors/defender_for_cloud.md#regulatory_compliance_standards)
+- [secure_score_controls](collectors/defender_for_cloud.md#secure_score_controls)
+- [secure_scores](collectors/defender_for_cloud.md#secure_scores)
+- [sub_assessments](collectors/defender_for_cloud.md#sub_assessments)
 
 ## [Microsoft Defender for Endpoint](collectors/mde.md)
 
@@ -253,6 +288,11 @@
 - [vulnerabilities](collectors/qualys.md#vulnerabilities)
 - [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
 
+## [Rapid7 InsightVM](collectors/rapid7_insightvm.md)
+
+- [assets](collectors/rapid7_insightvm.md#assets)
+- [vulnerabilities](collectors/rapid7_insightvm.md#vulnerabilities)
+
 ## [runZero](collectors/runzero.md)
 
 [Credentials](credentials/runzero.md)
@@ -277,6 +317,12 @@
 - [krow__location__c](collectors/salesforce.md#krow__location__c)
 - [krow__project_resources__c](collectors/salesforce.md#krow__project_resources__c)
 - [krow__team__c](collectors/salesforce.md#krow__team__c)
+
+## [SecurityScorecard](collectors/securityscorecard.md)
+
+- [company_factors](collectors/securityscorecard.md#company_factors)
+- [portfolio_companies](collectors/securityscorecard.md#portfolio_companies)
+- [portfolios](collectors/securityscorecard.md#portfolios)
 
 ## [Select Star](collectors/select_star.md)
 
