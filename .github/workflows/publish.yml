@@ -159,13 +159,20 @@ jobs:
           EOF
           )
 
-          HTTP_STATUS=$(curl --silent --show-error \
+          echo "STATUS length: ${#STATUS}"
+
+          HTTP_STATUS=$(curl --silent --show-error --verbose \
               -o /tmp/mastodon_response.json -w '%{http_code}' \
               -X POST "${API_ENDPOINT%/}/api/v1/statuses" \
               -H "Authorization: Bearer ${ACCESS_TOKEN}" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               --data-urlencode "status=${STATUS}" \
-              --data-urlencode "visibility=public")
+              --data-urlencode "visibility=public" \
+              2> /tmp/mastodon_verbose.log)
+
+          echo "::group::curl verbose log"
+          sed 's/Authorization: Bearer .*/Authorization: Bearer ***REDACTED***/' /tmp/mastodon_verbose.log
+          echo "::endgroup::"
 
           if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
             echo "Mastodon API returned HTTP $HTTP_STATUS:"
