@@ -154,7 +154,6 @@ jobs:
           Install / upgrade:
               pip install --upgrade posture
 
-          🔖 Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION}
           🐍 PyPI: https://pypi.org/project/posture/${VERSION}/
 
           #posture #compliance #python #devsecops
