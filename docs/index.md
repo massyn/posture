@@ -59,6 +59,13 @@
 - [entities](collectors/crowdstrike_identity.md#entities)
 - [entity_risk_factors](collectors/crowdstrike_identity.md#entity_risk_factors)
 
+## [cve-db](collectors/cve_db.md)
+
+[Credentials](credentials/cve_db.md)
+
+- [cve_cpe](collectors/cve_db.md#cve_cpe)
+- [cve_summary](collectors/cve_db.md#cve_summary)
+
 ## [DNSimple](collectors/dnsimple.md)
 
 [Credentials](credentials/dnsimple.md)

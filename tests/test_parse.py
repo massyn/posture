@@ -190,3 +190,47 @@ def test_bool_unknown_string_coerces_to_none_without_warning(caplog) -> None:
 
     assert pd.isna(df.loc[0, "flag"])
     assert "Unparseable bool" not in caplog.text
+
+
+def test_str_column_mixing_none_and_values_preserves_none() -> None:
+    # Regression: pandas' default string-dtype inference (future.infer_string,
+    # default on pandas >= 3.0) silently turned None into a bare nan float for
+    # a str-typed column mixing real strings with None across >= 2 rows,
+    # rather than keeping None. Caught via cve_db's real-world "N/A"-sentinel
+    # columns, but the bug is generic to any str column with mixed nulls.
+    manifest = {"columns": {"name": ("name", "str")}}
+    df = parse([{"name": "widget"}, {"name": None}], manifest, resource="widgets")
+
+    assert df.loc[0, "name"] == "widget"
+    assert df.loc[1, "name"] is None
+
+
+def test_int_float_bool_columns_have_nullable_dtypes() -> None:
+    # Regression: forcing dtype=object at DataFrame construction (the fix for
+    # the None-mangling bug above) also defeated storage backends that pick a
+    # column's SQL type off the DataFrame's own pandas dtype (e.g.
+    # DuckdbStorage._duckdb_type()) — every int/float/bool column silently
+    # fell back to VARCHAR/TEXT instead of BIGINT/DOUBLE/BOOLEAN. int/float/
+    # bool columns must end up in a real (nullable) pandas dtype, not object.
+    manifest = {
+        "columns": {
+            "count": ("count", "int"),
+            "score": ("score", "float"),
+            "flag": ("flag", "bool"),
+        }
+    }
+    df = parse(
+        [
+            {"count": 1, "score": 1.5, "flag": True},
+            {"count": None, "score": None, "flag": None},
+        ],
+        manifest,
+        resource="widgets",
+    )
+
+    assert pd.api.types.is_integer_dtype(df["count"].dtype)
+    assert pd.api.types.is_float_dtype(df["score"].dtype)
+    assert pd.api.types.is_bool_dtype(df["flag"].dtype)
+    assert pd.isna(df.loc[1, "count"])
+    assert pd.isna(df.loc[1, "score"])
+    assert pd.isna(df.loc[1, "flag"])

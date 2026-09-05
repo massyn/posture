@@ -23,11 +23,12 @@ from posture.exceptions import (
     PostureError,
     RateLimitExhausted,
     ResourceUnknown,
+    SourceUnknown,
     StorageConfigError,
     StorageError,
     StorageWriteError,
 )
-from posture.storage import Storage, storage_catalog, write_storage
+from posture.storage import open_storage, storage_catalog, write_storage
 
 logging.getLogger("posture").addHandler(logging.NullHandler())
 
@@ -35,7 +36,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "0.23.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "CCM",
@@ -44,11 +45,12 @@ __all__ = [
     "PostureError",
     "RateLimitExhausted",
     "ResourceUnknown",
-    "Storage",
+    "SourceUnknown",
     "StorageConfigError",
     "StorageError",
     "StorageWriteError",
     "catalog",
+    "open_storage",
     "runnable_sources",
     "storage_catalog",
     "write_storage",
@@ -67,6 +69,7 @@ def _register_sources() -> None:
     from posture.collectors.crowdstrike import CrowdstrikeCollector
     from posture.collectors.crowdstrike_cspm import CrowdstrikeCspmCollector
     from posture.collectors.crowdstrike_identity import CrowdstrikeIdentityCollector
+    from posture.collectors.cve_db import CveDbCollector
     from posture.collectors.defender_for_cloud import DefenderForCloudCollector
     from posture.collectors.dnsimple import DnsimpleCollector
     from posture.collectors.drata import DrataCollector
@@ -120,6 +123,7 @@ def _register_sources() -> None:
     _SOURCES["crowdstrike"] = CrowdstrikeCollector
     _SOURCES["crowdstrike_cspm"] = CrowdstrikeCspmCollector
     _SOURCES["crowdstrike_identity"] = CrowdstrikeIdentityCollector
+    _SOURCES["cve_db"] = CveDbCollector
     _SOURCES["defender_for_cloud"] = DefenderForCloudCollector
     _SOURCES["dnsimple"] = DnsimpleCollector
     _SOURCES["drata"] = DrataCollector
@@ -180,13 +184,13 @@ def CCM(
     try:
         collector_cls = _SOURCES[source]
     except KeyError:
-        raise ValueError(
+        raise SourceUnknown(
             f"Unknown source '{source}'. Available: {sorted(_SOURCES)}"
         ) from None
     return collector_cls(config, record_limit=record_limit)
 
 
-def catalog() -> dict[str, Any]:
+def catalog(filter: str | None = None) -> dict[str, Any]:
     """Return what posture has to offer, read straight off the collector classes.
 
     No instantiation, no credentials, no network calls — just the sources
@@ -195,17 +199,47 @@ def catalog() -> dict[str, Any]:
     which are derived and their declared columns). Code as documentation:
     this is only ever as accurate as the classes it reads, and it stays that
     way for free as collectors change.
+
+    ``filter`` narrows the result, reading ``os.environ`` to do so (a real
+    environment check, unlike the unfiltered call):
+
+    - ``None`` (default): every registered source, unconditionally.
+    - ``"environment"``: only sources that require credentials and have every
+      required env var set right now. A source with no required config (a
+      no-auth source, e.g. a public API) is never "environment-driven" and is
+      excluded here even though it would technically run — this is the lever
+      a cycle-through-all caller uses to skip no-auth sources deliberately,
+      per source, rather than needing per-collector opt-in gating.
+    - ``"runnable"``: everything that would actually work if collected right
+      now — the ``"environment"`` set, plus every no-auth source (empty
+      ``required_config``).
     """
+    if filter not in (None, "environment", "runnable"):
+        raise ValueError(
+            f"Unknown filter {filter!r}. Expected None, 'environment' or 'runnable'."
+        )
     _register_sources()
     sources: dict[str, Any] = {}
     for name, cls in sorted(_SOURCES.items()):
+        required_config = {
+            key: f"{cls.env_prefix}_{key.upper()}"
+            for key, required in cls.config_keys.items()
+            if required
+        }
+        if filter == "environment" and (
+            not required_config
+            or not all(env_var in os.environ for env_var in required_config.values())
+        ):
+            continue
+        if (
+            filter == "runnable"
+            and required_config
+            and not all(env_var in os.environ for env_var in required_config.values())
+        ):
+            continue
         sources[name] = {
             "display_name": cls.display_name or cls.env_prefix,
-            "required_config": {
-                key: f"{cls.env_prefix}_{key.upper()}"
-                for key, required in cls.config_keys.items()
-                if required
-            },
+            "required_config": required_config,
             "optional_config": {
                 key: f"{cls.env_prefix}_{key.upper()}"
                 for key, required in cls.config_keys.items()
@@ -226,14 +260,10 @@ def catalog() -> dict[str, Any]:
 
 
 def runnable_sources() -> dict[str, Any]:
-    """Subset of :func:`catalog` whose required env vars are all set right now.
+    """Subset of :func:`catalog` that would actually run right now.
 
-    Reads ``os.environ`` (a real environment check, unlike ``catalog()``) so a
-    caller — a universal collector cycling through sources — can filter to
-    what will actually run instead of instantiating every source to find out.
+    Thin wrapper for ``catalog(filter="runnable")`` — kept as its own name
+    since it's the common case for a universal collector cycling through
+    sources.
     """
-    return {
-        name: info
-        for name, info in catalog().items()
-        if all(env_var in os.environ for env_var in info["required_config"].values())
-    }
+    return catalog(filter="runnable")

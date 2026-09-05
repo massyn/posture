@@ -62,14 +62,14 @@ underlying API page, so peak memory is bounded to a single page rather than the 
 resource:
 
 ```python
-from posture import Storage
+from posture import open_storage
 
-store = Storage("sqlite", {"path": "posture.db"})
+store = open_storage("sqlite", {"path": "posture.db"})
 for df in ccm.collect_page("machine_vulnerabilities"):
     store.write_page(df, "machine_vulnerabilities", mode="append")
 ```
 
-`Storage("sqlite", ...)` mirrors `CCM("crowdstrike", ...)` — one instance, reused across
+`open_storage("sqlite", ...)` mirrors `CCM("crowdstrike", ...)` — one instance, reused across
 writes. A concrete class (`from posture.storage import SqliteStorage`) works identically
 when the backend is hardcoded rather than a runtime value.
 
@@ -83,9 +83,9 @@ caller to mistake for a complete snapshot.
 file rather than one file per page:
 
 ```python
-from posture import Storage
+from posture import open_storage
 
-store = Storage("parquet", {"path": "output"})
+store = open_storage("parquet", {"path": "output"})
 with store.write_stream("machine_vulnerabilities") as stream:
     for df in ccm.collect_page("machine_vulnerabilities"):
         stream.write(df)
@@ -123,9 +123,18 @@ registered `Collector` classes. It only reports *required* config — optional k
 (e.g. `region`, `base_url`) aren't tracked as data, so check a source's page in
 [`docs/index.md`](docs/index.md) for those.
 
-`runnable_sources()` filters `catalog()` down to sources whose required env vars are
-all set right now — useful for a universal collector that wants to skip sources with
-no credentials configured instead of instantiating each one to find out:
+`catalog()` also takes an optional `filter`, reading `os.environ` to narrow the result
+for a universal collector cycling through sources:
+
+- `catalog()` (default): every registered source, unconditionally.
+- `catalog(filter="environment")`: only sources that require credentials and have every
+  required env var set right now. A no-auth source (e.g. a public API with no required
+  config) is excluded here even though it would technically run — this is the lever to
+  deliberately skip no-auth sources in a cycle-through-all run.
+- `catalog(filter="runnable")`: everything that would actually work if collected right
+  now — the `"environment"` set, plus every no-auth source.
+
+`runnable_sources()` is a thin wrapper for `catalog(filter="runnable")`:
 
 ```python
 from posture import runnable_sources

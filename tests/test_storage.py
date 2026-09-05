@@ -21,8 +21,8 @@ from posture.storage import (
     S3Storage,
     SnowflakeStorage,
     SqliteStorage,
-    Storage,
     StorageBackend,
+    open_storage,
     storage_catalog,
     write_storage,
 )
@@ -432,6 +432,44 @@ def test_duckdb_truncate_then_append(tmp_path: Path) -> None:
     assert len(result) == 3
 
 
+def test_duckdb_all_null_column_then_real_string_data(tmp_path: Path) -> None:
+    # Regression: a column that is entirely None on its first write (a real
+    # shape — e.g. cve_db's version_start_excluding is unset for most CVEs)
+    # must still create as VARCHAR, not whatever DuckDB's own pandas-scanner
+    # inference guesses (INTEGER, in this case) from the all-null data. A
+    # later write with real string data in that column must not fail to
+    # insert with a cast error.
+    db_path = tmp_path / "posture.duckdb"
+    first = pd.DataFrame({"a": [1, 2], "maybe_str": [None, None]})
+    write_storage(
+        first, "duckdb", "hosts", config={"path": str(db_path)}, mode="truncate"
+    )
+
+    conn = duckdb.connect(str(db_path))
+    try:
+        dtype = conn.execute(
+            "SELECT data_type FROM information_schema.columns "
+            "WHERE table_name = 'hosts' AND column_name = 'maybe_str'"
+        ).fetchone()[0]
+        assert dtype == "VARCHAR"
+    finally:
+        conn.close()
+
+    second = pd.DataFrame({"a": [3], "maybe_str": ["real value"]})
+    write_storage(
+        second, "duckdb", "hosts", config={"path": str(db_path)}, mode="append"
+    )
+
+    conn = duckdb.connect(str(db_path))
+    try:
+        result = conn.execute("SELECT maybe_str FROM hosts ORDER BY a").df()
+    finally:
+        conn.close()
+    assert pd.isna(result.loc[0, "maybe_str"])
+    assert pd.isna(result.loc[1, "maybe_str"])
+    assert result.loc[2, "maybe_str"] == "real value"
+
+
 def test_duckdb_truncate_only_clears_current_tenancy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -515,7 +553,7 @@ def test_write_storage_unknown_backend(tmp_path: Path) -> None:
 
 
 def test_storage_factory_returns_matching_backend_instance(tmp_path: Path) -> None:
-    store = Storage("csv", {"path": str(tmp_path)})
+    store = open_storage("csv", {"path": str(tmp_path)})
     assert isinstance(store, CsvStorage)
     store.write(_DF, "hosts")
     assert (tmp_path / "default" / "hosts.csv").exists()
@@ -523,11 +561,11 @@ def test_storage_factory_returns_matching_backend_instance(tmp_path: Path) -> No
 
 def test_storage_factory_unknown_backend() -> None:
     with pytest.raises(ValueError, match="Unknown storage"):
-        Storage("bogus", {})
+        open_storage("bogus", {})
 
 
 def test_storage_factory_reused_across_write_page_calls(tmp_path: Path) -> None:
-    store = Storage("sqlite", {"path": str(tmp_path / "posture.db")})
+    store = open_storage("sqlite", {"path": str(tmp_path / "posture.db")})
     store.write_page(_DF, "hosts", mode="truncate")
     store.write_page(_DF, "hosts", mode="truncate")
     conn = sqlite3.connect(tmp_path / "posture.db")

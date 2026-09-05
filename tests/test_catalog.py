@@ -14,6 +14,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "crowdstrike",
         "crowdstrike_cspm",
         "crowdstrike_identity",
+        "cve_db",
         "defender_for_cloud",
         "dnsimple",
         "drata",
@@ -142,3 +143,40 @@ def test_runnable_sources_requires_every_required_env_var(
     monkeypatch.delenv("CROWDSTRIKE_CLIENT_SECRET", raising=False)
 
     assert "crowdstrike" not in runnable_sources()
+
+
+def test_runnable_sources_includes_no_auth_source() -> None:
+    # endoflife has no required_config at all — always runnable.
+    assert "endoflife" in runnable_sources()
+
+
+def test_catalog_filter_runnable_matches_runnable_sources() -> None:
+    assert catalog(filter="runnable") == runnable_sources()
+
+
+def test_catalog_filter_environment_excludes_no_auth_source() -> None:
+    # A no-auth source is never "environment-driven" — filter="environment"
+    # is the lever a cycle-through-all caller uses to deliberately skip it.
+    assert "endoflife" not in catalog(filter="environment")
+
+
+def test_catalog_filter_environment_requires_env_vars_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KNOWBE4_TOKEN", "dummy")
+    monkeypatch.delenv("CROWDSTRIKE_CLIENT_ID", raising=False)
+    monkeypatch.delenv("CROWDSTRIKE_CLIENT_SECRET", raising=False)
+
+    result = catalog(filter="environment")
+
+    assert "knowbe4" in result
+    assert "crowdstrike" not in result
+
+
+def test_catalog_none_filter_includes_everything() -> None:
+    assert set(catalog()) == set(catalog(filter=None))
+
+
+def test_catalog_rejects_unknown_filter() -> None:
+    with pytest.raises(ValueError, match="Unknown filter"):
+        catalog(filter="bogus")

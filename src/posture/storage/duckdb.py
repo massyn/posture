@@ -69,10 +69,22 @@ class DuckdbStorage(TableStorage):
         try:
             conn.register("_posture_df", df)
             try:
-                conn.execute(
-                    f"CREATE TABLE IF NOT EXISTS {table} AS "
-                    "SELECT * FROM _posture_df WHERE 1=0"
+                # Explicit column/type list rather than "AS SELECT * FROM
+                # _posture_df WHERE 1=0" — the latter lets DuckDB's own
+                # pandas-scanner inference decide types from the (zero-row)
+                # data instead of _duckdb_type(), and DuckDB infers an
+                # all-null object column as INTEGER regardless of pandas
+                # dtype. A later page with real string data in that column
+                # (e.g. cve_db's cve_cpe.version_start_excluding, all-null
+                # in an early year's file, real version strings in a later
+                # one) then fails to insert with a cast error. _duckdb_type()
+                # already falls back to VARCHAR for exactly this shape, so
+                # creation must go through it too, not just _sync_columns'
+                # later ALTER TABLE ADD COLUMN calls.
+                column_defs = ", ".join(
+                    f"{_quote_ident(col)} {_duckdb_type(df[col])}" for col in df.columns
                 )
+                conn.execute(f"CREATE TABLE IF NOT EXISTS {table} ({column_defs})")
                 self._sync_columns(conn, name, df)
                 if recreate:
                     conn.execute(

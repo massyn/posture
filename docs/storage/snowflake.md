@@ -31,12 +31,12 @@ from posture import write_storage
 write_storage(df, "snowflake", "table_name", config={ ... })
 ```
 
-For a paginated collection, use `Storage()` and call `write_page()` once per page instead:
+For a paginated collection, use `open_storage()` and call `write_page()` once per page instead:
 
 ```python
-from posture import Storage
+from posture import open_storage
 
-store = Storage("snowflake", config={ ... })
+store = open_storage("snowflake", config={ ... })
 for page in ccm.collect_page("table_name"):
     store.write_page(page, "table_name", mode="truncate")
 ```

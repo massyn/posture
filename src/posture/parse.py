@@ -65,13 +65,36 @@ def parse(
                 rows.append(_build_row(child, parent, columns, resource))
 
     if not rows:
-        df = pd.DataFrame(columns=column_names)
+        df = pd.DataFrame(columns=column_names, dtype=object)
     else:
-        df = pd.DataFrame(rows, columns=column_names)
+        # dtype=object pins every column to plain object dtype. Without it,
+        # pandas' default string-dtype inference (future.infer_string) can
+        # promote a str-typed column that mixes real strings with None
+        # (any missing value that isn't the column's only row) into its
+        # pyarrow-backed "str" dtype — which silently turns those None
+        # values into a bare nan float instead of preserving None. Values
+        # are already fully coerced by _coerce below, so object dtype loses
+        # nothing here.
+        df = pd.DataFrame(rows, columns=column_names, dtype=object)
 
     for name, spec in columns.items():
-        if spec[1] == "datetime":
+        type_name = spec[1]
+        if type_name == "datetime":
             df[name] = pd.to_datetime(df[name], utc=True).astype("datetime64[us, UTC]")
+        elif type_name == "int":
+            # Nullable Int64, not plain int64 — a column with any None (the
+            # overwhelmingly common case) can't live in a non-nullable numpy
+            # int dtype. Also restores pandas.api.types.is_integer_dtype()
+            # for storage backends (e.g. DuckdbStorage._duckdb_type()) that
+            # pick a column's SQL type off the DataFrame's own dtype — left
+            # as bare object (this function's construction dtype, needed to
+            # keep None from being mangled — see above) they'd all silently
+            # fall back to VARCHAR/TEXT instead of BIGINT.
+            df[name] = df[name].astype("Int64")
+        elif type_name == "float":
+            df[name] = df[name].astype("float64")
+        elif type_name == "bool":
+            df[name] = df[name].astype("boolean")
     return df
 
 

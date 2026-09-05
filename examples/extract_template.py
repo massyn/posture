@@ -37,7 +37,7 @@ from dotenv import load_dotenv
 
 from posture import CCM, runnable_sources
 from posture.exceptions import PostureError
-from posture.storage import ParquetStorage, Storage
+from posture.storage import ParquetStorage, open_storage
 
 load_dotenv()
 
@@ -55,7 +55,7 @@ OUTPUT = os.environ.get("POSTURE_OUTPUT", "output")
 # 2. SINK — keep ONE of these, delete the others, then point `store` at it.
 #    All bundled backends: parquet, csv, json, sqlite, duckdb, postgres,
 #    s3, gcs, bigquery, snowflake. Every one except the Parquet stream uses
-#    the identical `Storage(<name>, <config>).write_page(page, name, mode=...)`
+#    the identical `open_storage(<name>, <config>).write_page(page, name, mode=...)`
 #    shape shown in `store_csv` / `store_postgres` — swap the two strings.
 # ---------------------------------------------------------------------------
 def store_parquet(name: str, pages: Iterator[pd.DataFrame]) -> int:
@@ -70,7 +70,7 @@ def store_parquet(name: str, pages: Iterator[pd.DataFrame]) -> int:
 
 def store_csv(name: str, pages: Iterator[pd.DataFrame]) -> int:
     """Write each page as a CSV file under a per-table directory."""
-    backend = Storage("csv", {"path": OUTPUT})
+    backend = open_storage("csv", {"path": OUTPUT})
     rows = 0
     for page in pages:
         backend.write_page(page, name, mode=MODE)
@@ -80,7 +80,7 @@ def store_csv(name: str, pages: Iterator[pd.DataFrame]) -> int:
 
 def store_postgres(name: str, pages: Iterator[pd.DataFrame]) -> int:
     """Append each page to a Postgres table (one table per `name`)."""
-    backend = Storage("postgres", {"dsn": os.environ["POSTURE_POSTGRES_DSN"]})
+    backend = open_storage("postgres", {"dsn": os.environ["POSTURE_POSTGRES_DSN"]})
     rows = 0
     for page in pages:
         backend.write_page(page, name, mode=MODE)

@@ -5,13 +5,13 @@
     write_storage(df, "parquet", "crowdstrike_hosts", config={"path": "./data"})
 
 For a paginated collection (Collector.collect_page()), hold a backend
-instance and call write_page() once per page instead — Storage() is a
+instance and call write_page() once per page instead — open_storage() is a
 factory mirroring posture.CCM(), for when the backend is only known at
 runtime (a config value, a CLI flag) rather than hardcoded:
 
-    from posture.storage import Storage
+    from posture.storage import open_storage
 
-    csv_store = Storage("csv", {"path": "./data"})
+    csv_store = open_storage("csv", {"path": "./data"})
     for page in ccm.collect_page("hosts"):
         csv_store.write_page(page, "crowdstrike_hosts", mode="truncate")
 
@@ -53,8 +53,8 @@ __all__ = [
     "S3Storage",
     "SnowflakeStorage",
     "SqliteStorage",
-    "Storage",
     "StorageBackend",
+    "open_storage",
     "storage_catalog",
     "write_storage",
 ]
@@ -109,9 +109,14 @@ def __getattr__(name: str) -> Any:
     return cls
 
 
-def Storage(storage: str, config: dict[str, Any] | None = None) -> StorageBackend:
+def open_storage(storage: str, config: dict[str, Any] | None = None) -> StorageBackend:
     """Construct a storage backend instance for repeated writes — mirrors
     ``posture.CCM()`` for collectors: one instance = one write target.
+
+    Named ``open_storage`` rather than ``Storage`` so it doesn't collide with
+    ``posture.storage.base.Storage``, the unrelated ABC file-based backends
+    (csv/json/parquet) inherit from — the two aren't interchangeable, and
+    sharing a name made that easy to miss.
 
     Use this instead of importing a concrete backend class by name when the
     backend is only known at runtime; use it for a paginated collection via
@@ -138,8 +143,9 @@ def write_storage(
     ``storage`` is one of "csv", "json", "parquet", "sqlite", "duckdb",
     "postgres", "gcs", "s3", "bigquery", "snowflake". ``mode``:
     "truncate" overwrites/replaces, "append" keeps a dated history. For
-    per-page writes during a paginated collection, use Storage() to build an
-    instance and call write_page() on it instead (see module docstring).
+    per-page writes during a paginated collection, use open_storage() to
+    build an instance and call write_page() on it instead (see module
+    docstring).
     """
     _backend_class(storage)(config).write(df, name, mode=mode)
 

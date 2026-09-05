@@ -52,6 +52,17 @@ class ResourceUnknown(PostureError):
         self.resource = resource
 
 
+class SourceUnknown(PostureError, ValueError):
+    """Raised by CCM() when the requested source has no registered collector.
+
+    ResourceUnknown's counterpart one level up: ResourceUnknown is a known
+    collector rejecting an unknown resource; this is CCM() rejecting a source
+    name it has no collector class for at all. Also a ValueError (CCM()
+    historically raised plain ValueError for this), so existing
+    ``except ValueError`` code keeps working unchanged.
+    """
+
+
 class IncompleteCollection(PostureError):
     """Raised when a pull dies mid-pagination after retries are exhausted.
 

@@ -10,6 +10,7 @@ schema introspection — lives here so it is never reimplemented per vendor.
 from __future__ import annotations
 
 import concurrent.futures
+import copy
 import json
 import logging
 import os
@@ -227,13 +228,10 @@ class Collector(ABC):
         For a resource too large to hold comfortably in memory as a single
         DataFrame, use collect_page() directly and process one page at a time.
         """
-        pages = list(self.collect_page(resource, **kwargs))
-        if not pages:
-            manifest = self.schema(resource)
-            df = pd.DataFrame(columns=list(manifest["columns"].keys()))
-            df["_collected_at"] = pd.Timestamp(datetime.now(timezone.utc))
-            return df
-        return pd.concat(pages, ignore_index=True)
+        # _paginate() always yields at least one page before it can see a
+        # None cursor, so collect_page() never yields zero pages — no
+        # separate "zero pages" case needed here.
+        return pd.concat(list(self.collect_page(resource, **kwargs)), ignore_index=True)
 
     def collect_page(self, resource: str, **kwargs: Any) -> Iterator[pd.DataFrame]:
         """Yield one parsed DataFrame per underlying API page for ``resource``.
@@ -602,7 +600,11 @@ class Collector(ABC):
                 source=self.env_prefix.lower(),
                 resource=resource,
             )
-        return manifest
+        # A copy, not the live dict — self.manifest is a ClassVar shared by
+        # every instance of this collector class; a caller mutating the
+        # returned schema (e.g. ccm.schema("hosts")["columns"]["x"] = ...)
+        # must not corrupt it for every other instance and every future call.
+        return copy.deepcopy(manifest)
 
     def flush_cache(self) -> None:
         for entry in self._cache.values():
