@@ -144,6 +144,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -o pipefail
+          API_ENDPOINT="$(printf '%s' "$API_ENDPOINT" | tr -d '\r\n')"
+          ACCESS_TOKEN="$(printf '%s' "$ACCESS_TOKEN" | tr -d '\r\n')"
           STATUS=$(cat <<EOF
           📦 posture v${VERSION} is now on PyPI
 
