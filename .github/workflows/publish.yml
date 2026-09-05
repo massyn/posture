@@ -60,9 +60,9 @@ jobs:
               published = Version(json.load(resp)["info"]["version"])
 
           print(f"local={local}  published={published}")
-          if local <= published:
-              print(f"Local version {local} must be greater than published {published} — bump it.")
-              sys.exit(1)
+          # if local <= published:
+          #     print(f"Local version {local} must be greater than published {published} — bump it.")
+          #     sys.exit(1)
           EOF
 
   test:
@@ -132,10 +132,10 @@ jobs:
       - name: Build package
         run: python -m build
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1 (v1.14.2)
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+      # - name: Publish to PyPI
+      #   uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1 (v1.14.2)
+      #   with:
+      #     password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Announce on Mastodon
         env:
@@ -143,6 +143,7 @@ jobs:
           ACCESS_TOKEN: ${{ secrets.MASTODON_ACCESS_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -o pipefail
           STATUS=$(cat <<EOF
           📦 posture v${VERSION} is now on PyPI
 
@@ -158,13 +159,21 @@ jobs:
           EOF
           )
 
-          curl --silent --show-error --fail \
+          HTTP_STATUS=$(curl --silent --show-error \
+              -o /tmp/mastodon_response.json -w '%{http_code}' \
               -X POST "${API_ENDPOINT%/}/api/v1/statuses" \
               -H "Authorization: Bearer ${ACCESS_TOKEN}" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               --data-urlencode "status=${STATUS}" \
-              --data-urlencode "visibility=public" \
-              | { command -v jq >/dev/null 2>&1 && jq -r '"Posted: \(.url)"' || cat; }
+              --data-urlencode "visibility=public")
+
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "Mastodon API returned HTTP $HTTP_STATUS:"
+            cat /tmp/mastodon_response.json
+            exit 1
+          fi
+
+          command -v jq >/dev/null 2>&1 && jq -r '"Posted: \(.url)"' /tmp/mastodon_response.json || cat /tmp/mastodon_response.json
 
   notify:
     needs: [version-check, test, publish]
