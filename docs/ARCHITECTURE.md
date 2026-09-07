@@ -1160,6 +1160,42 @@ why something is built the way it is, not how to configure or call it.
   **Caveat:** `MANIFEST` built from the public SCC v1 reference, not a
   live org — same tier as `wiz.py`/`appomni.py`.
 
+- **HTTP headers** — raw `requests` against a caller-supplied host list, no
+  vendor SDK and no credential. Two deliberate deviations from the usual
+  collector contract (see the posture Citadel room, entries 232/233/234):
+  * **The host list is the scope boundary.** Every other collector takes a
+    credential and gets whatever the vendor's IAM entitles it to. There is
+    no gatekeeper here, so `hosts` (config key / `HTTP_HOSTS`,
+    comma-separated, or the `hosts` kwarg — a string or a list, kwarg wins)
+    *is* the authorisation mechanism. It defaults to empty and an empty
+    resolved list short-circuits `_fetch_page` before any request — same
+    "no fake credential, unscoped call is genuinely free" shape as
+    `endoflife.py`, so a generic loop over every source makes zero network
+    calls against this one.
+  * **Per-host failure handling, not all-or-nothing.** N independent hosts
+    in one call; one timing out or refusing must not discard the rest. A
+    network failure (and a malformed scope entry — a host with no
+    `http://`/`https://` scheme, which is mandatory and never defaulted) is
+    caught inside `_fetch_page` and emitted as a row with `ok=False` and an
+    `error` message, rather than propagating as `IncompleteCollection`.
+  Output is tidy/long: one row per `(host, header_name, header_value)`, a
+  fixed column set — a wide format (one column per header) was rejected
+  because header sets vary per host and would shift the manifest-driven
+  schema. One host per page (cursor = index into the list), like
+  `endoflife.py`'s per-product paging, so a failure on host N doesn't
+  discard N-1 already-yielded pages; no thread-pool fan-out. Redirects are
+  **not** followed (`allow_redirects=False`): the named host is the asset,
+  so a 3xx is captured as-is with its `Location` as an ordinary header row.
+  Scheme and port are part of the host's identity, taken verbatim
+  (`https://h:8443` ≠ `https://h`). TLS is two-pass for `https://`: the
+  verified handshake is tried first, and only on `SSLError` does it retry
+  with `verify=False` (suppressing `InsecureRequestWarning`), recording the
+  verification failure reason in `tls_error` first. The nullable `secure`
+  column is null for `http://`, true if verification succeeded, false if it
+  fell back to insecure. Certificate facts (subject/issuer/expiry/SANs —
+  `requests` doesn't expose them) and cipher/protocol strength
+  (`sslyze`/`testssl.sh` territory) are out of scope.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

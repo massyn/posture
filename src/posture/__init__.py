@@ -36,7 +36,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 __all__ = [
     "CCM",
@@ -81,6 +81,7 @@ def _register_sources() -> None:
     from posture.collectors.github import GithubCollector
     from posture.collectors.google_workspace import GoogleWorkspaceCollector
     from posture.collectors.healthchecks import HealthchecksCollector
+    from posture.collectors.http import HttpCollector
     from posture.collectors.intune import IntuneCollector
     from posture.collectors.jamf import JamfCollector
     from posture.collectors.jira import JiraCollector
@@ -133,6 +134,7 @@ def _register_sources() -> None:
     _SOURCES["github"] = GithubCollector
     _SOURCES["google_workspace"] = GoogleWorkspaceCollector
     _SOURCES["healthchecks"] = HealthchecksCollector
+    _SOURCES["http"] = HttpCollector
     _SOURCES["intune"] = IntuneCollector
     _SOURCES["jamf"] = JamfCollector
     _SOURCES["jira"] = JiraCollector

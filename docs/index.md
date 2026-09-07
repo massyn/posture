@@ -134,6 +134,12 @@
 - [checks](collectors/healthchecks.md#checks)
 - [flips](collectors/healthchecks.md#flips)
 
+## [HTTP headers](collectors/http.md)
+
+[Credentials](credentials/http.md)
+
+- [headers](collectors/http.md#headers)
+
 ## [Jamf](collectors/jamf.md)
 
 [Credentials](credentials/jamf.md)

@@ -4,12 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "posture"
-version = "1.0.1"
+version = "1.1.0"
 description = "Runtime-agnostic Python library for CCM (Continuous Control Monitoring) data collection."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "Phil Massyn", email = "phil.massyn@icloud.com" }]
+authors = [
+    { name = "Phil Massyn", email = "phil.massyn@icloud.com" },
+    { name = "Phil Massyn" },
+]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -69,6 +72,9 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/massyn/posture"
+Repository = "https://github.com/massyn/posture"
+Documentation = "https://github.com/massyn/posture/blob/main/docs/index.md"
+Issues = "https://github.com/massyn/posture/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/posture"]
