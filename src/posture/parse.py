@@ -201,6 +201,12 @@ def _coerce_datetime(
         parsed = _parse_epoch(value)
     else:
         text = str(value)
+        if not text.strip():
+            # A CSV-backed source represents an absent nullable datetime as an
+            # empty string. That is a null, not a malformed value — coerce it
+            # to NaT silently rather than emitting an "unparseable" warning
+            # once per affected row.
+            return pd.NaT
         if "format" in hints:
             # An explicit format is authoritative, not a fallback tried only
             # after the generic ISO guess fails: a manifest only declares one

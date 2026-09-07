@@ -192,6 +192,23 @@ def test_bool_unknown_string_coerces_to_none_without_warning(caplog) -> None:
     assert "Unparseable bool" not in caplog.text
 
 
+def test_empty_string_datetime_coerces_to_nat_without_warning(caplog) -> None:
+    # A CSV-backed source (e.g. Teams user_activity) reports an absent
+    # nullable datetime as "". That is a null, not a malformed value, and
+    # must coerce to NaT silently rather than warning once per affected row.
+    manifest = {"columns": {"deleted_date": ("deleted_date", "datetime")}}
+    with caplog.at_level("WARNING", logger="posture.parse"):
+        df = parse(
+            [{"deleted_date": ""}, {"deleted_date": "   "}],
+            manifest,
+            resource="user_activity",
+        )
+
+    assert df.loc[0, "deleted_date"] is pd.NaT
+    assert df.loc[1, "deleted_date"] is pd.NaT
+    assert "Unparseable datetime" not in caplog.text
+
+
 def test_str_column_mixing_none_and_values_preserves_none() -> None:
     # Regression: pandas' default string-dtype inference (future.infer_string,
     # default on pandas >= 3.0) silently turned None into a bare nan float for

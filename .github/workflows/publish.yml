@@ -60,9 +60,9 @@ jobs:
               published = Version(json.load(resp)["info"]["version"])
 
           print(f"local={local}  published={published}")
-          # if local <= published:
-          #     print(f"Local version {local} must be greater than published {published} — bump it.")
-          #     sys.exit(1)
+          if local <= published:
+              print(f"Local version {local} must be greater than published {published} — bump it.")
+              sys.exit(1)
           EOF
 
   test:
@@ -132,10 +132,10 @@ jobs:
       - name: Build package
         run: python -m build
 
-      # - name: Publish to PyPI
-      #   uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1 (v1.14.2)
-      #   with:
-      #     password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1 (v1.14.2)
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Announce on Mastodon
         env:
@@ -160,20 +160,13 @@ jobs:
           EOF
           )
 
-          echo "STATUS length: ${#STATUS}"
-
-          HTTP_STATUS=$(curl --silent --show-error --verbose \
+          HTTP_STATUS=$(curl --silent --show-error \
               -o /tmp/mastodon_response.json -w '%{http_code}' \
               -X POST "${API_ENDPOINT%/}/api/v1/statuses" \
               -H "Authorization: Bearer ${ACCESS_TOKEN}" \
               -H "Content-Type: application/x-www-form-urlencoded" \
               --data-urlencode "status=${STATUS}" \
-              --data-urlencode "visibility=public" \
-              2> /tmp/mastodon_verbose.log)
-
-          echo "::group::curl verbose log"
-          sed 's/Authorization: Bearer .*/Authorization: Bearer ***REDACTED***/' /tmp/mastodon_verbose.log
-          echo "::endgroup::"
+              --data-urlencode "visibility=public")
 
           if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
             echo "Mastodon API returned HTTP $HTTP_STATUS:"
