@@ -24,6 +24,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "github",
         "google_workspace",
         "healthchecks",
+        "http",
         "intune",
         "jamf",
         "jira",
