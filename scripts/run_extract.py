@@ -78,8 +78,8 @@ for source in sources:
                 for page in ccm.collect_page(table):
                     stream.write(page)
                     rows += len(page)
-        except PostureError as exc:
-            log.error("%s: FAILED - %s", name, exc)
+        except PostureError:
+            log.exception("%s: FAILED", name)
             continue
         log.info("%s: %d rows", name, rows)
         log.debug("%s report: %s", name, ccm.report(table))

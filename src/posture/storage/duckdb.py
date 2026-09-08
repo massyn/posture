@@ -24,7 +24,7 @@ from typing import Any, ClassVar
 import duckdb
 import pandas as pd
 
-from posture.storage.base import TableStorage
+from posture.storage.base import Schema, TableStorage, resolve_sql_type
 
 logger = logging.getLogger("posture.storage.duckdb")
 
@@ -46,6 +46,18 @@ def _duckdb_type(series: pd.Series) -> str:
     return "VARCHAR"
 
 
+# posture type name -> DuckDB type, used when a caller passes an explicit
+# schema. "json" stays VARCHAR: parse() emits it as a json.dumps() string.
+_POSTURE_TYPE_MAP = {
+    "str": "VARCHAR",
+    "int": "BIGINT",
+    "float": "DOUBLE",
+    "bool": "BOOLEAN",
+    "datetime": "TIMESTAMP",
+    "json": "VARCHAR",
+}
+
+
 def _quote_ident(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
@@ -61,7 +73,14 @@ class DuckdbStorage(TableStorage):
     def __repr__(self) -> str:
         return f"DuckdbStorage(path={self._path!s})"
 
-    def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+    def _write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         df = self._add_tenancy_column(df)
         table = _quote_ident(name)
@@ -82,10 +101,12 @@ class DuckdbStorage(TableStorage):
                 # creation must go through it too, not just _sync_columns'
                 # later ALTER TABLE ADD COLUMN calls.
                 column_defs = ", ".join(
-                    f"{_quote_ident(col)} {_duckdb_type(df[col])}" for col in df.columns
+                    f"{_quote_ident(col)} "
+                    f"{resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _duckdb_type)}"
+                    for col in df.columns
                 )
                 conn.execute(f"CREATE TABLE IF NOT EXISTS {table} ({column_defs})")
-                self._sync_columns(conn, name, df)
+                self._sync_columns(conn, name, df, schema)
                 if recreate:
                     conn.execute(
                         f"DELETE FROM {table} WHERE tenancy = ?", [self._tenancy]
@@ -104,7 +125,11 @@ class DuckdbStorage(TableStorage):
             conn.close()
 
     def _sync_columns(
-        self, conn: duckdb.DuckDBPyConnection, name: str, df: pd.DataFrame
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        name: str,
+        df: pd.DataFrame,
+        schema: Schema | None,
     ) -> None:
         existing = {
             row[0]
@@ -119,7 +144,8 @@ class DuckdbStorage(TableStorage):
         for col in new_cols:
             conn.execute(
                 f"ALTER TABLE {_quote_ident(name)} ADD COLUMN "
-                f"{_quote_ident(col)} {_duckdb_type(df[col])}"
+                f"{_quote_ident(col)} "
+                f"{resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _duckdb_type)}"
             )
         if missing_cols:
             logger.warning(

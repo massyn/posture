@@ -4,20 +4,17 @@
 
 ## Environment variables
 
-No required configuration.
-
-### Optional
-
 | Config key | Environment variable |
 | --- | --- |
 | `hosts` | `HTTP_HOSTS` |
+
 
 ## Example
 
 ```python
 from posture import CCM
 
-ccm = CCM("http")  # credentials from the environment
+ccm = CCM("http")  # credentials from HTTP_HOSTS
 df = ccm.collect("headers")
 ```
 
@@ -28,7 +25,7 @@ from pathlib import Path
 
 from posture import CCM
 
-ccm = CCM("http")  # credentials from the environment
+ccm = CCM("http")  # credentials from HTTP_HOSTS
 
 output_dir = Path("output")
 output_dir.mkdir(exist_ok=True)

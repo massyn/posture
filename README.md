@@ -24,7 +24,7 @@ with the matching extra:
 ```bash
 pip install posture[gcs]        # google-cloud-storage, for the "gcs" backend
 pip install posture[s3]         # boto3, for the "s3" backend
-pip install posture[bigquery]   # google-cloud-bigquery, for the "bigquery" backend
+pip install posture[bigquery]   # google-cloud-bigquery + pandas-gbq, for the "bigquery" backend
 pip install posture[snowflake]  # snowflake-connector-python, for the "snowflake" backend
 ```
 
@@ -161,6 +161,19 @@ keys all show up as *optional* here even though one specific combination (`dsn` 
 or all of `host`/`dbname`/`user`/`password`) is actually required — that either/or logic
 lives in `PostgresStorage.__init__`, not in a flat required/optional key list.
 
+### Update check
+
+Constructing a collector with `CCM(...)` checks PyPI once per process and logs a
+warning (on the `posture` logger) if a newer release is available. It is best-effort —
+any network failure is swallowed silently and never delays a run by more than two
+seconds. Set `POSTURE_VERSION_CHECK=0` to disable it, or call it yourself:
+
+```python
+from posture import check_for_update
+
+check_for_update()  # returns the newer version string, or None
+```
+
 ## Example: export Crowdstrike hosts to local JSON
 
 ```python
@@ -257,6 +270,34 @@ Every file write goes through a temp file and an atomic rename, so a failure par
 through never leaves a broken file at the real path. For a paginated collection, use
 `write_page()` on a backend instance instead of `write_storage()` — see
 [Paginated retrieval](#paginated-retrieval-for-large-resources) above.
+
+#### Pinning column types with `schema=`
+
+By default the database backends infer each SQL column's type from the DataFrame's
+dtypes. That reads the type off the *data*, so a column that is entirely null on one
+run lands as text and gets its real type on the next — a schema change BigQuery and
+Snowflake reject outright. Pass `schema=` (column name → posture type name) to declare
+the types from the collector's manifest instead:
+
+```python
+ccm = CCM("azure_entra")
+
+df = ccm.collect("users")
+write_storage(
+    df, "bigquery", "azure_entra_users",
+    config={"project_id": "...", "dataset_id": "..."},
+    mode="append",
+    schema=ccm.column_types("users"),   # {'id': 'str', 'is_resource_account': 'bool', ...}
+)
+```
+
+`Collector.column_types(resource)` returns that mapping — the manifest's declared types
+plus the `_collected_at` timestamp `collect()` appends. `write()`, `write_page()` and
+`write_storage()` all take `schema=`. It applies to `sqlite`/`duckdb`/`postgres`/
+`bigquery`/`snowflake`; the file backends accept and ignore it. Columns not named in
+the mapping (a backend's own `tenancy`/`upload_timestamp`, anything you add yourself)
+still fall back to dtype inference. Omitting `schema=` keeps the pure-inference
+behaviour unchanged.
 
 ### A full extraction script to copy
 

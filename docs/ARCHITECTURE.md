@@ -101,6 +101,25 @@ tests/
     has bespoke machinery the base class can't generalise (pyTenable's export jobs
     qualify, later, as an extra). Crowdstrike is generic REST — that pattern is the
     base class's job.
+11. **Storage backends take the schema, they don't re-derive it from the DataFrame.**
+    A pandas dtype is inferred from the values present, so an all-null column is bare
+    `object` on one run and `Int64`/`boolean` on the next once real values arrive. A
+    table backend that reads its SQL column types off the dtype (`bigquery`,
+    `snowflake`, `postgres`, `duckdb`, `sqlite`) then emits a column-type change on the
+    second run that BigQuery and Snowflake reject outright. So `write()` /
+    `write_page()` / `write_storage()` take an optional `schema=` — column name → one
+    of the six manifest type names — produced by `Collector.column_types(resource)`
+    (the manifest's declared types, plus the injected `_collected_at`). Named columns
+    get their type from the manifest; columns absent from the map (a backend's own
+    `tenancy` / `upload_timestamp`, or extras on a hand-built frame) still fall back to
+    dtype inference, and `schema=None` keeps pure inference — the pre-1.2.0 behaviour,
+    still correct when a freshly `parse()`d frame is written straight through. The
+    manifest is the authority on types; a DataFrame only carries them intact until
+    something downstream (a concat with an empty page, a CSV round-trip) flattens the
+    nullable dtype back to `object`. The file backends (`csv`/`json`/`parquet`/`gcs`/
+    `s3`) accept `schema=` and ignore it — a file format stores whatever dtype the
+    frame has. `json` maps to the same text type as `str` for now; native
+    `JSON`/`JSONB`/`VARIANT` columns are a later change.
 
 ## Schema: declared manifest per resource (allowlist, not flattener)
 
@@ -132,6 +151,9 @@ tests/
   per host.
 - Empty results return the full declared column set, zero rows.
 - The manifest is executable documentation: `ccm.schema("hosts")` returns it.
+  `ccm.column_types("hosts")` returns just the declared types as a flat
+  `{column: type}` map (plus the injected `_collected_at`), for handing to a storage
+  backend as `schema=` — see locked decision #11.
 - Allowlist ≠ normalisation: raw vendor field names and semantics. Interpretation
   belongs to the downstream SQL layer, never here.
 
@@ -410,10 +432,12 @@ API docs) can write it accurately.
   as optional extras. `.env` loading is part and parcel of the library, not optional:
   `posture` calls `load_dotenv()` unconditionally at import time. It never overrides
   variables already set in the environment.
-- **Out of scope for v1 — do not build:** Store/storage backends, TTLs or cache
-  configuration, incremental sync, alert delivery, per-collector pip packages,
-  unified filter languages. (`collect_page()` — see locked decision #3 — shipped;
-  it's the deferred `stream()` mentioned in earlier versions of this doc.)
+- **Out of scope for v1 — do not build:** TTLs or cache configuration, incremental
+  sync, alert delivery, per-collector pip packages, unified filter languages.
+  (`collect_page()` — see locked decision #3 — shipped; it's the deferred `stream()`
+  mentioned in earlier versions of this doc. The bundled storage backends shipped in
+  1.0.0 and are part of the frozen public surface — see CLAUDE.md's "1.0.0 contract"
+  and locked decision #11.)
 - Production-ready code only. No placeholder code, no speculative syntax, no TODO-stubs
   that would break at runtime.
 - Python 3.10+. Type hints throughout. pytest. Keep it simple — this library is five

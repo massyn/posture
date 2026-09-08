@@ -15,6 +15,10 @@ Citadel room, entries 232/233/234):
   short-circuits ``_fetch_page`` before any request is made, so a generic
   loop over every registered source's resources makes zero network calls
   against this source unless an operator has deliberately named hosts.
+  Because an unset host list is indistinguishable in effect from a missing
+  credential, ``hosts`` is declared as a *required* config key: a caller
+  cycling through ``catalog(filter="environment")`` picks up http exactly
+  when ``HTTP_HOSTS`` is set, and skips it otherwise.
 
 * **Per-host failure handling, not all-or-nothing.** There are N independent
   hosts in one call; one host timing out or refusing a connection must not
@@ -54,6 +58,7 @@ latter is ``sslyze``/``testssl.sh`` territory.
 from __future__ import annotations
 
 import logging
+import os
 import time
 import warnings
 from typing import Any, ClassVar
@@ -88,16 +93,30 @@ class HttpCollector(Collector):
     env_prefix = "HTTP"
     display_name = "HTTP headers"
     manifest = MANIFEST
-    # No credential exists to require — declared anyway (as not-required) so
-    # catalog()/generated docs document the hosts default the same way every
-    # other collector's optional config is documented.
-    config_keys: ClassVar[dict[str, bool]] = {"hosts": False}
+    # No vendor credential exists, but ``hosts`` is the scope/authorisation
+    # boundary (see the module docstring): without it the collector makes
+    # zero requests and produces no output, exactly like a collector with a
+    # missing credential. It is therefore declared *required* so
+    # ``catalog(filter="environment")`` includes http iff ``HTTP_HOSTS`` is
+    # set, and excludes it otherwise — same as every other collector.
+    config_keys: ClassVar[dict[str, bool]] = {"hosts": True}
 
     def __init__(
         self, config: dict[str, Any] | None = None, *, record_limit: int | None = None
     ) -> None:
         super().__init__(config, record_limit=record_limit)
         self._default_hosts = _split_hosts(self._config.get("hosts"))
+
+    def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
+        # ``hosts`` is declared required so ``catalog(filter="environment")``
+        # gates on ``HTTP_HOSTS`` like any other collector's credential. At
+        # runtime, though, an unset host list is a valid state — the
+        # collector simply makes zero requests (see the module docstring), so
+        # it must still construct. Supply an empty default rather than let
+        # the base resolver raise for the missing key.
+        if "hosts" not in explicit and "HTTP_HOSTS" not in os.environ:
+            explicit = {**explicit, "hosts": ""}
+        return super()._resolve_config(explicit)
 
     def _authenticate(self) -> None:
         # No credential — the host list is the scope boundary, not an identity.

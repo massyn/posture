@@ -35,7 +35,7 @@ from typing import Any, ClassVar
 import pandas as pd
 
 from posture.exceptions import StorageConfigError
-from posture.storage.base import TableStorage
+from posture.storage.base import Schema, TableStorage, resolve_sql_type
 
 logger = logging.getLogger("posture.storage.snowflake")
 
@@ -70,6 +70,19 @@ def _sf_type(series: pd.Series) -> str:
         if is_dtype(series.dtype):
             return sf_type
     return "VARCHAR"
+
+
+# posture type name -> Snowflake type, used when a caller passes an explicit
+# schema. "json" stays VARCHAR: parse() emits it as a json.dumps() string,
+# and a native VARIANT column is a separate change.
+_POSTURE_TYPE_MAP = {
+    "str": "VARCHAR",
+    "int": "INTEGER",
+    "float": "FLOAT",
+    "bool": "BOOLEAN",
+    "datetime": "TIMESTAMP_NTZ",
+    "json": "VARCHAR",
+}
 
 
 class SnowflakeStorage(TableStorage):
@@ -117,14 +130,21 @@ class SnowflakeStorage(TableStorage):
     def __repr__(self) -> str:
         return f"SnowflakeStorage(account={self._config['account']!s}, database={self._database!s})"
 
-    def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+    def _write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
         from snowflake.connector.pandas_tools import write_pandas
 
         df = self._add_tenancy_column(df)
         table_name = name.upper()
 
-        self._create_table_if_missing(table_name, df)
-        self._sync_columns(table_name, df)
+        self._create_table_if_missing(table_name, df, schema)
+        self._sync_columns(table_name, df, schema)
         if recreate:
             self._delete_tenancy_rows(table_name)
         if df.empty:
@@ -152,8 +172,14 @@ class SnowflakeStorage(TableStorage):
     def _table_ref(self, table_name: str) -> str:
         return f"{self._database}.{self._schema}.{table_name}"
 
-    def _create_table_if_missing(self, table_name: str, df: pd.DataFrame) -> None:
-        columns = ", ".join(f"{col.upper()} {_sf_type(df[col])}" for col in df.columns)
+    def _create_table_if_missing(
+        self, table_name: str, df: pd.DataFrame, schema: Schema | None
+    ) -> None:
+        columns = ", ".join(
+            f"{col.upper()} "
+            f"{resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _sf_type)}"
+            for col in df.columns
+        )
         cur = self._conn.cursor()
         try:
             cur.execute(
@@ -162,7 +188,9 @@ class SnowflakeStorage(TableStorage):
         finally:
             cur.close()
 
-    def _sync_columns(self, table_name: str, df: pd.DataFrame) -> None:
+    def _sync_columns(
+        self, table_name: str, df: pd.DataFrame, schema: Schema | None
+    ) -> None:
         cur = self._conn.cursor()
         try:
             cur.execute(f"SELECT * FROM {self._table_ref(table_name)} LIMIT 0")
@@ -185,7 +213,8 @@ class SnowflakeStorage(TableStorage):
                 for col in new_cols:
                     cur.execute(
                         f"ALTER TABLE {self._table_ref(table_name)} "
-                        f"ADD COLUMN {col.upper()} {_sf_type(df[col])}"
+                        f"ADD COLUMN {col.upper()} "
+                        f"{resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _sf_type)}"
                     )
             finally:
                 cur.close()
