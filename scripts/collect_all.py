@@ -103,16 +103,17 @@ for source in sources:
     ccm = CCM(source)
     for table in ccm.tables():
         name = f"{source}_{table}"
+        schema = ccm.column_types(table)
         try:
             rows = 0
             for page in ccm.collect_page(table):
-                parquet_latest.write_page(page, name, mode="truncate")
-                parquet_history.write_page(page, name, mode="append")
-                duckdb_store.write_page(page, name, mode="append")
-                postgres_store.write_page(page, name, mode="append")
+                parquet_latest.write_page(page, name, mode="truncate", schema=schema)
+                parquet_history.write_page(page, name, mode="append", schema=schema)
+                duckdb_store.write_page(page, name, mode="append", schema=schema)
+                postgres_store.write_page(page, name, mode="append", schema=schema)
                 rows += len(page)
-        except PostureError as exc:
-            log.error("%s: FAILED - %s", name, exc)
+        except PostureError:
+            log.exception("%s: FAILED", name)
             continue
         log.info("%s: %d rows", name, rows)
         log.debug("%s report: %s", name, ccm.report(table))

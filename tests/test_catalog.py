@@ -174,6 +174,25 @@ def test_catalog_filter_environment_requires_env_vars_set(
     assert "crowdstrike" not in result
 
 
+def test_http_declares_hosts_as_required_config() -> None:
+    # HTTP_HOSTS is the scope/authorisation boundary for the http collector
+    # (no vendor credential exists), so it is a required key, not optional.
+    result = catalog()
+
+    assert result["http"]["required_config"] == {"hosts": "HTTP_HOSTS"}
+    assert "hosts" not in result["http"]["optional_config"]
+
+
+def test_catalog_filter_environment_includes_http_only_when_hosts_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("HTTP_HOSTS", raising=False)
+    assert "http" not in catalog(filter="environment")
+
+    monkeypatch.setenv("HTTP_HOSTS", "https://example.com")
+    assert "http" in catalog(filter="environment")
+
+
 def test_catalog_none_filter_includes_everything() -> None:
     assert set(catalog()) == set(catalog(filter=None))
 

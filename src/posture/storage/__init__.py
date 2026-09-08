@@ -137,6 +137,7 @@ def write_storage(
     config: dict[str, Any] | None = None,
     *,
     mode: str = "truncate",
+    schema: Any | None = None,
 ) -> None:
     """Write ``df`` as ``name`` to ``storage`` in one shot.
 
@@ -146,8 +147,15 @@ def write_storage(
     per-page writes during a paginated collection, use open_storage() to
     build an instance and call write_page() on it instead (see module
     docstring).
+
+    ``schema`` (column name -> posture type name, from
+    ``Collector.column_types``) pins SQL column types for the table backends
+    (sqlite/duckdb/postgres/bigquery/snowflake) instead of inferring them
+    from ``df``'s dtypes — which otherwise flips an all-null column's type
+    between runs. Ignored by the file backends. ``None`` keeps the pure
+    inference behaviour.
     """
-    _backend_class(storage)(config).write(df, name, mode=mode)
+    _backend_class(storage)(config).write(df, name, mode=mode, schema=schema)
 
 
 def storage_catalog() -> dict[str, Any]:

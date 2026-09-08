@@ -16,6 +16,7 @@ from typing import Any
 
 from dotenv import find_dotenv, load_dotenv
 
+from posture._version_check import check_for_update
 from posture.base import Collector
 from posture.exceptions import (
     AuthenticationError,
@@ -36,7 +37,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "CCM",
@@ -50,6 +51,7 @@ __all__ = [
     "StorageError",
     "StorageWriteError",
     "catalog",
+    "check_for_update",
     "open_storage",
     "runnable_sources",
     "storage_catalog",
@@ -183,6 +185,7 @@ def CCM(
     of a source's extraction, not a full collection run.
     """
     _register_sources()
+    check_for_update()
     try:
         collector_cls = _SOURCES[source]
     except KeyError:

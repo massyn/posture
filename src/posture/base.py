@@ -606,6 +606,31 @@ class Collector(ABC):
         # must not corrupt it for every other instance and every future call.
         return copy.deepcopy(manifest)
 
+    def column_types(self, resource: str) -> dict[str, str]:
+        """Declared type of every column ``collect(resource)`` produces.
+
+        Maps column name to one of ``"str"``, ``"int"``, ``"float"``,
+        ``"bool"``, ``"datetime"`` or ``"json"`` — read straight off the
+        manifest, plus the ``_collected_at`` timestamp ``collect()`` appends.
+
+        Pass it to a storage backend's ``write()``/``write_page()`` (or
+        ``write_storage()``) as ``schema=`` so SQL column types come from the
+        manifest instead of being inferred from a DataFrame's dtypes.
+        Inference reads the type off the data, so an all-null column lands as
+        text one run and its real type the next — a schema change BigQuery
+        and Snowflake then reject.
+        """
+        manifest = self.manifest.get(resource)
+        if manifest is None:
+            raise ResourceUnknown(
+                f"Unknown resource '{resource}' for {self.__class__.__name__}",
+                source=self.env_prefix.lower(),
+                resource=resource,
+            )
+        types = {col: spec[1] for col, spec in manifest["columns"].items()}
+        types["_collected_at"] = "datetime"
+        return types
+
     def flush_cache(self) -> None:
         for entry in self._cache.values():
             self._spill.delete(entry.path)

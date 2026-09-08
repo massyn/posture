@@ -25,7 +25,7 @@ from typing import Any, ClassVar
 
 import pandas as pd
 
-from posture.storage.base import TableStorage
+from posture.storage.base import Schema, TableStorage, resolve_sql_type
 
 logger = logging.getLogger("posture.storage.sqlite")
 
@@ -47,6 +47,23 @@ def _sqlite_type(series: pd.Series) -> str:
     return "TEXT"
 
 
+# posture type name -> SQLite column type, used when a caller passes an
+# explicit schema. "json" stays TEXT: parse() emits it as a json.dumps()
+# string, and SQLite has no native JSON type anyway.
+_POSTURE_TYPE_MAP = {
+    "str": "TEXT",
+    "int": "INTEGER",
+    "float": "REAL",
+    "bool": "BOOLEAN",
+    "datetime": "TIMESTAMP",
+    "json": "TEXT",
+}
+
+
+def _quote_ident(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
 class SqliteStorage(TableStorage):
     env_prefix = "POSTURE_SQLITE"
     config_keys: ClassVar[dict[str, bool]] = {"path": True}
@@ -58,25 +75,46 @@ class SqliteStorage(TableStorage):
     def __repr__(self) -> str:
         return f"SqliteStorage(path={self._path!s})"
 
-    def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+    def _write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         df = self._add_tenancy_column(df)
         conn = sqlite3.connect(self._path)
         try:
             with conn:
-                table_exists = self._sync_columns(conn, name, df)
-                if recreate and table_exists:
+                table_exists = self._sync_columns(conn, name, df, schema)
+                if table_exists and recreate:
                     conn.execute(
                         f'DELETE FROM "{name}" WHERE tenancy = ?', (self._tenancy,)
                     )
-                # If the table doesn't exist yet, to_sql() creates it from
-                # exactly df's columns — no separate CREATE TABLE needed.
+                if not table_exists:
+                    # Create explicitly (rather than letting to_sql() infer
+                    # the schema from dtypes) so an all-null column gets its
+                    # declared type instead of one that shifts between runs.
+                    column_defs = ", ".join(
+                        f"{_quote_ident(col)} "
+                        f"{resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _sqlite_type)}"
+                        for col in df.columns
+                    )
+                    conn.execute(
+                        f"CREATE TABLE IF NOT EXISTS {_quote_ident(name)} ({column_defs})"
+                    )
                 df.to_sql(name, conn, if_exists="append", index=False)
         finally:
             conn.close()
 
     def _sync_columns(
-        self, conn: sqlite3.Connection, name: str, df: pd.DataFrame
+        self,
+        conn: sqlite3.Connection,
+        name: str,
+        df: pd.DataFrame,
+        schema: Schema | None,
     ) -> bool:
         """Add any of df's columns missing from an existing table; warn (never
         drop) about any of the table's columns missing from df. Returns
@@ -90,7 +128,8 @@ class SqliteStorage(TableStorage):
         missing_cols = existing - set(df.columns)
         for col in new_cols:
             conn.execute(
-                f'ALTER TABLE "{name}" ADD COLUMN "{col}" {_sqlite_type(df[col])}'
+                f'ALTER TABLE "{name}" ADD COLUMN "{col}" '
+                f"{resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _sqlite_type)}"
             )
         if missing_cols:
             logger.warning(

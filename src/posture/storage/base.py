@@ -38,6 +38,7 @@ from __future__ import annotations
 import os
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, ClassVar, Protocol, runtime_checkable
@@ -47,6 +48,36 @@ import pandas as pd
 from posture.exceptions import StorageConfigError, StorageError, StorageWriteError
 
 _MODES = ("truncate", "append")
+
+#: A ``schema`` argument to ``write``/``write_page``: column name -> posture
+#: type name (``str``/``int``/``float``/``bool``/``datetime``/``json``), as
+#: returned by ``Collector.column_types``. ``None`` means "infer every column
+#: type from the DataFrame's dtypes", the pre-schema behaviour.
+Schema = Mapping[str, str]
+
+
+def resolve_sql_type(
+    col: str,
+    series: pd.Series,
+    schema: Schema | None,
+    type_map: Mapping[str, str],
+    infer: Callable[[pd.Series], str],
+) -> str:
+    """SQL type for ``col``: from the declared ``schema`` when it names the
+    column, otherwise inferred from ``series``' dtype.
+
+    ``type_map`` translates a posture type name to this backend's SQL type
+    string. Columns a backend adds itself (``tenancy``, ``upload_timestamp``,
+    ``_collected_at`` when absent from a hand-built schema) fall through to
+    inference, which is reliable for them — they are never all-null. An
+    unrecognised declared type name also falls through rather than raising.
+    """
+    if schema is not None:
+        declared = schema.get(col)
+        mapped = type_map.get(declared) if declared is not None else None
+        if mapped is not None:
+            return mapped
+    return infer(series)
 
 
 @runtime_checkable
@@ -60,9 +91,23 @@ class StorageBackend(Protocol):
 
     def __init__(self, config: dict[str, Any] | None = None) -> None: ...
 
-    def write(self, df: pd.DataFrame, name: str, *, mode: str = ...) -> None: ...
+    def write(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        mode: str = ...,
+        schema: Schema | None = ...,
+    ) -> None: ...
 
-    def write_page(self, df: pd.DataFrame, name: str, *, mode: str = ...) -> None: ...
+    def write_page(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        mode: str = ...,
+        schema: Schema | None = ...,
+    ) -> None: ...
 
 
 def _check_mode(mode: str, *, source: str) -> None:
@@ -135,15 +180,33 @@ class Storage(_ConfigResolverMixin, ABC):
         df["upload_timestamp"] = self._upload_timestamp
         return df
 
-    def write(self, df: pd.DataFrame, name: str, *, mode: str = "truncate") -> None:
-        """Write the whole of ``df`` as a single file."""
+    def write(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        mode: str = "truncate",
+        schema: Schema | None = None,
+    ) -> None:
+        """Write the whole of ``df`` as a single file.
+
+        ``schema`` is accepted for signature parity with the table backends
+        (where it pins SQL column types) but ignored here — a file format
+        carries whatever dtypes the DataFrame has. Wiring it into parquet's
+        pyarrow schema is a separate change.
+        """
         _check_mode(mode, source=self.env_prefix.lower())
         df = self._add_upload_timestamp(df)
         path = self._path_for(name, mode=mode, paginated=False)
         self._atomic_write(df, path)
 
     def write_page(
-        self, df: pd.DataFrame, name: str, *, mode: str = "truncate"
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        mode: str = "truncate",
+        schema: Schema | None = None,
     ) -> None:
         """Write one page of ``name`` as its own uniquely-named file.
 
@@ -255,28 +318,47 @@ class TableStorage(_ConfigResolverMixin, ABC):
         df["upload_timestamp"] = self._upload_timestamp
         return df
 
-    def write(self, df: pd.DataFrame, name: str, *, mode: str = "truncate") -> None:
+    def write(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        mode: str = "truncate",
+        schema: Schema | None = None,
+    ) -> None:
         _check_mode(mode, source=self.env_prefix.lower())
         df = self._add_upload_timestamp(df)
-        self._call_write_table(df, name, recreate=mode == "truncate")
+        self._call_write_table(df, name, recreate=mode == "truncate", schema=schema)
 
     def write_page(
-        self, df: pd.DataFrame, name: str, *, mode: str = "truncate"
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        mode: str = "truncate",
+        schema: Schema | None = None,
     ) -> None:
         _check_mode(mode, source=self.env_prefix.lower())
         df = self._add_upload_timestamp(df)
         if mode == "truncate" and name not in self._truncated_tables:
-            self._call_write_table(df, name, recreate=True)
+            self._call_write_table(df, name, recreate=True, schema=schema)
             self._truncated_tables.add(name)
             return
-        self._call_write_table(df, name, recreate=False)
+        self._call_write_table(df, name, recreate=False, schema=schema)
 
-    def _call_write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+    def _call_write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
         """Wraps _write_table() so any driver exception (psycopg, sqlite3,
         duckdb, ...) becomes StorageWriteError with the original as
         __cause__, instead of a different raw exception type per backend."""
         try:
-            self._write_table(df, name, recreate=recreate)
+            self._write_table(df, name, recreate=recreate, schema=schema)
         except StorageError:
             raise
         except Exception as exc:
@@ -286,5 +368,19 @@ class TableStorage(_ConfigResolverMixin, ABC):
             ) from exc
 
     @abstractmethod
-    def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
-        """Write ``df`` into table ``name``, recreating it first if ``recreate``."""
+    def _write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
+        """Write ``df`` into table ``name``, recreating it first if ``recreate``.
+
+        ``schema`` (column name -> posture type name) pins SQL column types
+        for the columns it names; any column absent from it — including the
+        backend-added ``tenancy``/``upload_timestamp`` — has its type
+        inferred from the DataFrame's dtypes, as before. ``None`` infers
+        every column.
+        """

@@ -27,7 +27,7 @@ from typing import Any, ClassVar
 import pandas as pd
 
 from posture.exceptions import StorageConfigError
-from posture.storage.base import TableStorage
+from posture.storage.base import Schema, TableStorage, resolve_sql_type
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,19 @@ def _bq_type(series: pd.Series) -> str:
         if is_dtype(series.dtype):
             return bq_type
     return "STRING"
+
+
+# posture type name -> BigQuery type, used when a caller passes an explicit
+# schema. "json" stays STRING for now: parse() already emits it as a
+# json.dumps() string, and a native JSON column is a separate change.
+_POSTURE_TYPE_MAP = {
+    "str": "STRING",
+    "int": "INTEGER",
+    "float": "FLOAT",
+    "bool": "BOOLEAN",
+    "datetime": "DATETIME",
+    "json": "STRING",
+}
 
 
 def _coerce_for_load(df: pd.DataFrame) -> pd.DataFrame:
@@ -99,7 +112,14 @@ class BigQueryStorage(TableStorage):
     def __repr__(self) -> str:
         return f"BigQueryStorage(project_id={self._project_id!s}, dataset_id={self._dataset_id!s})"
 
-    def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+    def _write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
         bigquery = self._bigquery
         table_id = f"{self._project_id}.{self._dataset_id}.{name}"
 
@@ -113,10 +133,15 @@ class BigQueryStorage(TableStorage):
         if recreate:
             self._delete_tenancy_rows(table_id, self._tenancy)
 
-        schema = [bigquery.SchemaField(col, _bq_type(df[col])) for col in df.columns]
+        bq_schema = [
+            bigquery.SchemaField(
+                col, resolve_sql_type(col, df[col], schema, _POSTURE_TYPE_MAP, _bq_type)
+            )
+            for col in df.columns
+        ]
         job_config = bigquery.LoadJobConfig(
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-            schema=schema,
+            schema=bq_schema,
             schema_update_options=[
                 bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION,
                 bigquery.SchemaUpdateOption.ALLOW_FIELD_RELAXATION,

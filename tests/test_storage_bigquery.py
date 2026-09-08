@@ -32,6 +32,7 @@ class _FakeClient:
     def __init__(self) -> None:
         self.deletes: list[tuple[str, str]] = []  # (table_id, tenancy)
         self.loads: list[tuple[pd.DataFrame, str]] = []
+        self.load_configs: list[object] = []
         self.fail_loads = False
         # table_id -> known columns, simulating BigQuery's own schema state
         # (updated after each successful load, same as ALLOW_FIELD_ADDITION
@@ -53,6 +54,7 @@ class _FakeClient:
 
     def load_table_from_dataframe(self, df, table_id, job_config) -> _FakeJob:
         self.loads.append((df.copy(), table_id))
+        self.load_configs.append(job_config)
         if not self.fail_loads:
             existing = self.tables.get(table_id, [])
             self.tables[table_id] = existing + [
@@ -144,3 +146,37 @@ def test_bigquery_warns_on_missing_column(
         store.write(narrower, "hosts", mode="truncate")
 
     assert any("'b'" in record.getMessage() for record in caplog.records)
+
+
+def _field_type(job_config, name: str) -> str:
+    return next(f.field_type for f in job_config.schema if f.name == name)
+
+
+def test_bigquery_all_null_bool_infers_string_without_schema(
+    fake_bq: _FakeClient,
+) -> None:
+    # The #14 shape: an all-null bool column, no schema -> dtype inference
+    # can only see object, so the load declares STRING. Documents the bug
+    # the schema argument fixes.
+    df = pd.DataFrame({"a": [1], "is_resource_account": [None]})
+    store = BigQueryStorage({"project_id": "proj", "dataset_id": "ds"})
+    store.write(df, "users", mode="append")
+
+    assert _field_type(fake_bq.load_configs[-1], "is_resource_account") == "STRING"
+
+
+def test_bigquery_schema_pins_all_null_bool_to_boolean(fake_bq: _FakeClient) -> None:
+    df = pd.DataFrame({"a": [1], "is_resource_account": [None]})
+    store = BigQueryStorage({"project_id": "proj", "dataset_id": "ds"})
+    store.write(
+        df,
+        "users",
+        mode="append",
+        schema={"a": "int", "is_resource_account": "bool"},
+    )
+
+    job_config = fake_bq.load_configs[-1]
+    assert _field_type(job_config, "is_resource_account") == "BOOLEAN"
+    assert _field_type(job_config, "a") == "INTEGER"
+    # A column absent from the schema still falls back to inference.
+    assert _field_type(job_config, "tenancy") == "STRING"

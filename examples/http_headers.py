@@ -11,8 +11,6 @@ scheme; list a host twice with both schemes if you want both checked.
 
 from __future__ import annotations
 
-import pandas as pd
-
 from posture import CCM
 
 HOSTS = [
@@ -28,6 +26,7 @@ def main() -> None:
     ccm = CCM("http")
     df = ccm.collect("headers", hosts=HOSTS)
     print(df)
+
 
 if __name__ == "__main__":
     main()

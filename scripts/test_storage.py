@@ -63,20 +63,27 @@ def main() -> None:
     for resource in ccm.tables():
         print(f"collecting '{resource}'...")
         df = ccm.collect(resource)
+        schema = ccm.column_types(resource)
         print(f"  {len(df)} records")
 
         for storage, config in backends:
             for mode in ("truncate", "append"):
                 print(f"  writing {storage} ({mode})...")
-                write_storage(df, storage, resource, config=config, mode=mode)
+                write_storage(
+                    df, storage, resource, config=config, mode=mode, schema=schema
+                )
 
         for mode, config in sqlite_config.items():
             print(f"  writing sqlite ({mode})...")
-            write_storage(df, "sqlite", resource, config=config, mode=mode)
+            write_storage(
+                df, "sqlite", resource, config=config, mode=mode, schema=schema
+            )
 
         for mode, config in duckdb_config.items():
             print(f"  writing duckdb ({mode})...")
-            write_storage(df, "duckdb", resource, config=config, mode=mode)
+            write_storage(
+                df, "duckdb", resource, config=config, mode=mode, schema=schema
+            )
 
     ccm.flush_cache()
     print(

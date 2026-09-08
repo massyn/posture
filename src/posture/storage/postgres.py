@@ -32,7 +32,7 @@ import psycopg
 from psycopg import sql
 
 from posture.exceptions import StorageConfigError
-from posture.storage.base import TableStorage
+from posture.storage.base import Schema, TableStorage, resolve_sql_type
 
 logger = logging.getLogger("posture.storage.postgres")
 
@@ -55,6 +55,19 @@ def _pg_type(series: pd.Series) -> str:
         if is_dtype(series.dtype):
             return pg_type
     return "TEXT"
+
+
+# posture type name -> Postgres type, used when a caller passes an explicit
+# schema. "json" stays TEXT: parse() emits it as a json.dumps() string, and
+# a native jsonb column is a separate change.
+_POSTURE_TYPE_MAP = {
+    "str": "TEXT",
+    "int": "BIGINT",
+    "float": "DOUBLE PRECISION",
+    "bool": "BOOLEAN",
+    "datetime": "TIMESTAMPTZ",
+    "json": "TEXT",
+}
 
 
 class PostgresStorage(TableStorage):
@@ -97,18 +110,32 @@ class PostgresStorage(TableStorage):
     def __repr__(self) -> str:
         return "PostgresStorage(dsn=<redacted>)"
 
-    def _write_table(self, df: pd.DataFrame, name: str, *, recreate: bool) -> None:
+    def _write_table(
+        self,
+        df: pd.DataFrame,
+        name: str,
+        *,
+        recreate: bool,
+        schema: Schema | None,
+    ) -> None:
         df = self._add_tenancy_column(df)
         table = sql.Identifier(name)
         with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
             column_defs = sql.SQL(", ").join(
-                sql.SQL("{} {}").format(sql.Identifier(col), sql.SQL(_pg_type(df[col])))
+                sql.SQL("{} {}").format(
+                    sql.Identifier(col),
+                    sql.SQL(
+                        resolve_sql_type(
+                            col, df[col], schema, _POSTURE_TYPE_MAP, _pg_type
+                        )
+                    ),
+                )
                 for col in df.columns
             )
             cur.execute(
                 sql.SQL("CREATE TABLE IF NOT EXISTS {} ({})").format(table, column_defs)
             )
-            self._sync_columns(cur, name, df)
+            self._sync_columns(cur, name, df, schema)
             if recreate:
                 cur.execute(
                     sql.SQL("DELETE FROM {} WHERE tenancy = %s").format(table),
@@ -122,7 +149,13 @@ class PostgresStorage(TableStorage):
                 for row in df.itertuples(index=False, name=None):
                     copy.write_row(tuple(None if pd.isna(v) else v for v in row))
 
-    def _sync_columns(self, cur: psycopg.Cursor, name: str, df: pd.DataFrame) -> None:
+    def _sync_columns(
+        self,
+        cur: psycopg.Cursor,
+        name: str,
+        df: pd.DataFrame,
+        schema: Schema | None,
+    ) -> None:
         cur.execute(
             "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
             (name,),
@@ -135,7 +168,11 @@ class PostgresStorage(TableStorage):
                 sql.SQL("ALTER TABLE {} ADD COLUMN {} {}").format(
                     sql.Identifier(name),
                     sql.Identifier(col),
-                    sql.SQL(_pg_type(df[col])),
+                    sql.SQL(
+                        resolve_sql_type(
+                            col, df[col], schema, _POSTURE_TYPE_MAP, _pg_type
+                        )
+                    ),
                 )
             )
         if missing_cols:

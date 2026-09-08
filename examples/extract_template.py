@@ -9,7 +9,10 @@ your own project, then make three decisions:
 
 Every SCOPE function funnels each table through `store()`, which is just an alias
 for whichever `store_*` function you kept. `store()` is handed the page *iterator*
-straight from `CCM.collect_page()` — the whole table never sits in memory at once.
+straight from `CCM.collect_page()` — the whole table never sits in memory at once —
+plus `schema`, the table's declared column types from `CCM.column_types()`. The
+table backends use it to pin SQL column types from the manifest instead of guessing
+them from a page's dtypes (which flips an all-null column's type between runs).
 
 Environment
 -----------
@@ -55,11 +58,18 @@ OUTPUT = os.environ.get("POSTURE_OUTPUT", "output")
 # 2. SINK — keep ONE of these, delete the others, then point `store` at it.
 #    All bundled backends: parquet, csv, json, sqlite, duckdb, postgres,
 #    s3, gcs, bigquery, snowflake. Every one except the Parquet stream uses
-#    the identical `open_storage(<name>, <config>).write_page(page, name, mode=...)`
+#    the identical
+#    `open_storage(<name>, <config>).write_page(page, name, mode=..., schema=...)`
 #    shape shown in `store_csv` / `store_postgres` — swap the two strings.
 # ---------------------------------------------------------------------------
-def store_parquet(name: str, pages: Iterator[pd.DataFrame]) -> int:
-    """Stream to one Parquet file, appending each page as a row group."""
+def store_parquet(
+    name: str, pages: Iterator[pd.DataFrame], schema: dict[str, str]
+) -> int:
+    """Stream to one Parquet file, appending each page as a row group.
+
+    ``schema`` is unused here — the Parquet stream takes the page dtypes as
+    given. The table backends below feed it to ``write_page``.
+    """
     rows = 0
     with ParquetStorage({"path": OUTPUT}).write_stream(name, mode=MODE) as stream:
         for page in pages:
@@ -68,22 +78,24 @@ def store_parquet(name: str, pages: Iterator[pd.DataFrame]) -> int:
     return rows
 
 
-def store_csv(name: str, pages: Iterator[pd.DataFrame]) -> int:
+def store_csv(name: str, pages: Iterator[pd.DataFrame], schema: dict[str, str]) -> int:
     """Write each page as a CSV file under a per-table directory."""
     backend = open_storage("csv", {"path": OUTPUT})
     rows = 0
     for page in pages:
-        backend.write_page(page, name, mode=MODE)
+        backend.write_page(page, name, mode=MODE, schema=schema)
         rows += len(page)
     return rows
 
 
-def store_postgres(name: str, pages: Iterator[pd.DataFrame]) -> int:
+def store_postgres(
+    name: str, pages: Iterator[pd.DataFrame], schema: dict[str, str]
+) -> int:
     """Append each page to a Postgres table (one table per `name`)."""
     backend = open_storage("postgres", {"dsn": os.environ["POSTURE_POSTGRES_DSN"]})
     rows = 0
     for page in pages:
-        backend.write_page(page, name, mode=MODE)
+        backend.write_page(page, name, mode=MODE, schema=schema)
         rows += len(page)
     return rows
 
@@ -116,11 +128,11 @@ def extract_all() -> None:
 def _run(ccm: CCM, source: str, table: str) -> None:
     name = f"{source}_{table}"
     try:
-        rows = store(name, ccm.collect_page(table))
-    except PostureError as exc:
+        rows = store(name, ccm.collect_page(table), ccm.column_types(table))
+    except PostureError:
         # A collection that dies mid-stream is deliberately NOT written:
         # a partial snapshot presented as complete is a compliance lie.
-        log.error("%s: FAILED — %s", name, exc)
+        log.exception("%s: FAILED", name)
         return
     log.info("%s: %d rows", name, rows)
 
