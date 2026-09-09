@@ -165,6 +165,8 @@
 
 - [blueprints](collectors/kandji.md#blueprints)
 - [device_details](collectors/kandji.md#device_details)
+- [device_library_items](collectors/kandji.md#device_library_items)
+- [device_parameters](collectors/kandji.md#device_parameters)
 - [devices](collectors/kandji.md#devices)
 - [vulnerabilities](collectors/kandji.md#vulnerabilities)
 

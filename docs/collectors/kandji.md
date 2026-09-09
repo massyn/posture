@@ -18,6 +18,8 @@ from posture import CCM
 ccm = CCM("kandji")  # credentials from KANDJI_API_URL, KANDJI_API_TOKEN
 df = ccm.collect("blueprints")
 df = ccm.collect("device_details")
+df = ccm.collect("device_library_items")
+df = ccm.collect("device_parameters")
 df = ccm.collect("devices")
 df = ccm.collect("vulnerabilities")
 ```
@@ -43,6 +45,8 @@ for table in ccm.tables():
 
 - [blueprints](#blueprints)
 - [device_details](#device_details)
+- [device_library_items](#device_library_items)
+- [device_parameters](#device_parameters)
 - [devices](#devices)
 - [vulnerabilities](#vulnerabilities)
 
@@ -59,16 +63,69 @@ for table in ccm.tables():
 | --- | --- |
 | `device_id` | `str` |
 | `device_name` | `str` |
-| `serial_number` | `str` |
 | `platform` | `str` |
 | `os_version` | `str` |
-| `last_check_in` | `datetime` |
+| `system_version` | `str` |
+| `model` | `str` |
+| `serial_number` | `str` |
+| `udid` | `str` |
+| `processor_name` | `str` |
+| `memory` | `str` |
+| `assigned_user_email` | `str` |
+| `assigned_user_name` | `str` |
+| `blueprint_name` | `str` |
+| `blueprint_uuid` | `str` |
+| `last_user` | `str` |
+| `first_enrollment` | `datetime` |
+| `last_enrollment` | `datetime` |
+| `mdm_enabled` | `bool` |
 | `is_supervised` | `bool` |
+| `mdm_install_date` | `datetime` |
+| `last_check_in` | `datetime` |
+| `agent_installed` | `bool` |
+| `agent_version` | `str` |
+| `agent_last_check_in` | `datetime` |
 | `filevault_enabled` | `bool` |
+| `filevault_recovery_key_type` | `str` |
 | `filevault_recovery_key_escrowed` | `bool` |
-| `firewall_enabled` | `bool` |
-| `gatekeeper_enabled` | `bool` |
-| `sip_enabled` | `bool` |
+| `filevault_next_rotation` | `datetime` |
+| `filevault_regen_required` | `bool` |
+| `activation_lock_enabled` | `bool` |
+| `user_activation_lock_enabled` | `bool` |
+| `activation_lock_supported` | `bool` |
+| `recovery_lock_enabled` | `bool` |
+| `firmware_password_exists` | `bool` |
+| `remote_desktop_enabled` | `bool` |
+| `auto_enrolled` | `bool` |
+| `local_hostname` | `str` |
+| `mac_address` | `str` |
+| `ip_address` | `str` |
+| `public_ip` | `str` |
+
+### device_library_items
+
+| Column | Type |
+| --- | --- |
+| `device_id` | `str` |
+| `library_item_row_id` | `str` |
+| `item_id` | `str` |
+| `name` | `str` |
+| `type` | `str` |
+| `status` | `str` |
+| `rules_present` | `bool` |
+| `reported_at` | `datetime` |
+| `most_recent_action` | `datetime` |
+
+### device_parameters
+
+| Column | Type |
+| --- | --- |
+| `device_id` | `str` |
+| `item_id` | `str` |
+| `name` | `str` |
+| `category` | `str` |
+| `subcategory` | `str` |
+| `status` | `str` |
 
 ### devices
 
@@ -80,17 +137,23 @@ for table in ccm.tables():
 | `platform` | `str` |
 | `os_version` | `str` |
 | `serial_number` | `str` |
+| `udid` | `str` |
 | `asset_tag` | `str` |
 | `blueprint_id` | `str` |
+| `blueprint_name` | `str` |
 | `mdm_enabled` | `bool` |
 | `agent_installed` | `bool` |
 | `agent_version` | `str` |
 | `is_missing` | `bool` |
 | `is_removed` | `bool` |
+| `lost_mode_status` | `str` |
 | `first_enrollment` | `datetime` |
 | `last_enrollment` | `datetime` |
 | `last_check_in` | `datetime` |
 | `user_email` | `str` |
+| `user_name` | `str` |
+| `user_id` | `str` |
+| `tags` | `json` |
 
 ### vulnerabilities
 

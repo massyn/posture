@@ -155,6 +155,7 @@ jobs:
               pip install --upgrade posture
 
           🐍 PyPI: https://pypi.org/project/posture/${VERSION}/
+          🧑‍💻 GitHub: https://github.com/massyn/posture
 
           #posture #compliance #python #devsecops
           EOF

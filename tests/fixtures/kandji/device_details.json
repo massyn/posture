@@ -1,15 +1,62 @@
 {
-    "device_id": "1",
-    "device_name": "MAC-1",
-    "serial_number": "SN-1",
-    "platform": "Mac",
-    "os_version": "14.5",
-    "last_check_in": "2026-06-01T00:00:00.000Z",
-    "is_supervised": true,
-    "security": {
-        "filevault": {"enabled": true, "recovery_key_escrowed": true},
-        "firewall": {"enabled": true},
-        "gatekeeper": {"enabled": true},
-        "system_integrity_protection": {"enabled": true}
+    "general": {
+        "device_id": "1",
+        "device_name": "MAC-1",
+        "platform": "Mac",
+        "os_version": "26.6.2",
+        "system_version": "26.6.2 (25G83)",
+        "model": "MacBook Pro (14-inch, M5 Pro)",
+        "assigned_user": {"email": "user@example.com", "name": "Test User"},
+        "blueprint_name": "Standard macOS",
+        "blueprint_uuid": "bp-1",
+        "last_user": "testuser",
+        "first_enrollment": "2026-09-08 07:15:41.154295+00:00",
+        "last_enrollment": "2026-09-08 07:15:41.154295+00:00"
+    },
+    "mdm": {
+        "mdm_enabled": "True",
+        "supervised": "True",
+        "install_date": "2026-09-08 07:15:40.948091+00:00",
+        "last_check_in": "2026-09-09 03:39:43.785303+00:00"
+    },
+    "activation_lock": {
+        "user_activation_lock_enabled": false,
+        "device_activation_lock_enabled": false,
+        "activation_lock_supported": true
+    },
+    "filevault": {
+        "filevault_enabled": true,
+        "filevault_recoverykey_type": "Personal",
+        "filevault_prk_escrowed": true,
+        "filevault_next_rotation": "2026-12-07T07:17:12.159217Z",
+        "filevault_regen_required": false
+    },
+    "automated_device_enrollment": {
+        "auto_enroll_eligible": true,
+        "auto_enrolled": true
+    },
+    "kandji_agent": {
+        "agent_installed": "True",
+        "last_check_in": "2026-09-09T02:06:10.531490Z",
+        "agent_version": "5.1.28 (5393)"
+    },
+    "hardware_overview": {
+        "processor_name": "Apple M5 Pro",
+        "memory": "24 GB LPDDR5",
+        "udid": "UDID-1",
+        "serial_number": "SN-1"
+    },
+    "network": {
+        "local_hostname": "MAC-1",
+        "mac_address": "fc:b2:14:b9:ec:18",
+        "ip_address": "10.0.0.10",
+        "public_ip": "203.0.113.9"
+    },
+    "recovery_information": {
+        "recovery_lock_enabled": false,
+        "firmware_password_exist": false
+    },
+    "security_information": {
+        "remote_desktop_enabled": false
     }
 }

@@ -34,9 +34,10 @@ def test_device_details_batches_ids_from_devices() -> None:
         responses.GET,
         "https://example.api.kandji.io/api/v1/devices/1/details",
         json={
-            "device_id": "1",
-            "serial_number": "SN-1",
-            "security": {"filevault": {"enabled": True}},
+            "general": {"device_id": "1", "device_name": "MAC-1"},
+            "hardware_overview": {"serial_number": "SN-1"},
+            "mdm": {"supervised": "True"},
+            "filevault": {"filevault_enabled": True},
         },
         status=200,
     )
@@ -50,7 +51,72 @@ def test_device_details_batches_ids_from_devices() -> None:
     assert len(df) == 1
     assert df.loc[0, "device_id"] == "1"
     assert df.loc[0, "serial_number"] == "SN-1"
+    assert bool(df.loc[0, "is_supervised"]) is True
     assert bool(df.loc[0, "filevault_enabled"]) is True
+
+
+@responses.activate
+def test_device_parameters_fans_out_and_explodes() -> None:
+    responses.add(
+        responses.GET,
+        "https://example.api.kandji.io/api/v1/devices",
+        json=[{"device_id": "1"}],
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://example.api.kandji.io/api/v1/devices/1/parameters",
+        json={
+            "device_id": "1",
+            "parameters": [
+                {"item_id": "p1", "name": "Enable Firewall", "status": "PASS"},
+                {"item_id": "p2", "name": "Enable Gatekeeper", "status": "FAIL"},
+            ],
+        },
+        status=200,
+    )
+
+    ccm = CCM(
+        "kandji",
+        {"api_url": "https://example.api.kandji.io", "api_token": "tok"},
+    )
+    df = ccm.collect("device_parameters")
+
+    assert len(df) == 2
+    assert set(df["device_id"]) == {"1"}
+    assert set(df["name"]) == {"Enable Firewall", "Enable Gatekeeper"}
+
+
+@responses.activate
+def test_device_library_items_fans_out_and_explodes() -> None:
+    responses.add(
+        responses.GET,
+        "https://example.api.kandji.io/api/v1/devices",
+        json=[{"device_id": "1"}],
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://example.api.kandji.io/api/v1/devices/1/status",
+        json={
+            "device_id": "1",
+            "library_items": [
+                {"id": 42, "item_id": "li1", "name": "Falcon", "status": "PASS"},
+            ],
+        },
+        status=200,
+    )
+
+    ccm = CCM(
+        "kandji",
+        {"api_url": "https://example.api.kandji.io", "api_token": "tok"},
+    )
+    df = ccm.collect("device_library_items")
+
+    assert len(df) == 1
+    assert df.loc[0, "device_id"] == "1"
+    assert df.loc[0, "library_item_row_id"] == "42"
+    assert df.loc[0, "name"] == "Falcon"
 
 
 @responses.activate
