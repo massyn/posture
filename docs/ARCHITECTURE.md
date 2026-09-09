@@ -858,24 +858,37 @@ why something is built the way it is, not how to configure or call it.
   `next` is already a complete URL — the same cursor shape as AppOmni's
   `policies`/`open_policy_issues`, despite `vulnerabilities` using
   `page`/`size` rather than `limit`/`offset` for its own default params
-  (irrelevant once `next` takes over). `device_details` fans out one
-  `GET /devices/{id}/details` call per id via `Collector._resumable_fanout`
-  (ids read from `devices` internally unless a `device_ids` kwarg is
-  given) — the same per-item fan-out shape as `appomni.py`'s
-  `policy_risk_summary`.
-  **Caveat:** `MANIFEST` column paths were built from Kandji's public API
-  reference, a third-party Python wrapper (frefrik/python-kandji), and a
-  third-party MCP server built against this API, not a live schema
-  introspection against a real tenant — same caveat tier as `wiz.py`,
+  (irrelevant once `next` takes over). `device_details` (one row per
+  device), `device_parameters` (one row per device per blueprint
+  compliance parameter), and `device_library_items` (one row per device
+  per assigned library item) each fan out one call per id via
+  `Collector._resumable_fanout` — `GET /devices/{id}/details`,
+  `/parameters`, `/status` respectively — with `requires: "devices"` so
+  the id list replays from the session cache instead of re-collecting
+  `devices` over the network three times (the same per-item fan-out shape
+  as `intune.py`'s `managed_device_detail`; ids come from a `device_ids`
+  kwarg if given). `device_parameters`/`device_library_items` inject
+  `device_id` client-side from the fan-out id and explode the per-device
+  response list into rows.
+  `devices`, `device_details`, `device_parameters` and
+  `device_library_items` column paths are verified against a live tenant's
+  responses. `device_details` is a deeply section-keyed object
+  (`general`/`mdm`/`filevault`/`hardware_overview`/`activation_lock`/
+  `recovery_information`/`security_information`/`kandji_agent`/`network`) —
+  firewall/Gatekeeper/SIP state is *not* carried there, only as named
+  compliance rows in `device_parameters` ("Enable Firewall" / "Enable
+  Gatekeeper" / "Enable System Integrity Protection"), and only when the
+  tenant's blueprint includes those checks.
+  **Caveat:** `blueprints` and `vulnerabilities` column paths were built
+  from Kandji's public API reference, a third-party Python wrapper
+  (frefrik/python-kandji), and a third-party MCP server built against this
+  API, not a live schema introspection — same caveat tier as `wiz.py`,
   `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`,
   `phriendly_phishing.py`, `vanta.py`, and `crowdstrike_identity.py`.
-  `device_details`'s security-posture field nesting (FileVault/firewall/
-  Gatekeeper/SIP) is a best-effort guess at naming conventions, not a
-  confirmed response shape. `vulnerabilities`' exact grain (a CVE catalog
-  vs. a per-device detection feed) is also unconfirmed, though the
-  endpoint path itself was independently corroborated by two sources.
-  Verify field names/nesting and the vulnerabilities grain against a real
-  tenant's response before relying on this collector.
+  `vulnerabilities`' exact grain (a CVE catalog vs. a per-device detection
+  feed) is also unconfirmed, though the endpoint path itself was
+  independently corroborated by two sources. Verify those two resources
+  against a real tenant's response before relying on them.
 
 - **SonarCloud** — raw `requests` against SonarCloud's hosted Web API
   (`https://sonarcloud.io/api`), no vendor SDK. This targets SonarCloud

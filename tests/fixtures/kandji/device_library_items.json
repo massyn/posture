@@ -1,0 +1,25 @@
+{
+    "device_id": "1",
+    "library_items": [
+        {
+            "id": 5031,
+            "item_id": "2cbfd2f8-7c7b-4b1b-8940-420a07224859",
+            "name": "macOS - CrowdStrike Falcon Client Install",
+            "status": "PASS",
+            "reported_at": null,
+            "type": "custom-app",
+            "rules_present": false,
+            "most_recent_action": "2026-09-09T02:06:10Z"
+        },
+        {
+            "id": 5065,
+            "item_id": "0a30729c-4c52-45cd-a340-2a2e3c4024eb",
+            "name": "macOS - CrowdStrike Settings",
+            "status": "success",
+            "reported_at": "2026-09-08T07:18:55.630226Z",
+            "type": "profile",
+            "rules_present": false,
+            "most_recent_action": "2026-09-08T07:18:55.630226Z"
+        }
+    ]
+}

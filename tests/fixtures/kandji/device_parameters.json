@@ -1,0 +1,19 @@
+{
+    "device_id": "1",
+    "parameters": [
+        {
+            "status": "PASS",
+            "item_id": "b648790a-0fac-43b8-bd96-5682f60f467e",
+            "name": "Enable System Integrity Protection",
+            "category": "System Security",
+            "subcategory": "SIP"
+        },
+        {
+            "status": "FAIL",
+            "item_id": "34e7d714-5772-416d-9aff-c467504b45eb",
+            "name": "Disable Internet Sharing",
+            "category": "Network",
+            "subcategory": "Sharing"
+        }
+    ]
+}
