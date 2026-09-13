@@ -1,0 +1,56 @@
+[
+  {
+    "id": "alert-1",
+    "title": "Vulnerability Intelligence from Insikt Group - 3 references",
+    "type": "REFERENCE",
+    "rule": {
+      "id": "rule-1",
+      "name": "Vulnerability Intelligence from Insikt Group",
+      "url": {"portal": "https://app.recordedfuture.com/rule-1"}
+    },
+    "review": {
+      "status": "no-action",
+      "status_in_portal": "New",
+      "assignee": null,
+      "note": null
+    },
+    "url": {
+      "api": "https://api.recordedfuture.com/v3/alerts/alert-1",
+      "portal": "https://app.recordedfuture.com/live/sc/notification/?id=alert-1"
+    },
+    "hits": [
+      {
+        "id": "hit-1",
+        "entities": [{"id": "entity-1", "name": "CVE-2024-1234", "type": "CyberVulnerability"}],
+        "document": {
+          "title": "New exploit for CVE-2024-1234",
+          "url": "https://example.com/article",
+          "source": {"id": "src-1", "name": "Example Source"}
+        },
+        "fragment": "CVE-2024-1234 is being actively exploited.",
+        "primary_entity": null
+      }
+    ]
+  },
+  {
+    "id": "alert-2",
+    "title": "Vulnerability Intelligence from Insikt Group - 1 reference",
+    "type": "REFERENCE",
+    "rule": {
+      "id": "rule-1",
+      "name": "Vulnerability Intelligence from Insikt Group",
+      "url": {"portal": "https://app.recordedfuture.com/rule-1"}
+    },
+    "review": {
+      "status": "resolved",
+      "status_in_portal": "Resolved",
+      "assignee": "alice@example.com",
+      "note": "handled"
+    },
+    "url": {
+      "api": "https://api.recordedfuture.com/v3/alerts/alert-2",
+      "portal": "https://app.recordedfuture.com/live/sc/notification/?id=alert-2"
+    },
+    "hits": []
+  }
+]

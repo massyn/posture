@@ -1,0 +1,14 @@
+[
+  {
+    "id": "board-1",
+    "name": "Engineering",
+    "url": "https://trello.com/b/board-1/engineering",
+    "closed": false
+  },
+  {
+    "id": "board-2",
+    "name": "Old Project",
+    "url": "https://trello.com/b/board-2/old-project",
+    "closed": true
+  }
+]

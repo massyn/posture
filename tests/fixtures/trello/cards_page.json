@@ -1,0 +1,23 @@
+[
+  {
+    "id": "card-1",
+    "name": "Fix login bug",
+    "idBoard": "board-1",
+    "idList": "list-1",
+    "idMembers": ["member-1", "member-2"],
+    "due": "2026-09-20T00:00:00.000Z",
+    "dateLastActivity": "2026-09-10T12:00:00.000Z",
+    "shortUrl": "https://trello.com/c/card-1",
+    "closed": false
+  },
+  {
+    "id": "card-2",
+    "name": "Write docs",
+    "idBoard": "board-1",
+    "idList": "list-2",
+    "idMembers": [],
+    "dateLastActivity": "2026-08-01T09:30:00.000Z",
+    "shortUrl": "https://trello.com/c/card-2",
+    "closed": true
+  }
+]

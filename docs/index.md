@@ -13,6 +13,8 @@
 
 ## [Cisco Duo](collectors/duo.md)
 
+[Credentials](credentials/duo.md)
+
 - [admins](collectors/duo.md#admins)
 - [endpoints](collectors/duo.md#endpoints)
 - [groups](collectors/duo.md#groups)
@@ -75,6 +77,8 @@
 
 ## [Drata](collectors/drata.md)
 
+[Credentials](credentials/drata.md)
+
 - [assets](collectors/drata.md#assets)
 - [controls](collectors/drata.md#controls)
 - [devices](collectors/drata.md#devices)
@@ -99,6 +103,8 @@
 - [users](collectors/azure_entra.md#users)
 
 ## [GCP Security Command Center](collectors/gcp_security_command_center.md)
+
+[Credentials](credentials/gcp_security_command_center.md)
 
 - [assets](collectors/gcp_security_command_center.md#assets)
 - [findings](collectors/gcp_security_command_center.md#findings)
@@ -179,6 +185,8 @@
 - [training_enrollments](collectors/knowbe4.md#training_enrollments)
 
 ## [Microsoft Defender for Cloud](collectors/defender_for_cloud.md)
+
+[Credentials](credentials/defender_for_cloud.md)
 
 - [alerts](collectors/defender_for_cloud.md#alerts)
 - [assessments](collectors/defender_for_cloud.md#assessments)
@@ -305,8 +313,18 @@
 
 ## [Rapid7 InsightVM](collectors/rapid7_insightvm.md)
 
+[Credentials](credentials/rapid7_insightvm.md)
+
 - [assets](collectors/rapid7_insightvm.md#assets)
 - [vulnerabilities](collectors/rapid7_insightvm.md#vulnerabilities)
+
+## [Recorded Future](collectors/recorded_future.md)
+
+[Credentials](credentials/recorded_future.md)
+
+- [alert_hits](collectors/recorded_future.md#alert_hits)
+- [alerts](collectors/recorded_future.md#alerts)
+- [vulnerability_risklist](collectors/recorded_future.md#vulnerability_risklist)
 
 ## [runZero](collectors/runzero.md)
 
@@ -334,6 +352,8 @@
 - [krow__team__c](collectors/salesforce.md#krow__team__c)
 
 ## [SecurityScorecard](collectors/securityscorecard.md)
+
+[Credentials](credentials/securityscorecard.md)
 
 - [company_factors](collectors/securityscorecard.md#company_factors)
 - [portfolio_companies](collectors/securityscorecard.md#portfolio_companies)
@@ -412,6 +432,13 @@
 - [assets](collectors/tenablesc.md#assets)
 - [hosts](collectors/tenablesc.md#hosts)
 - [vulnerabilities](collectors/tenablesc.md#vulnerabilities)
+
+## [Trello](collectors/trello.md)
+
+[Credentials](credentials/trello.md)
+
+- [boards](collectors/trello.md#boards)
+- [cards](collectors/trello.md#cards)
 
 ## [UpGuard](collectors/upguard.md)
 
