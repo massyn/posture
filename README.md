@@ -4,6 +4,9 @@ Runtime-agnostic Python library for CCM (Continuous Control Monitoring) data col
 The entire contract: credentials in, DataFrame out. Runs unchanged in Docker, Airflow,
 Databricks — the library never knows or cares where it executes.
 
+[![Publish to PyPI](https://github.com/massyn/posture/actions/workflows/publish.yml/badge.svg)](https://github.com/massyn/posture/actions/workflows/publish.yml) 
+![PyPI Version](https://img.shields.io/pypi/v/posture) ![PyPI Downloads](https://img.shields.io/pypi/dd/posture)
+
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the design behind this
 library — the collect/parse split, locked design decisions, manifest schema, and
 per-collector implementation notes.
@@ -320,4 +323,13 @@ pip install -e ".[dev]"
 pytest
 ruff check src tests
 black src tests
+```
+
+This repo ships a pre-commit hook (`.githooks/pre-commit`) that regenerates
+`docs/index.md`/`docs/collectors/*.md` via `scripts/build_schema.py` before
+every commit, so those generated docs never drift from `catalog()`. Enable it
+once per clone:
+
+```bash
+git config core.hooksPath .githooks
 ```

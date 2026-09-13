@@ -37,7 +37,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 __all__ = [
     "CCM",
@@ -99,6 +99,7 @@ def _register_sources() -> None:
     from posture.collectors.precise import PreciseCollector
     from posture.collectors.qualys import QualysCollector
     from posture.collectors.rapid7_insightvm import Rapid7InsightVMCollector
+    from posture.collectors.recorded_future import RecordedFutureCollector
     from posture.collectors.runzero import RunzeroCollector
     from posture.collectors.sailpoint import SailpointCollector
     from posture.collectors.salesforce import SalesforceCollector
@@ -112,6 +113,7 @@ def _register_sources() -> None:
     from posture.collectors.teams import TeamsCollector
     from posture.collectors.tenableio import TenableioCollector
     from posture.collectors.tenablesc import TenablescCollector
+    from posture.collectors.trello import TrelloCollector
     from posture.collectors.upguard import UpGuardCollector
     from posture.collectors.uptimerobot import UptimeRobotCollector
     from posture.collectors.vanta import VantaCollector
@@ -152,6 +154,7 @@ def _register_sources() -> None:
     _SOURCES["precise"] = PreciseCollector
     _SOURCES["qualys"] = QualysCollector
     _SOURCES["rapid7_insightvm"] = Rapid7InsightVMCollector
+    _SOURCES["recorded_future"] = RecordedFutureCollector
     _SOURCES["runzero"] = RunzeroCollector
     _SOURCES["sailpoint"] = SailpointCollector
     _SOURCES["salesforce"] = SalesforceCollector
@@ -165,6 +168,7 @@ def _register_sources() -> None:
     _SOURCES["teams"] = TeamsCollector
     _SOURCES["tenableio"] = TenableioCollector
     _SOURCES["tenablesc"] = TenablescCollector
+    _SOURCES["trello"] = TrelloCollector
     _SOURCES["upguard"] = UpGuardCollector
     _SOURCES["uptimerobot"] = UptimeRobotCollector
     _SOURCES["vanta"] = VantaCollector

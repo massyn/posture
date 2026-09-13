@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import pytest
 
 from posture import catalog, runnable_sources
+
+_CREDENTIALS_DIR = Path(__file__).parent.parent / "docs" / "credentials"
 
 
 def test_catalog_lists_all_registered_sources() -> None:
@@ -40,6 +44,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "precise",
         "qualys",
         "rapid7_insightvm",
+        "recorded_future",
         "runzero",
         "sailpoint",
         "salesforce",
@@ -53,6 +58,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "teams",
         "tenableio",
         "tenablesc",
+        "trello",
         "upguard",
         "uptimerobot",
         "vanta",
@@ -119,6 +125,17 @@ def test_catalog_requires_no_credentials_or_network() -> None:
     # a collector or touch the network.
     result = catalog()
     assert result["knowbe4"]["required_config"]["token"] == "KNOWBE4_TOKEN"
+
+
+def test_every_registered_source_has_a_credentials_doc() -> None:
+    # docs/ARCHITECTURE.md's "Credentials documentation" section requires a
+    # hand-written docs/credentials/<source>.md for every collector — this
+    # is what actually enforces that, rather than relying on remembering to
+    # write one each time a collector is added.
+    missing = [
+        name for name in catalog() if not (_CREDENTIALS_DIR / f"{name}.md").exists()
+    ]
+    assert not missing, f"Missing docs/credentials/<source>.md for: {missing}"
 
 
 def test_runnable_sources_excludes_source_missing_env_vars(

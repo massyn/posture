@@ -384,17 +384,24 @@ generated `docs/index.md` entry gets a direct "Credentials" link straight
 to it, alongside the link to `docs/collectors/<source>.md`. That's the one
 place it's linked from — `docs/collectors/<source>.md` (the generated
 schema/env-var page) deliberately does not repeat it, since anyone landing
-there arrived from the index and already saw it. When the credentials doc
-doesn't exist (not every collector has one yet), the index entry just omits
-that link — a missing credentials doc is a documentation gap, never a
-build failure. Do not fabricate a
-credentials page's steps from guesswork the way `MANIFEST` caveats
-elsewhere in this file are sometimes tolerated (built from public docs, not
-live-verified) — a wrong click-path is actively misleading to someone
-provisioning real production access, worse than no page at all. Skip the
-page (leaving the collector unlinked) rather than invent one, until someone
-who actually knows the vendor's console (or a v3+ pass over its own admin
-API docs) can write it accurately.
+there arrived from the index and already saw it. `build_schema.py`
+surfacing the gap in its own stdout is not enough on its own — it was
+missed twice in a row for a freshly-added collector regardless (nobody
+reads a build script's stdout as a gate) — so
+`tests/test_catalog.py::test_every_registered_source_has_a_credentials_doc`
+asserts every name `catalog()` returns has a matching
+`docs/credentials/<source>.md`, and fails the suite (and therefore CI) when
+one is missing. **Adding a collector without its credentials page is not a
+"finish it later" gap — it fails `pytest` outright**, in the same commit,
+not a follow-up PR. Do not fabricate a credentials page's steps from
+guesswork the way `MANIFEST` caveats elsewhere in this file are sometimes
+tolerated (built from public docs, not live-verified) — a wrong click-path
+is actively misleading to someone provisioning real production access,
+worse than no page at all. If the vendor's console can't be verified yet,
+write the page anyway from the best available public admin-API docs and
+flag the specific unverified steps inline, rather than skipping the page
+and leaving the test failing — but do not merge a new collector with a
+red test suite either way.
 
 ## Observability
 
