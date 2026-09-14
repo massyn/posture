@@ -23,6 +23,8 @@ from posture import CCM
 ccm = CCM("trello")  # credentials from TRELLO_API_KEY, TRELLO_TOKEN
 df = ccm.collect("boards")
 df = ccm.collect("cards")
+df = ccm.collect("lists")
+df = ccm.collect("members")
 ```
 
 ## Example: export every table to CSV
@@ -46,6 +48,8 @@ for table in ccm.tables():
 
 - [boards](#boards)
 - [cards](#cards)
+- [lists](#lists)
+- [members](#members)
 
 ### boards
 
@@ -69,4 +73,22 @@ for table in ccm.tables():
 | `date_last_activity` | `datetime` |
 | `url` | `str` |
 | `closed` | `bool` |
+
+### lists
+
+| Column | Type |
+| --- | --- |
+| `id` | `str` |
+| `id_board` | `str` |
+| `name` | `str` |
+| `closed` | `bool` |
+
+### members
+
+| Column | Type |
+| --- | --- |
+| `id` | `str` |
+| `id_board` | `str` |
+| `username` | `str` |
+| `full_name` | `str` |
 

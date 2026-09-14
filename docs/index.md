@@ -439,6 +439,8 @@
 
 - [boards](collectors/trello.md#boards)
 - [cards](collectors/trello.md#cards)
+- [lists](collectors/trello.md#lists)
+- [members](collectors/trello.md#members)
 
 ## [UpGuard](collectors/upguard.md)
 
