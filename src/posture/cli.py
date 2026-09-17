@@ -185,7 +185,7 @@ def _collect_source(
     try:
         ccm = CCM(source)
     except (PostureError, ValueError) as exc:
-        logger.error("%s: skipped - %s", source, exc)
+        logger.exception("%s: skipped", source)
         return [{"table": source, "records": 0, "status": f"failed: {exc}"}]
 
     results: list[dict[str, Any]] = []
@@ -196,7 +196,7 @@ def _collect_source(
         try:
             record_count = _collect_resource(ccm, resource, path)
         except PostureError as exc:
-            logger.error("%s.%s: failed - %s", source, resource, exc)
+            logger.exception("%s.%s: failed", source, resource)
             results.append({"table": stem, "records": 0, "status": f"failed: {exc}"})
             continue
         logger.info(
