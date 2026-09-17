@@ -34,6 +34,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "jira",
         "kandji",
         "knowbe4",
+        "macadmins",
         "mde",
         "miro",
         "nullify",

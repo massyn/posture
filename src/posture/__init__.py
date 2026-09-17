@@ -37,7 +37,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.4.1"
+__version__ = "1.5.0"
 
 __all__ = [
     "CCM",
@@ -89,6 +89,7 @@ def _register_sources() -> None:
     from posture.collectors.jira import JiraCollector
     from posture.collectors.kandji import KandjiCollector
     from posture.collectors.knowbe4 import Knowbe4Collector
+    from posture.collectors.macadmins import MacadminsCollector
     from posture.collectors.mde import MdeCollector
     from posture.collectors.miro import MiroCollector
     from posture.collectors.nullify import NullifyCollector
@@ -144,6 +145,7 @@ def _register_sources() -> None:
     _SOURCES["jira"] = JiraCollector
     _SOURCES["kandji"] = KandjiCollector
     _SOURCES["knowbe4"] = Knowbe4Collector
+    _SOURCES["macadmins"] = MacadminsCollector
     _SOURCES["mde"] = MdeCollector
     _SOURCES["miro"] = MiroCollector
     _SOURCES["nullify"] = NullifyCollector

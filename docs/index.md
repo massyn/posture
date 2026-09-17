@@ -184,6 +184,13 @@
 - [psts](collectors/knowbe4.md#psts)
 - [training_enrollments](collectors/knowbe4.md#training_enrollments)
 
+## [MacAdmins SOFA Feed](collectors/macadmins.md)
+
+[Credentials](credentials/macadmins.md)
+
+- [macos_cves](collectors/macadmins.md#macos_cves)
+- [macos_releases](collectors/macadmins.md#macos_releases)
+
 ## [Microsoft Defender for Cloud](collectors/defender_for_cloud.md)
 
 [Credentials](credentials/defender_for_cloud.md)
