@@ -310,6 +310,55 @@ scopes (`extract_all`, `extract_collector`, `extract_table`), a `store()` you po
 at Parquet, CSV, or Postgres, and a CLI entrypoint with commented Airflow-DAG and
 Databricks blocks to swap in.
 
+## Command-line: `posturecollect`
+
+`pip install posture` also installs a `posturecollect` console command — a
+zero-code way to extract every table from every collector straight to
+Parquet. No script to write, no storage backend to wire up: point it at an
+output directory and it walks every registered collector, streaming each
+resource page-by-page into its own parquet file.
+
+```bash
+posturecollect
+```
+
+With no flags, it scans the environment for every source that has all of
+its required variables set (the same check `catalog(filter="environment")`
+does) and collects all of them in one pass — the fastest way to pull a
+full, current snapshot of everything you have credentials for into local
+Parquet files, e.g. for ad hoc analysis in DuckDB/pandas or a one-off load
+into a warehouse.
+
+```bash
+posturecollect --include crowdstrike endoflife   # only these sources, regardless of environment
+posturecollect --output ./data                   # base directory for the parquet files (default: ./output)
+posturecollect --output ./data --history         # one dated file per table per day, instead of overwriting
+posturecollect --thread 5                        # collect this many sources concurrently (default: 3)
+posturecollect --debug                           # verbose debug-level logging
+```
+
+`--include` is also the only way to reach a no-auth source (e.g.
+`endoflife`, `macadmins`) — a source with nothing to check is never picked
+up by the default environment-variable scan, so name it explicitly to
+collect it.
+
+Every resource is streamed page-by-page straight into its parquet file, so
+memory use stays bounded to a single page regardless of table size — a
+resource with millions of rows collects the same way as one with ten.
+Output is one file per `<source>_<resource>`:
+
+- default: `<output>/<source>_<resource>.parquet` (overwritten every run —
+  point a DuckDB/pandas read at the directory for the latest snapshot)
+- `--history`: `<output>/<source>_<resource>/<YYYY.MM.DD>.parquet` (one
+  dated snapshot per day, so scheduling it as a daily cron job builds up a
+  queryable history for free)
+
+A failure on one source or resource is logged and doesn't stop the rest of
+the run — everything else still gets collected. `posturecollect` exits
+non-zero if anything failed, and prints a summary table (table name, record
+count, status) once every source has finished, so a run's outcome is
+visible at a glance without scrolling back through the log.
+
 ## Supported sources
 
 See [`docs/index.md`](docs/index.md) for the full list of collectors, each with
