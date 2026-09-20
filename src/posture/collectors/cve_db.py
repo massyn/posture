@@ -15,11 +15,19 @@ one thing this collector never assumes — it declares the resources on offer
 (``_meta.tables``) and, per resource, the list of per-year Parquet file URLs
 to pull (``<resource>.files.parquet``). Fetched once per instance (cached on
 ``self._file_manifest``, populated lazily on first ``collect()`` — no
-network call at construction) and used as the page list for both resources:
-one page per file, cursor = index into that list, same bounded-per-item
-pagination shape as ``endoflife.py``'s one-page-per-product loop. A failure
-partway through still yields ``IncompleteCollection``, not a partial
-snapshot silently treated as complete.
+network call at construction).
+
+**Pagination is by row count, not by file.** The per-year files are treated
+as one continuous stream of rows and cut into pages of ``page_size`` rows
+(config key / ``CVE_DB_PAGE_SIZE``, default 25,000) — a page may hold the
+tail of one year and the head of the next, and only the final page is short.
+Year size is set by NVD's publishing volume (recent years are far larger than
+early ones), so a page-per-file scheme gives unbounded pages. The cursor is
+``(file_index, row_offset)``. Only the file currently being read is held
+(``self._current_file``, an Arrow table — compact, unlike a list of Python
+dicts) and only the rows of the page being emitted are converted to records.
+A failure partway through still yields ``IncompleteCollection``, not a
+partial snapshot silently treated as complete.
 
 Two resources, matching ``manifest.json``'s two tables one-for-one:
 
@@ -60,13 +68,15 @@ import logging
 from io import BytesIO
 from typing import Any, ClassVar
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from posture.base import Collector, RateLimitedSignal
 
 logger = logging.getLogger("posture.collectors.cve_db")
 
 _DEFAULT_BASE_URL = "https://cve-db.pages.dev"
+_DEFAULT_PAGE_SIZE = 25_000
 
 MANIFEST: dict[str, dict[str, Any]] = {
     "cve_summary": {
@@ -120,7 +130,7 @@ class CveDbCollector(Collector):
     env_prefix = "CVE_DB"
     display_name = "cve-db"
     manifest = MANIFEST
-    config_keys: ClassVar[dict[str, bool]] = {"base_url": False}
+    config_keys: ClassVar[dict[str, bool]] = {"base_url": False, "page_size": False}
     url_config_keys = ("base_url",)
 
     def __init__(
@@ -128,6 +138,12 @@ class CveDbCollector(Collector):
     ) -> None:
         super().__init__(config, record_limit=record_limit)
         self._base_url = self._config.get("base_url", _DEFAULT_BASE_URL)
+        self._page_size = int(self._config.get("page_size", _DEFAULT_PAGE_SIZE))
+        if self._page_size < 1:
+            raise ValueError(f"page_size must be >= 1, got {self._page_size}")
+        # (url, table) of the year file currently being paged through, so
+        # consecutive pages don't re-download it. Only one is ever held.
+        self._current_file: tuple[str, pa.Table] | None = None
         # Resource -> list of Parquet file URLs, read off manifest.json.
         # None until the first _fetch_page call — no network call at
         # construction, per the locked config-resolution rule.
@@ -164,21 +180,34 @@ class CveDbCollector(Collector):
         if not files:
             return [], None
 
-        index = cursor or 0
-        records = self._fetch_parquet(files[index])
-        next_cursor = index + 1 if index + 1 < len(files) else None
+        file_index, offset = cursor or (0, 0)
+        records: list[dict[str, Any]] = []
+        while file_index < len(files) and len(records) < self._page_size:
+            table = self._load_file(files[file_index])
+            chunk = table.slice(offset, self._page_size - len(records))
+            records.extend(self._to_records(chunk))
+            offset += chunk.num_rows
+            if offset >= table.num_rows:
+                file_index, offset = file_index + 1, 0
+
+        next_cursor = (file_index, offset) if file_index < len(files) else None
         return records, next_cursor
 
-    def _fetch_parquet(self, url: str) -> list[dict[str, Any]]:
-        response = self._session.get(url, timeout=60)
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            raise RateLimitedSignal(
-                retry_after=float(retry_after) if retry_after else None
-            )
-        response.raise_for_status()
+    def _load_file(self, url: str) -> pa.Table:
+        if self._current_file is None or self._current_file[0] != url:
+            response = self._session.get(url, timeout=60)
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                raise RateLimitedSignal(
+                    retry_after=float(retry_after) if retry_after else None
+                )
+            response.raise_for_status()
+            self._current_file = (url, pq.read_table(BytesIO(response.content)))
+        return self._current_file[1]
 
-        df = pd.read_parquet(BytesIO(response.content)).astype(object)
+    @staticmethod
+    def _to_records(table: pa.Table) -> list[dict[str, Any]]:
+        df = table.to_pandas().astype(object)
         df = df.replace({"N/A": None, "": None})
         df = df.where(df.notna(), None)
         return df.to_dict("records")

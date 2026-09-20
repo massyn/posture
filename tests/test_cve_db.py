@@ -125,3 +125,91 @@ def test_manifest_json_fetched_once_across_resources() -> None:
         c for c in responses.calls if c.request.url.endswith("manifest.json")
     ]
     assert len(manifest_calls) == 1
+
+
+def _register_year_files(rows_per_year: dict[int, int]) -> dict[int, str]:
+    urls = {
+        y: f"https://cve-db.pages.dev/cve_summary_{y}.parquet" for y in rows_per_year
+    }
+    responses.add(
+        responses.GET,
+        "https://cve-db.pages.dev/manifest.json",
+        json={
+            "_meta": {"tables": ["cve_summary"]},
+            "cve_summary": {"files": {"parquet": list(urls.values())}},
+        },
+        status=200,
+    )
+    for year, count in rows_per_year.items():
+        df = pd.DataFrame({"cve_id": [f"CVE-{year}-{i:04d}" for i in range(count)]})
+        responses.add(
+            responses.GET,
+            urls[year],
+            body=df.to_parquet(),
+            status=200,
+            content_type="application/octet-stream",
+        )
+    return urls
+
+
+@responses.activate
+def test_pages_are_row_count_bounded_and_span_years() -> None:
+    _register_year_files({2022: 3, 2023: 4, 2024: 2})
+
+    ccm = CCM("cve_db", {"page_size": 4})
+    pages = list(ccm.collect_page("cve_summary"))
+
+    # 9 rows in 4-row pages: the second page straddles 2022/2023 and 2023/2024
+    # boundaries, only the last page is short.
+    assert [len(p) for p in pages] == [4, 4, 1]
+    assert list(pages[0]["cve_id"]) == [
+        "CVE-2022-0000",
+        "CVE-2022-0001",
+        "CVE-2022-0002",
+        "CVE-2023-0000",
+    ]
+    ids = [i for p in pages for i in p["cve_id"]]
+    assert len(ids) == len(set(ids)) == 9
+    assert ids[-1] == "CVE-2024-0001"
+
+
+@responses.activate
+def test_year_file_downloaded_once_across_its_pages() -> None:
+    urls = _register_year_files({2022: 5, 2023: 5})
+
+    ccm = CCM("cve_db", {"page_size": 2})
+    ccm.collect("cve_summary")
+
+    for url in urls.values():
+        assert sum(1 for c in responses.calls if c.request.url == url) == 1
+
+
+@responses.activate
+def test_page_ending_exactly_on_year_boundary_loses_no_rows() -> None:
+    _register_year_files({2022: 4, 2023: 4})
+
+    ccm = CCM("cve_db", {"page_size": 4})
+    pages = list(ccm.collect_page("cve_summary"))
+
+    assert [len(p) for p in pages] == [4, 4]
+    assert pages[1].loc[0, "cve_id"] == "CVE-2023-0000"
+
+
+@responses.activate
+def test_record_limit_applies_across_page_boundary() -> None:
+    _register_year_files({2022: 3, 2023: 4})
+
+    ccm = CCM("cve_db", {"page_size": 2}, record_limit=5)
+    df = ccm.collect("cve_summary")
+
+    assert len(df) == 5
+
+
+def test_page_size_read_from_env_and_validated(monkeypatch) -> None:
+    import pytest
+
+    monkeypatch.setenv("CVE_DB_PAGE_SIZE", "1000")
+    assert CCM("cve_db")._page_size == 1000
+
+    with pytest.raises(ValueError):
+        CCM("cve_db", {"page_size": 0})
