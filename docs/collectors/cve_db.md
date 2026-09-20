@@ -11,6 +11,7 @@ No required configuration.
 | Config key | Environment variable |
 | --- | --- |
 | `base_url` | `CVE_DB_BASE_URL` |
+| `page_size` | `CVE_DB_PAGE_SIZE` |
 
 ## Example
 
