@@ -5,7 +5,7 @@ from posture.exceptions import PostureError, SourceUnknown
 
 
 def test_version() -> None:
-    assert posture.__version__ == "1.5.1"
+    assert posture.__version__ == "1.5.2"
 
 
 def test_ccm_unknown_source_raises_source_unknown() -> None:

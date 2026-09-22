@@ -12,8 +12,8 @@ static export elsewhere.
 
 **Manifest-driven, not hardcoded.** ``GET {base_url}/manifest.json`` is the
 one thing this collector never assumes — it declares the resources on offer
-(``_meta.tables``) and, per resource, the list of per-year Parquet file URLs
-to pull (``<resource>.files.parquet``). Fetched once per instance (cached on
+(``_meta.tables``) and, per resource, the list of per-year gzipped CSV file
+URLs to pull (``<resource>.files.csv``). Fetched once per instance (cached on
 ``self._file_manifest``, populated lazily on first ``collect()`` — no
 network call at construction).
 
@@ -26,6 +26,9 @@ early ones), so a page-per-file scheme gives unbounded pages. The cursor is
 ``(file_index, row_offset)``. Only the file currently being read is held
 (``self._current_file``, an Arrow table — compact, unlike a list of Python
 dicts) and only the rows of the page being emitted are converted to records.
+Every column is read as a string — no Arrow type inference, which samples only
+the first block and would reject a later ``"N/A"`` in a column it had guessed
+numeric — and ``parse()`` coerces to the manifest's declared types as usual.
 A failure partway through still yields ``IncompleteCollection``, not a
 partial snapshot silently treated as complete.
 
@@ -45,7 +48,7 @@ directly off ``manifest.json``'s own declared ``type`` per field
 (``is_app``, ``is_kev``, ...) but which the source itself types ``integer``
 (0/1), so they stay ``int`` rather than being reinterpreted as ``bool``.
 
-**Null sentinels.** cve-db's Parquet export uses the literal string ``"N/A"``
+**Null sentinels.** cve-db's CSV export uses the literal string ``"N/A"``
 as its null marker across both tables (`epss`, `epss_percentile`,
 `kev_date_added` when a CVE has no EPSS/KEV data, but also scattered through
 otherwise-string columns like `cwe`/`cvss_version`/`base_score` for very old
@@ -55,7 +58,7 @@ sub-metric flags (`is_remote`/`is_adjacent`/`is_local`/`is_physical`/
 1990s (verified against the real `cve_summary_1999` file, 39 rows) carry an
 **empty string**, not `"N/A"`, on exactly those columns — the same "no CVSS
 vector to derive this from" case, just a different literal. Both sentinels
-normalise to ``None`` in ``_fetch_parquet`` before records ever reach
+normalise to ``None`` in ``_to_records`` before records ever reach
 ``parse()``, the same as any other collector's source-specific null
 convention (e.g. MDE's tri-state bool strings), so a missing EPSS score or a
 pre-CVSS-era CVE doesn't spam an "unparseable float"/"unparseable int"
@@ -64,12 +67,13 @@ warning per row.
 
 from __future__ import annotations
 
+import gzip
 import logging
 from io import BytesIO
 from typing import Any, ClassVar
 
 import pyarrow as pa
-import pyarrow.parquet as pq
+import pyarrow.csv as pv
 
 from posture.base import Collector, RateLimitedSignal
 
@@ -144,7 +148,7 @@ class CveDbCollector(Collector):
         # (url, table) of the year file currently being paged through, so
         # consecutive pages don't re-download it. Only one is ever held.
         self._current_file: tuple[str, pa.Table] | None = None
-        # Resource -> list of Parquet file URLs, read off manifest.json.
+        # Resource -> list of gzipped CSV file URLs, read off manifest.json.
         # None until the first _fetch_page call — no network call at
         # construction, per the locked config-resolution rule.
         self._file_manifest: dict[str, list[str]] | None = None
@@ -164,7 +168,7 @@ class CveDbCollector(Collector):
             response.raise_for_status()
             data = response.json()
             self._file_manifest = {
-                name: info["files"]["parquet"]
+                name: info["files"]["csv"]
                 for name, info in data.items()
                 if name != "_meta"
             }
@@ -183,7 +187,7 @@ class CveDbCollector(Collector):
         file_index, offset = cursor or (0, 0)
         records: list[dict[str, Any]] = []
         while file_index < len(files) and len(records) < self._page_size:
-            table = self._load_file(files[file_index])
+            table = self._load_file(resource, files[file_index])
             chunk = table.slice(offset, self._page_size - len(records))
             records.extend(self._to_records(chunk))
             offset += chunk.num_rows
@@ -193,7 +197,7 @@ class CveDbCollector(Collector):
         next_cursor = (file_index, offset) if file_index < len(files) else None
         return records, next_cursor
 
-    def _load_file(self, url: str) -> pa.Table:
+    def _load_file(self, resource: str, url: str) -> pa.Table:
         if self._current_file is None or self._current_file[0] != url:
             response = self._session.get(url, timeout=60)
             if response.status_code == 429:
@@ -202,7 +206,12 @@ class CveDbCollector(Collector):
                     retry_after=float(retry_after) if retry_after else None
                 )
             response.raise_for_status()
-            self._current_file = (url, pq.read_table(BytesIO(response.content)))
+            column_types = {col: pa.string() for col in MANIFEST[resource]["columns"]}
+            table = pv.read_csv(
+                BytesIO(gzip.decompress(response.content)),
+                convert_options=pv.ConvertOptions(column_types=column_types),
+            )
+            self._current_file = (url, table)
         return self._current_file[1]
 
     @staticmethod

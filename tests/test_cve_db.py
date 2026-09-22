@@ -1,3 +1,4 @@
+import gzip
 from pathlib import Path
 
 import pandas as pd
@@ -7,13 +8,13 @@ from posture import CCM
 
 FIXTURES = Path(__file__).parent / "fixtures" / "cve_db"
 
-_SUMMARY_URL = "https://cve-db.pages.dev/cve_summary_2024.parquet"
-_CPE_URL = "https://cve-db.pages.dev/cve_cpe_2024.parquet"
+_SUMMARY_URL = "https://cve-db.pages.dev/cve_summary_2024.csv.gz"
+_CPE_URL = "https://cve-db.pages.dev/cve_cpe_2024.csv.gz"
 
 _MANIFEST_JSON = {
     "_meta": {"tables": ["cve_summary", "cve_cpe"], "total_cves": 2},
-    "cve_summary": {"files": {"parquet": [_SUMMARY_URL]}},
-    "cve_cpe": {"files": {"parquet": [_CPE_URL]}},
+    "cve_summary": {"files": {"csv": [_SUMMARY_URL]}},
+    "cve_cpe": {"files": {"csv": [_CPE_URL]}},
 }
 
 
@@ -27,14 +28,14 @@ def _register_manifest_and_files() -> None:
     responses.add(
         responses.GET,
         _SUMMARY_URL,
-        body=(FIXTURES / "cve_summary_2024.parquet").read_bytes(),
+        body=(FIXTURES / "cve_summary_2024.csv.gz").read_bytes(),
         status=200,
         content_type="application/octet-stream",
     )
     responses.add(
         responses.GET,
         _CPE_URL,
-        body=(FIXTURES / "cve_cpe_2024.parquet").read_bytes(),
+        body=(FIXTURES / "cve_cpe_2024.csv.gz").read_bytes(),
         status=200,
         content_type="application/octet-stream",
     )
@@ -64,7 +65,7 @@ def test_cve_summary_collects_and_normalises_na_sentinel() -> None:
 
 @responses.activate
 def test_empty_string_sentinel_on_cvss_flags_normalises_to_null() -> None:
-    # Pre-CVSS-era CVEs (verified against the real cve_summary_1999.parquet
+    # Pre-CVSS-era CVEs (verified against the real cve_summary_1999.csv.gz
     # file) carry an empty string, not "N/A", on exactly the CVSS-derived
     # flag columns — the same "no CVSS vector to derive this from" null, just
     # a different sentinel literal.
@@ -87,7 +88,7 @@ def test_empty_string_sentinel_on_cvss_flags_normalises_to_null() -> None:
     responses.add(
         responses.GET,
         _SUMMARY_URL,
-        body=df.to_parquet(),
+        body=gzip.compress(df.to_csv(index=False).encode()),
         status=200,
         content_type="application/octet-stream",
     )
@@ -129,14 +130,14 @@ def test_manifest_json_fetched_once_across_resources() -> None:
 
 def _register_year_files(rows_per_year: dict[int, int]) -> dict[int, str]:
     urls = {
-        y: f"https://cve-db.pages.dev/cve_summary_{y}.parquet" for y in rows_per_year
+        y: f"https://cve-db.pages.dev/cve_summary_{y}.csv.gz" for y in rows_per_year
     }
     responses.add(
         responses.GET,
         "https://cve-db.pages.dev/manifest.json",
         json={
             "_meta": {"tables": ["cve_summary"]},
-            "cve_summary": {"files": {"parquet": list(urls.values())}},
+            "cve_summary": {"files": {"csv": list(urls.values())}},
         },
         status=200,
     )
@@ -145,7 +146,7 @@ def _register_year_files(rows_per_year: dict[int, int]) -> dict[int, str]:
         responses.add(
             responses.GET,
             urls[year],
-            body=df.to_parquet(),
+            body=gzip.compress(df.to_csv(index=False).encode()),
             status=200,
             content_type="application/octet-stream",
         )
