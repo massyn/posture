@@ -12,14 +12,14 @@ CVE_CPE_MANIFEST = MANIFEST["cve_cpe"]
 
 
 def _clean_records(path: Path) -> list[dict]:
-    df = pd.read_parquet(path).astype(object)
-    df = df.where(df != "N/A", None)
-    df = df.where(df.notna(), None)
+    # Read as the collector does: every column a string, "N/A" and "" as nulls.
+    df = pd.read_csv(path, dtype=str, keep_default_na=False).astype(object)
+    df = df.replace({"N/A": None, "": None})
     return df.to_dict("records")
 
 
 def test_cve_summary_page() -> None:
-    records = _clean_records(FIXTURES / "cve_summary_2024.parquet")
+    records = _clean_records(FIXTURES / "cve_summary_2024.csv.gz")
 
     df = parse(records, CVE_SUMMARY_MANIFEST, resource="cve_summary")
 
@@ -39,7 +39,7 @@ def test_cve_summary_page() -> None:
 
 
 def test_cve_cpe_page() -> None:
-    records = _clean_records(FIXTURES / "cve_cpe_2024.parquet")
+    records = _clean_records(FIXTURES / "cve_cpe_2024.csv.gz")
 
     df = parse(records, CVE_CPE_MANIFEST, resource="cve_cpe")
 
