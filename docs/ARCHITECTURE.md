@@ -83,7 +83,7 @@ tests/
    loop, at the request level. Retry at request level only — never restart a stream
    that has already yielded.
 8. **Transient connection errors are retried, not fatal.** `ConnectionError`,
-   `Timeout`, and `ChunkedEncodingError` get up to 2 retries with a fixed 5s wait,
+   `Timeout`, and `ChunkedEncodingError` get up to 5 retries with a fixed 5s wait,
    at the request level, in the base class — a network blip must not kill an
    otherwise-healthy collection. Retries exhausted → the underlying exception
    propagates and is wrapped as `IncompleteCollection` same as any other failure.
@@ -421,6 +421,17 @@ red test suite either way.
 - **Rate limiting:** reactive 429 + `Retry-After` at request level, plus proactive
   pacing off `X-RateLimit-Remaining` headers. Exponential backoff when no `Retry-After`
   is given, capped at 60s per attempt.
+- **Transient 5xx:** opt-in per collector. A collector that has observed a vendor
+  returning 5xx under load raises `TransientServerErrorSignal(status_code,
+  retry_after=...)` from `posture.base`; `_request_with_retry` retries it up to 10
+  times with the same backoff/jitter/60s cap as 429s, logs each retry, and counts it
+  in the report's `retries`. Exhausted → propagates as `IncompleteCollection` with the
+  status code in the message. Raise it only for genuinely transient codes (500/502/
+  503/504), never 501/505. Currently used by `crowdstrike.py` only (Spotlight
+  vulnerabilities 500s mid-pagination, issue #26) — any other collector hitting the
+  same failure mode should adopt the signal in its own status-code check rather than
+  adding a bespoke retry loop. Collectors that don't raise it still fail fast on 5xx
+  via `raise_for_status()`.
 
 ## Guardrails
 

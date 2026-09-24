@@ -37,7 +37,7 @@ logger = logging.getLogger("posture")
 load_dotenv(find_dotenv(usecwd=True))
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.5.2"
+__version__ = "1.5.3"
 
 __all__ = [
     "CCM",

@@ -50,6 +50,12 @@ _MAX_RATE_LIMIT_RETRIES = 100
 _MAX_CONNECTION_RETRIES = 5
 _CONNECTION_RETRY_WAIT_SECONDS = 5.0
 
+# A 5xx the collector has classified as transient (TransientServerErrorSignal).
+# Opt-in per collector — only raised where a vendor has been observed returning
+# 5xx under load mid-pagination, so a genuinely broken endpoint elsewhere still
+# fails fast. Backoff caps at _BACKOFF_CAP_SECONDS per attempt.
+_MAX_SERVER_ERROR_RETRIES = 10
+
 # Collectors that fan out per-item network calls (e.g. one detail request per
 # id) share this session, so the connection pool must be sized to match —
 # otherwise urllib3 logs "Connection pool is full" and serialises anyway.
@@ -470,6 +476,7 @@ class Collector(ABC):
         attempt = 0
         rate_limit_attempt = 0
         connection_attempt = 0
+        server_error_attempt = 0
         while True:
             try:
                 self._ensure_authenticated_with_retry(resource)
@@ -507,6 +514,26 @@ class Collector(ABC):
                 # with the detail intact rather than burning _MAX_RETRIES
                 # attempts before surfacing an unhelpful error.
                 raise
+            except TransientServerErrorSignal as exc:
+                server_error_attempt += 1
+                if server_error_attempt > _MAX_SERVER_ERROR_RETRIES:
+                    raise
+                report.retries += 1
+                logger.warning(
+                    "transient server error, retrying",
+                    extra={
+                        "source": self.env_prefix.lower(),
+                        "resource": resource,
+                        "attempt": server_error_attempt,
+                        "status_code": exc.status_code,
+                    },
+                )
+                wait = min(
+                    exc.retry_after
+                    or _BACKOFF_BASE_SECONDS * (2**server_error_attempt),
+                    _BACKOFF_CAP_SECONDS,
+                )
+                time.sleep(wait * random.uniform(0.75, 1.25))
             except _TRANSIENT_CONNECTION_ERRORS as exc:
                 connection_attempt += 1
                 if connection_attempt > _MAX_CONNECTION_RETRIES:
@@ -645,6 +672,18 @@ class RateLimitedSignal(Exception):
 
 class UnauthorizedSignal(Exception):
     pass
+
+
+class TransientServerErrorSignal(Exception):
+    """Raised by a collector for a 5xx it has determined is transient (vendor
+    under load), not a broken endpoint. Retried with exponential backoff up to
+    _MAX_SERVER_ERROR_RETRIES times; carries the status code so it survives
+    into the IncompleteCollection message once retries are exhausted."""
+
+    def __init__(self, status_code: int, retry_after: float | None = None) -> None:
+        super().__init__(f"transient server error (HTTP {status_code})")
+        self.status_code = status_code
+        self.retry_after = retry_after
 
 
 class PermissionDeniedSignal(Exception):

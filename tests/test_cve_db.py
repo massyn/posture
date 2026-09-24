@@ -12,7 +12,7 @@ _SUMMARY_URL = "https://cve-db.pages.dev/cve_summary_2024.csv.gz"
 _CPE_URL = "https://cve-db.pages.dev/cve_cpe_2024.csv.gz"
 
 _MANIFEST_JSON = {
-    "_meta": {"tables": ["cve_summary", "cve_cpe"], "total_cves": 2},
+    "_meta": {"tables": {"cve_summary": 2, "cve_cpe": 2}},
     "cve_summary": {"files": {"csv": [_SUMMARY_URL]}},
     "cve_cpe": {"files": {"csv": [_CPE_URL]}},
 }
@@ -136,7 +136,7 @@ def _register_year_files(rows_per_year: dict[int, int]) -> dict[int, str]:
         responses.GET,
         "https://cve-db.pages.dev/manifest.json",
         json={
-            "_meta": {"tables": ["cve_summary"]},
+            "_meta": {"tables": {"cve_summary": sum(rows_per_year.values())}},
             "cve_summary": {"files": {"csv": list(urls.values())}},
         },
         status=200,
