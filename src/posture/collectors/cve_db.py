@@ -11,9 +11,9 @@ Healthchecks' ``api_url``/DNSimple's ``endpoint``, for anyone mirroring the
 static export elsewhere.
 
 **Manifest-driven, not hardcoded.** ``GET {base_url}/manifest.json`` is the
-one thing this collector never assumes — it declares the resources on offer
-(``_meta.tables``) and, per resource, the list of per-year gzipped CSV file
-URLs to pull (``<resource>.files.csv``). Fetched once per instance (cached on
+one thing this collector never assumes — every top-level key other than
+``_meta`` is a resource on offer, carrying the list of per-year gzipped CSV
+file URLs to pull (``<resource>.files.csv``). ``_meta`` itself is never read. Fetched once per instance (cached on
 ``self._file_manifest``, populated lazily on first ``collect()`` — no
 network call at construction).
 

@@ -15,7 +15,12 @@ import logging
 import time
 from typing import Any, ClassVar
 
-from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
+from posture.base import (
+    Collector,
+    RateLimitedSignal,
+    TransientServerErrorSignal,
+    UnauthorizedSignal,
+)
 from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.crowdstrike")
@@ -41,7 +46,14 @@ _DEFAULT_VULN_FACETS = ["cve", "host_info", "remediation"]
 # has been observed read-timing-out under CrowdStrike-side load. A longer
 # read timeout than the collector default gives slow responses room to
 # complete instead of tripping the connection-retry path.
-_VULN_REQUEST_TIMEOUT = (10, 60)
+_VULN_REQUEST_TIMEOUT = (10, 120)
+
+# Crowdstrike (Spotlight vulnerabilities especially) returns 5xx under load,
+# typically mid-pagination deep into a large pull. These are retried by the
+# base class with backoff rather than failing the collection. Only gateway/
+# availability codes — a 501/505 is not transient and still fails fast.
+_TRANSIENT_SERVER_ERROR_CODES = frozenset({500, 502, 503, 504})
+_SERVER_ERROR_RETRY_AFTER_SECONDS = 30.0
 
 # Crowdstrike's API occasionally returns a 404 for a request that is
 # perfectly valid (observed across devices/entities, zero-trust-assessment,
@@ -388,6 +400,16 @@ class CrowdstrikeCollector(Collector):
             )
         if response.status_code == 401:
             raise UnauthorizedSignal()
+        if response.status_code in _TRANSIENT_SERVER_ERROR_CODES:
+            retry_after = response.headers.get("Retry-After")
+            raise TransientServerErrorSignal(
+                response.status_code,
+                retry_after=(
+                    float(retry_after)
+                    if retry_after
+                    else _SERVER_ERROR_RETRY_AFTER_SECONDS
+                ),
+            )
         if response.status_code != 200:
             logger.warning(
                 "unexpected status code",
