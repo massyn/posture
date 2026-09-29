@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -47,13 +48,12 @@ from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.servicenow")
 
-_DEFAULT_SCHEMA_PATH = Path(__file__).parent / "servicenow.json"
 _PAGE_LIMIT = 500
 _AUTH_TYPES = ("oauth2", "basic")
 
 
-def _load_manifest(schema_path: Path) -> dict[str, dict[str, Any]]:
-    tables: dict[str, dict[str, str]] = json.loads(schema_path.read_text())
+def _load_manifest(schema_json: str) -> dict[str, dict[str, Any]]:
+    tables: dict[str, dict[str, str]] = json.loads(schema_json)
     manifest: dict[str, dict[str, Any]] = {}
     for table, fields in tables.items():
         manifest[table] = {
@@ -65,7 +65,13 @@ def _load_manifest(schema_path: Path) -> dict[str, dict[str, Any]]:
     return manifest
 
 
-MANIFEST: dict[str, dict[str, Any]] = _load_manifest(_DEFAULT_SCHEMA_PATH)
+MANIFEST: dict[str, dict[str, Any]] = _load_manifest(
+    # importlib.resources rather than Path(__file__): zip-safe, e.g. when
+    # posture is imported from a Snowflake stage.
+    files("posture.collectors")
+    .joinpath("servicenow.json")
+    .read_text()
+)
 
 
 class ServicenowCollector(Collector):
@@ -103,7 +109,7 @@ class ServicenowCollector(Collector):
             "SERVICENOW_SCHEMA_FILE"
         )
         if schema_file:
-            self.manifest = _load_manifest(Path(schema_file))
+            self.manifest = _load_manifest(Path(schema_file).read_text())
 
     def _resolve_config(self, explicit: dict[str, Any]) -> dict[str, Any]:
         resolved: dict[str, Any] = {"instance": self._require(explicit, "instance")}
