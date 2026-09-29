@@ -27,17 +27,16 @@ Dependencies
 from __future__ import annotations
 
 import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 from posture.exceptions import AuthenticationError
 
-_DEFAULT_SCHEMA_PATH = Path(__file__).parent / "salesforce.json"
 
-
-def _load_manifest(schema_path: Path) -> dict[str, dict[str, Any]]:
-    tables: dict[str, dict[str, str]] = json.loads(schema_path.read_text())
+def _load_manifest(schema_json: str) -> dict[str, dict[str, Any]]:
+    tables: dict[str, dict[str, str]] = json.loads(schema_json)
     manifest: dict[str, dict[str, Any]] = {}
     for table, fields in tables.items():
         query = f"select {','.join(fields)} from {table}"
@@ -50,7 +49,13 @@ def _load_manifest(schema_path: Path) -> dict[str, dict[str, Any]]:
     return manifest
 
 
-MANIFEST: dict[str, dict[str, Any]] = _load_manifest(_DEFAULT_SCHEMA_PATH)
+MANIFEST: dict[str, dict[str, Any]] = _load_manifest(
+    # importlib.resources rather than Path(__file__): zip-safe, e.g. when
+    # posture is imported from a Snowflake stage.
+    files("posture.collectors")
+    .joinpath("salesforce.json")
+    .read_text()
+)
 
 
 class SalesforceCollector(Collector):
@@ -81,7 +86,7 @@ class SalesforceCollector(Collector):
         # instead of editing the one shipped with posture.
         schema_file = self._config.get("schema_file")
         if schema_file:
-            self.manifest = _load_manifest(Path(schema_file))
+            self.manifest = _load_manifest(Path(schema_file).read_text())
 
     def _authenticate(self) -> None:
         try:

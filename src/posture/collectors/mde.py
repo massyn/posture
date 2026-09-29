@@ -217,39 +217,6 @@ MANIFEST: dict[str, dict[str, Any]] = {
 }
 
 
-# ============================================================================
-# TEMP-DEBUG: MDE non-200 diagnostic logging. Remove this whole block (and its
-# call site in _get) once the root cause of MDE's failures has been found.
-# Writes request/response detail for any non-200 response to error.log next
-# to the CWD. Authorization header is redacted — never write secrets to disk.
-# ============================================================================
-_ERROR_LOG_PATH = "error.log"
-_ERROR_LOG_LOCK = threading.Lock()
-
-
-def _log_error_to_file(url: str, params: dict[str, Any] | None, response: Any) -> None:
-    headers = {
-        key: ("<redacted>" if key.lower() == "authorization" else value)
-        for key, value in response.request.headers.items()
-    }
-    entry = (
-        f"{time.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-        f"URL: {url}\n"
-        f"Status: {response.status_code}\n"
-        f"Payload/params: {params!r}\n"
-        f"Request headers: {headers!r}\n"
-        f"Response body: {response.text}\n"
-        f"{'-' * 80}\n"
-    )
-    with _ERROR_LOG_LOCK, open(_ERROR_LOG_PATH, "a", encoding="utf-8") as fh:
-        fh.write(entry)
-
-
-# ============================================================================
-# END TEMP-DEBUG
-# ============================================================================
-
-
 class MdeCollector(Collector):
     env_prefix = "MDE"
     display_name = "Microsoft Defender for Endpoint"
@@ -343,10 +310,6 @@ class MdeCollector(Collector):
     ) -> Any:
         self._pace_request()
         response = self._session.get(url, params=params, timeout=timeout)
-        if response.status_code != 200:
-            _log_error_to_file(
-                url, params, response
-            )  # TEMP-DEBUG: remove once MDE failure root cause is found
         if response.status_code in (429, 502, 503, 504):
             # 502/503/504 are transient gateway/service-unavailable errors from
             # the nginx layer in front of Microsoft's API (e.g. a bare "502 Bad

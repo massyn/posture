@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -50,7 +51,6 @@ from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.jira")
 
-_DEFAULT_SCHEMA_PATH = Path(__file__).parent / "jira.json"
 _PAGE_SIZE = 100
 _AUTH_TYPES = ("cloud", "server")
 
@@ -86,9 +86,9 @@ _PROJECT_COLUMNS: dict[str, tuple[str, str]] = {
 
 
 def _load_manifest(
-    schema_path: Path,
+    schema_json: str,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
-    custom_fields: dict[str, list[str]] = json.loads(schema_path.read_text()).get(
+    custom_fields: dict[str, list[str]] = json.loads(schema_json).get(
         "custom_fields", {}
     )
     issue_columns = dict(_STANDARD_ISSUE_COLUMNS)
@@ -102,7 +102,13 @@ def _load_manifest(
     return manifest, dict(custom_fields)
 
 
-MANIFEST, _CUSTOM_FIELDS = _load_manifest(_DEFAULT_SCHEMA_PATH)
+MANIFEST, _CUSTOM_FIELDS = _load_manifest(
+    # importlib.resources rather than Path(__file__): zip-safe, e.g. when
+    # posture is imported from a Snowflake stage.
+    files("posture.collectors")
+    .joinpath("jira.json")
+    .read_text()
+)
 
 
 def _issue_search_fields(columns: dict[str, tuple[str, str]]) -> list[str]:
@@ -149,7 +155,9 @@ class JiraCollector(Collector):
             "JIRA_SCHEMA_FILE"
         )
         if schema_file:
-            self.manifest, self._custom_field_ids = _load_manifest(Path(schema_file))
+            self.manifest, self._custom_field_ids = _load_manifest(
+                Path(schema_file).read_text()
+            )
 
         self._custom_fields_validated = False
 
