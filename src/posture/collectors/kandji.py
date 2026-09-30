@@ -45,7 +45,13 @@ object (``general``, ``mdm``, ``filevault``, ``hardware_overview``,
 carried there; it surfaces only as named compliance rows in
 ``device_parameters`` (``name`` = "Enable Firewall" / "Enable Gatekeeper" /
 "Enable System Integrity Protection"), and only when the tenant's blueprint
-includes those checks.
+includes those checks. Windows devices return a differently keyed
+``details`` payload (e.g. ``general.device_model``,
+``hardware_overview.smbios_serial_number``, no ``filevault``/
+``activation_lock``/``recovery_information`` sections at all); fields with
+a Mac equivalent are copied under the Mac key before parsing (see
+``_WINDOWS_DETAIL_ALIASES``), so both platforms share one column set and the
+Mac-only columns are simply null for Windows rows.
 
 **Caveat — not live-verified:** ``blueprints`` and ``vulnerabilities``
 column paths were built from Kandji's public API reference, a third-party
@@ -80,6 +86,27 @@ _FANOUT_SPECS: dict[str, tuple[str, str | None]] = {
     "device_details": ("/api/v1/devices/{id}/details", None),
     "device_parameters": ("/api/v1/devices/{id}/parameters", "parameters"),
     "device_library_items": ("/api/v1/devices/{id}/status", "library_items"),
+}
+
+# Windows devices return a differently keyed /details payload from Macs.
+# Where a Windows field carries the same fact as a mapped Mac field, it is
+# copied under the Mac key so device_details keeps one common column set:
+# (mac section, mac key) -> (windows section, windows key). Values are
+# carried verbatim — memory is "16 GB LPDDR5" on a Mac but bare megabytes
+# ("32768") on Windows, and ip_address is the Wi-Fi IPv4 address only.
+_WINDOWS_DETAIL_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
+    ("general", "model"): ("general", "device_model"),
+    ("general", "system_version"): ("general", "full_software_version"),
+    ("hardware_overview", "serial_number"): (
+        "hardware_overview",
+        "smbios_serial_number",
+    ),
+    ("hardware_overview", "memory"): ("hardware_overview", "total_ram"),
+    ("kandji_agent", "agent_installed"): ("kandji_agent", "is_agent_installed"),
+    ("kandji_agent", "agent_version"): ("kandji_agent", "version"),
+    ("kandji_agent", "last_check_in"): ("kandji_agent", "last_check_in_datetime"),
+    ("network", "local_hostname"): ("network", "dns_computer_name"),
+    ("network", "ip_address"): ("network", "wifi_ipv4_address"),
 }
 
 _DEVICES_PAGE_SIZE = 300
@@ -347,6 +374,15 @@ class KandjiCollector(Collector):
         path, list_key = _FANOUT_SPECS[resource]
         payload = self._get(self._base_url + path.format(id=device_id)).json()
         if list_key is None:
+            if (payload.get("general") or {}).get("platform") == "Windows":
+                for (section, key), (
+                    src_section,
+                    src_key,
+                ) in _WINDOWS_DETAIL_ALIASES.items():
+                    value = (payload.get(src_section) or {}).get(src_key)
+                    target = payload.setdefault(section, {})
+                    if value is not None and target.get(key) is None:
+                        target[key] = value
             return payload
         items = payload.get(list_key) or []
         return [{**item, "device_id": str(device_id)} for item in items]
