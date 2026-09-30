@@ -1,3 +1,4 @@
+import pandas as pd
 import responses
 
 from posture import CCM
@@ -53,6 +54,60 @@ def test_device_details_batches_ids_from_devices() -> None:
     assert df.loc[0, "serial_number"] == "SN-1"
     assert bool(df.loc[0, "is_supervised"]) is True
     assert bool(df.loc[0, "filevault_enabled"]) is True
+
+
+@responses.activate
+def test_device_details_maps_windows_fields_to_common_columns() -> None:
+    responses.add(
+        responses.GET,
+        "https://example.api.kandji.io/api/v1/devices",
+        json=[{"device_id": "1"}],
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://example.api.kandji.io/api/v1/devices/1/details",
+        json={
+            "general": {
+                "device_id": "1",
+                "platform": "Windows",
+                "device_model": "Surface Laptop 6",
+                "full_software_version": "10.0.26200.9457",
+            },
+            "hardware_overview": {
+                "smbios_serial_number": "SN-W1",
+                "total_ram": "32768",
+            },
+            "kandji_agent": {
+                "is_agent_installed": True,
+                "version": "1.22.3.0",
+                "last_check_in_datetime": "2026-09-30T06:15:46.105584Z",
+            },
+            "network": {
+                "dns_computer_name": "WIN-1",
+                "wifi_ipv4_address": "192.168.0.70",
+            },
+        },
+        status=200,
+    )
+
+    ccm = CCM(
+        "kandji",
+        {"api_url": "https://example.api.kandji.io", "api_token": "tok"},
+    )
+    df = ccm.collect("device_details")
+
+    row = df.loc[0]
+    assert row["model"] == "Surface Laptop 6"
+    assert row["system_version"] == "10.0.26200.9457"
+    assert row["serial_number"] == "SN-W1"
+    assert row["memory"] == "32768"
+    assert bool(row["agent_installed"]) is True
+    assert row["agent_version"] == "1.22.3.0"
+    assert row["agent_last_check_in"].year == 2026
+    assert row["local_hostname"] == "WIN-1"
+    assert row["ip_address"] == "192.168.0.70"
+    assert row["filevault_enabled"] is pd.NA
 
 
 @responses.activate
