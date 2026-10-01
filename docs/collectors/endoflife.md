@@ -19,6 +19,7 @@ from posture import CCM
 
 ccm = CCM("endoflife")  # credentials from the environment
 df = ccm.collect("cycles")
+df = ccm.collect("products")
 ```
 
 ## Example: export every table to CSV
@@ -41,6 +42,7 @@ for table in ccm.tables():
 ## Tables
 
 - [cycles](#cycles)
+- [products](#products)
 
 ### cycles
 
@@ -65,4 +67,15 @@ for table in ccm.tables():
 | `latest_date` | `datetime` |
 | `latest_link` | `str` |
 | `custom` | `json` |
+
+### products
+
+| Column | Type |
+| --- | --- |
+| `product` | `str` |
+| `label` | `str` |
+| `category` | `str` |
+| `aliases` | `json` |
+| `tags` | `json` |
+| `uri` | `str` |
 

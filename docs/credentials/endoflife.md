@@ -7,19 +7,21 @@ There is nothing to provision in a vendor console.
 
 ## Scoping collection
 
-Because there's no credential to gate this collector, `ccm.collect("cycles")`
-with no products configured returns zero rows and makes no network call at
-all — it does not default to pulling every product endoflife.date tracks
-(400+ at time of writing). Tell it which products to track either via
-config/environment or per call:
+Two tables:
 
-* `products` (config key / `ENDOFLIFE_PRODUCTS`, comma-separated) sets a
-  default product list for every `collect("cycles")` call.
-* `ccm.collect("cycles", products=["python", "ubuntu", "postgresql"])`
-  overrides that default for one call (kwargs win over the configured
-  default, same rule every other collector's query-dialect kwargs follow).
+* `products` — every product endoflife.date tracks (478 at time of
+  writing), one row each. Always unscoped.
+* `cycles` — every release cycle, one row per release. With no products
+  configured it pulls every product's cycles in a single request
+  (`GET /products/full`). To limit it to particular products:
+  * `products` (config key / `ENDOFLIFE_PRODUCTS`) sets a default product
+    list for every `collect("cycles")` call, separated by commas and/or
+    spaces, e.g. `ENDOFLIFE_PRODUCTS="python, ubuntu postgresql"`.
+  * `ccm.collect("cycles", products=["python", "ubuntu", "postgresql"])`
+    overrides that default for one call (kwargs win over the configured
+    default, same rule every other collector's query-dialect kwargs follow).
 
-Find valid product ids via `GET https://endoflife.date/api/v1/products`.
+Valid product ids are the `product` column of the `products` table.
 
 ## Record the credentials
 

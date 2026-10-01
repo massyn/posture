@@ -4,25 +4,24 @@ Raw ``requests`` against endoflife.date's v1 API (``https://endoflife.date/api/v
 no vendor SDK — public data, no auth of any kind. That's the one thing that
 makes this collector unlike every other one in this codebase: there is no
 credential to gate it, so ``config_keys`` has no required keys and
-``runnable_sources()`` always reports it ready. Rather than inventing a fake
-required credential (which would break the "explicit collect() call" contract
-every other source honours), the collector makes an unscoped call genuinely
-free: ``products`` (config key / ``ENDOFLIFE_PRODUCTS``, comma-separated, or
-the ``products`` kwarg, a comma-separated string or a list — kwarg wins per
-the locked kwargs-override rule) defaults to empty, and an empty resolved
-product list short-circuits ``_fetch_page`` before any HTTP request is
-made. A generic loop over every
-registered source's resources (e.g. ``scripts/extract_test.py``) therefore
-makes zero network calls against this source unless an operator has
-deliberately named products to track, either via env var or kwarg.
+``runnable_sources()`` always reports it ready. It is still never picked up
+by ``catalog(filter="environment")`` (nothing to check), so a default
+``posturecollect`` run only reaches it via ``--include``.
 
-One resource, ``cycles``: one ``GET /products/<id>`` call per configured
-product id (paginated one product per page — not batched — so a failure on
-product N doesn't discard N-1 already-yielded pages, no per-item thread-pool
-fan-out needed given the small product counts this is used for). Each
-release in the response's nested ``releases`` list becomes one row, with the
-requesting product's id/label injected onto it (not present in the release
-object itself).
+Two resources:
+
+* ``products`` — ``GET /products``, every product endoflife.date tracks
+  (one row each, one request, unscoped).
+* ``cycles`` — every release cycle, one row per release with the owning
+  product's id/label injected onto it (not present in the release object
+  itself). Scoped by ``products`` (config key / ``ENDOFLIFE_PRODUCTS``, or the
+  ``products`` kwarg — a string or a list, kwarg wins per the locked
+  kwargs-override rule); a string is split on commas and/or whitespace.
+  With no products resolved, every product's cycles are fetched in a single
+  ``GET /products/full`` call (one page) rather than one request per
+  product. With products named, it's one ``GET /products/<id>`` per product,
+  one product per page — so a failure on product N doesn't discard N-1
+  already-yielded pages.
 
 **Schema note — allowlist, not normalisation.** endoflife.date's v1 API is
 mostly consistent across products (the classic v0-API ambiguity, where `eol`
@@ -46,6 +45,7 @@ across products, so it's typed `json` rather than exploded into columns.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal
@@ -55,6 +55,16 @@ logger = logging.getLogger("posture.collectors.endoflife")
 _BASE_URL = "https://endoflife.date/api/v1"
 
 MANIFEST: dict[str, dict[str, Any]] = {
+    "products": {
+        "columns": {
+            "product": ("name", "str"),
+            "label": ("label", "str"),
+            "category": ("category", "str"),
+            "aliases": ("aliases", "json"),
+            "tags": ("tags", "json"),
+            "uri": ("uri", "str"),
+        }
+    },
     "cycles": {
         "columns": {
             "product": ("product", "str"),
@@ -77,7 +87,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "latest_link": ("latest.link", "str"),
             "custom": ("custom", "json"),
         }
-    }
+    },
 }
 
 
@@ -104,28 +114,33 @@ class EndoflifeCollector(Collector):
         products = kwargs.get("products")
         if products is None:
             return self._default_products
-        if isinstance(products, str):
-            return _split_products(products)
-        return list(products)
+        return _split_products(products)
 
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
+        if resource == "products":
+            return self._get("/products"), None
         if resource != "cycles":
             raise ValueError(f"Unknown resource '{resource}'")
 
         products = self._resolve_products(kwargs)
         if not products:
-            return [], None
+            records = [
+                record
+                for product in self._get("/products/full")
+                for record in _release_records(product)
+            ]
+            return records, None
 
         index = cursor or 0
         product_id = products[index]
-        records = self._fetch_product_cycles(product_id)
+        records = _release_records(self._get(f"/products/{product_id}"))
         next_cursor = index + 1 if index + 1 < len(products) else None
         return records, next_cursor
 
-    def _fetch_product_cycles(self, product_id: str) -> list[dict[str, Any]]:
-        response = self._session.get(f"{_BASE_URL}/products/{product_id}", timeout=30)
+    def _get(self, path: str) -> Any:
+        response = self._session.get(f"{_BASE_URL}{path}", timeout=60)
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             raise RateLimitedSignal(
@@ -133,25 +148,23 @@ class EndoflifeCollector(Collector):
             )
         if response.status_code == 404:
             raise ValueError(
-                f"Unknown endoflife.date product '{product_id}' — check the id "
+                f"endoflife.date returned 404 for {path} — check product ids "
                 f"against GET {_BASE_URL}/products"
             )
         response.raise_for_status()
+        return response.json()["result"]
 
-        result = response.json()["result"]
-        releases: list[dict[str, Any]] = result.get("releases", [])
-        records: list[dict[str, Any]] = []
-        for release in releases:
-            record = dict(release)
-            record["product"] = result.get("name", product_id)
-            record["product_label"] = result.get("label")
-            records.append(record)
-        return records
+
+def _release_records(product: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {**release, "product": product["name"], "product_label": product.get("label")}
+        for release in product.get("releases", [])
+    ]
 
 
 def _split_products(value: Any) -> list[str]:
     if not value:
         return []
     if isinstance(value, str):
-        return [item.strip() for item in value.split(",") if item.strip()]
+        return [item for item in re.split(r"[,\s]+", value) if item]
     return list(value)

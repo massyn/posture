@@ -5,15 +5,77 @@ from posture import CCM
 from posture.exceptions import PostureError
 
 
-@responses.activate
-def test_no_products_configured_makes_no_network_call() -> None:
-    # No responses registered at all — any HTTP call this makes fails the
-    # test via responses' "connection refused" behaviour.
-    ccm = CCM("endoflife")
-    df = ccm.collect("cycles")
+def _release(name: str) -> dict:
+    return {"name": name, "isEol": False, "isMaintained": True}
 
-    assert len(df) == 0
-    assert ccm.report("cycles")["records"] == 0
+
+@responses.activate
+def test_no_products_configured_fetches_every_product_in_one_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ENDOFLIFE_PRODUCTS", raising=False)
+    responses.add(
+        responses.GET,
+        "https://endoflife.date/api/v1/products/full",
+        json={
+            "result": [
+                {"name": "python", "label": "Python", "releases": [_release("3.13")]},
+                {
+                    "name": "ubuntu",
+                    "label": "Ubuntu",
+                    "releases": [_release("24.04"), _release("22.04")],
+                },
+                {"name": "empty", "label": "Empty", "releases": []},
+            ]
+        },
+        status=200,
+    )
+
+    df = CCM("endoflife").collect("cycles")
+
+    assert list(df["product"]) == ["python", "ubuntu", "ubuntu"]
+    assert list(df["cycle"]) == ["3.13", "24.04", "22.04"]
+    assert df.loc[1, "product_label"] == "Ubuntu"
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_products_env_var_accepts_commas_and_spaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENDOFLIFE_PRODUCTS", " python, ubuntu  debian,")
+    for product in ("python", "ubuntu", "debian"):
+        responses.add(
+            responses.GET,
+            f"https://endoflife.date/api/v1/products/{product}",
+            json={"result": {"name": product, "releases": [_release("1")]}},
+            status=200,
+        )
+
+    df = CCM("endoflife").collect("cycles")
+
+    assert list(df["product"]) == ["python", "ubuntu", "debian"]
+    assert len(responses.calls) == 3
+
+
+@responses.activate
+def test_products_resource_lists_every_product() -> None:
+    responses.add(
+        responses.GET,
+        "https://endoflife.date/api/v1/products",
+        json={
+            "result": [
+                {"name": "python", "aliases": [], "label": "Python"},
+                {"name": "alpine-linux", "aliases": ["alpine"], "label": "Alpine"},
+            ]
+        },
+        status=200,
+    )
+
+    df = CCM("endoflife", {"products": "python"}).collect("products")
+
+    assert list(df["product"]) == ["python", "alpine-linux"]
+    assert len(responses.calls) == 1
 
 
 @responses.activate
