@@ -3,6 +3,7 @@ collector and write it to parquet.
 
     posturecollect
     posturecollect --include crowdstrike endoflife
+    posturecollect --include crowdstrike.hosts --exclude endoflife
     posturecollect --output ./data --history
     posturecollect --include qualys --debug
     posturecollect --thread 5
@@ -14,6 +15,10 @@ source, e.g. ``endoflife``/``macadmins``, is never picked up here since it
 has nothing to check). ``--include`` overrides that entirely: only the named
 source(s) are collected, unconditionally — this is the one way to reach a
 no-auth source, or to run a single source regardless of what's configured.
+``--exclude`` then removes entries from whichever set applies. Both take
+``<source>`` or ``<source>.<resource>`` entries, and fall back to the
+``POSTURE_INCLUDE``/``POSTURE_EXCLUDE`` environment variables (comma- or
+space-separated) — see ``posture._selection``.
 
 Every resource of every selected source is streamed page-by-page
 (``Collector.collect_page()``) straight into a parquet file via
@@ -38,7 +43,8 @@ the run — ``main()`` returns a non-zero exit code if anything failed, so a
 scheduler can still detect a partial run without losing the sources that
 did succeed.
 
-Sources are collected concurrently, ``--thread`` (default 3) at a time —
+Sources are collected concurrently, ``--thread`` (else the
+``POSTURE_THREAD`` environment variable, else 3) at a time —
 each source gets its own ``CCM`` instance and writes only to its own
 ``<source>_<resource>.parquet`` file(s), so sources share no mutable state
 and can safely run in parallel. Resources within one source are still
@@ -69,7 +75,8 @@ import pyarrow.parquet as pq
 from dotenv import load_dotenv
 
 import posture
-from posture import CCM, catalog
+from posture import CCM
+from posture._selection import select_tables, split_list
 from posture.exceptions import PostureError
 from posture.storage.parquet import arrow_schema
 
@@ -77,6 +84,7 @@ logger = logging.getLogger("posture.cli")
 
 _ARG_FLAGS = {
     "include": "--include",
+    "exclude": "--exclude",
     "output": "--output",
     "history": "--history",
     "debug": "--debug",
@@ -102,13 +110,28 @@ def _env_bool(env_var: str, value: str) -> bool:
     )
 
 
+def _env_positive_int(env_var: str, value: str) -> int:
+    """Parse a positive integer environment variable, exiting on anything
+    else rather than silently falling back to the default."""
+    try:
+        number = int(value.strip())
+    except ValueError:
+        number = 0
+    if number < 1:
+        raise SystemExit(f"{env_var}={value!r} is not a positive integer")
+    return number
+
+
 #: Arguments that fall back to an environment variable (which may come from
 #: .env or --env's file) before their built-in default: name -> (env var,
 #: default, parser for the variable's string value). Resolved after --env has
 #: swapped the env file in.
 _ENV_DEFAULTS: dict[str, tuple[str, Any, Any]] = {
+    "include": ("POSTURE_INCLUDE", None, split_list),
+    "exclude": ("POSTURE_EXCLUDE", None, split_list),
     "output": ("POSTURE_OUTPUT", "output", lambda _var, value: value),
     "history": ("POSTURE_HISTORY", False, _env_bool),
+    "thread": ("POSTURE_THREAD", 3, _env_positive_int),
 }
 
 
@@ -119,11 +142,22 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--include",
         nargs="+",
-        metavar="SOURCE",
+        metavar="SOURCE[.RESOURCE]",
         default=None,
         help=(
-            "only collect these source(s), regardless of environment "
-            "variables — the one way to reach a no-auth source"
+            "only collect these source(s) or source.resource table(s), "
+            "regardless of environment variables — the one way to reach a "
+            "no-auth source (default: $POSTURE_INCLUDE)"
+        ),
+    )
+    parser.add_argument(
+        "--exclude",
+        nargs="+",
+        metavar="SOURCE[.RESOURCE]",
+        default=None,
+        help=(
+            "skip these source(s) or source.resource table(s) "
+            "(default: $POSTURE_EXCLUDE)"
         ),
     )
     parser.add_argument(
@@ -154,9 +188,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--thread",
         type=int,
-        default=3,
+        default=None,
         metavar="N",
-        help="number of sources to collect concurrently (default: %(default)s)",
+        help=(
+            "number of sources to collect concurrently "
+            "(default: $POSTURE_THREAD, else 3)"
+        ),
     )
     parser.add_argument(
         "--env",
@@ -208,21 +245,6 @@ def _apply_env_defaults(args: argparse.Namespace) -> None:
             setattr(args, name, parse(env_var, value) if value else default)
 
 
-def _select_sources(include: list[str] | None) -> dict[str, Any]:
-    """Resolve which sources to collect, per the module docstring's rules."""
-    if include is None:
-        return catalog(filter="environment")
-
-    all_sources = catalog()
-    unknown = [name for name in include if name not in all_sources]
-    if unknown:
-        raise SystemExit(
-            f"Unknown source(s): {', '.join(unknown)}. "
-            f"Available: {', '.join(sorted(all_sources))}"
-        )
-    return {name: all_sources[name] for name in include}
-
-
 def _output_path(output_dir: Path, table: str, *, history: bool) -> Path:
     if history:
         today = datetime.now(timezone.utc).date()
@@ -263,9 +285,9 @@ def _collect_resource(ccm: Any, resource: str, path: Path) -> int:
 
 
 def _collect_source(
-    source: str, info: dict[str, Any], output_dir: Path, *, history: bool
+    source: str, resources: list[str], output_dir: Path, *, history: bool
 ) -> list[dict[str, Any]]:
-    """Collect every resource of one source, returning one result dict per
+    """Collect ``resources`` of one source, returning one result dict per
         table (``table``, ``records``, ``seconds`` — wall-clock time spent on that
     table, failed or not — and ``status``, "ok" or "failed: <reason>").
 
@@ -282,7 +304,7 @@ def _collect_source(
         ]
 
     results: list[dict[str, Any]] = []
-    for resource in info["resources"]:
+    for resource in resources:
         stem = f"{source}_{resource}"
         path = _output_path(output_dir, stem, history=history)
         logger.info("%s.%s: collecting", source, resource)
@@ -352,12 +374,12 @@ def main(argv: list[str] | None = None) -> int:
     _log_parameters(args, argv)
 
     output_dir = Path(args.output)
-    sources = _select_sources(args.include)
+    sources = select_tables(args.include, args.exclude)
 
     if not sources:
         logger.warning(
             "No sources to collect — set the required environment "
-            "variable(s) for a source, or pass --include"
+            "variable(s) for a source, or check --include/--exclude"
         )
         return 0
 
@@ -372,9 +394,9 @@ def main(argv: list[str] | None = None) -> int:
     with ThreadPoolExecutor(max_workers=args.thread) as pool:
         futures = {
             pool.submit(
-                _collect_source, source, info, output_dir, history=args.history
+                _collect_source, source, resources, output_dir, history=args.history
             ): source
-            for source, info in sources.items()
+            for source, resources in sources.items()
         }
         for future, source in futures.items():
             try:

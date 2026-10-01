@@ -42,7 +42,7 @@ _DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
 load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"
 
 __all__ = [
     "CCM",
