@@ -1,0 +1,18 @@
+[
+  {
+    "name": "python",
+    "aliases": [],
+    "label": "Python",
+    "category": "lang",
+    "tags": ["lang"],
+    "uri": "https://endoflife.date/api/v1/products/python"
+  },
+  {
+    "name": "alpine-linux",
+    "aliases": ["alpine", "alpinelinux"],
+    "label": "Alpine Linux",
+    "category": "os",
+    "tags": ["linux-distribution", "os"],
+    "uri": "https://endoflife.date/api/v1/products/alpine-linux"
+  }
+]

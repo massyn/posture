@@ -37,7 +37,7 @@ def test_exclude_resource_drops_only_that_resource() -> None:
 
 def test_exclude_source_drops_it_from_include() -> None:
     assert select_tables(["macadmins", "endoflife"], ["macadmins"]) == {
-        "endoflife": ["cycles"]
+        "endoflife": ["products", "cycles"]
     }
 
 

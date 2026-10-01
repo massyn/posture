@@ -93,6 +93,7 @@
 [Credentials](credentials/endoflife.md)
 
 - [cycles](collectors/endoflife.md#cycles)
+- [products](collectors/endoflife.md#products)
 
 ## [EntraID](collectors/azure_entra.md)
 

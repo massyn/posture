@@ -39,3 +39,12 @@ def test_cycles_page() -> None:
     assert pd.isna(chrome_row["latest_version"])
     assert pd.isna(chrome_row["latest_date"])
     assert pd.isna(chrome_row["custom"])
+
+
+def test_products_page() -> None:
+    df = parse(_load("products_page.json"), MANIFEST["products"], resource="products")
+
+    assert list(df["product"]) == ["python", "alpine-linux"]
+    assert df.loc[1, "category"] == "os"
+    assert json.loads(df.loc[1, "aliases"]) == ["alpine", "alpinelinux"]
+    assert json.loads(df.loc[1, "tags"]) == ["linux-distribution", "os"]

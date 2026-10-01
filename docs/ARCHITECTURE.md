@@ -1252,10 +1252,9 @@ why something is built the way it is, not how to configure or call it.
     no gatekeeper here, so `hosts` (config key / `HTTP_HOSTS`,
     comma-separated, or the `hosts` kwarg — a string or a list, kwarg wins)
     *is* the authorisation mechanism. It defaults to empty and an empty
-    resolved list short-circuits `_fetch_page` before any request — same
-    "no fake credential, unscoped call is genuinely free" shape as
-    `endoflife.py`, so a generic loop over every source makes zero network
-    calls against this one.
+    resolved list short-circuits `_fetch_page` before any request — "no
+    fake credential, unscoped call is genuinely free", so a generic loop
+    over every source makes zero network calls against this one.
   * **Per-host failure handling, not all-or-nothing.** N independent hosts
     in one call; one timing out or refusing must not discard the rest. A
     network failure (and a malformed scope entry — a host with no
