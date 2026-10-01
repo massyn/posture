@@ -32,23 +32,6 @@ _FEED = {
 }
 
 
-def test_select_sources_include_bypasses_environment_check(monkeypatch) -> None:
-    monkeypatch.delenv("CROWDSTRIKE_CLIENT_ID", raising=False)
-    sources = cli._select_sources(["macadmins"])
-    assert set(sources) == {"macadmins"}
-
-
-def test_select_sources_unknown_include_raises_systemexit() -> None:
-    with pytest.raises(SystemExit):
-        cli._select_sources(["not-a-real-source"])
-
-
-def test_select_sources_default_uses_environment_filter(monkeypatch) -> None:
-    monkeypatch.delenv("ENDOFLIFE_PRODUCTS", raising=False)
-    sources = cli._select_sources(None)
-    assert "macadmins" not in sources  # no-auth sources excluded by default
-
-
 def test_output_path_default_vs_history(tmp_path: Path) -> None:
     default_path = cli._output_path(tmp_path, "macadmins_macos_releases", history=False)
     assert default_path == tmp_path / "macadmins_macos_releases.parquet"
@@ -107,9 +90,33 @@ def test_main_debug_sets_root_logger_to_debug(tmp_path: Path) -> None:
     assert logging.getLogger().level == logging.DEBUG
 
 
-def test_thread_default_is_three() -> None:
+def test_thread_default_is_three(monkeypatch) -> None:
+    monkeypatch.delenv("POSTURE_THREAD", raising=False)
     args = cli._parse_args(["--include", "macadmins"])
+    cli._apply_env_defaults(args)
     assert args.thread == 3
+
+
+def test_thread_falls_back_to_posture_thread(monkeypatch) -> None:
+    monkeypatch.setenv("POSTURE_THREAD", "7")
+    args = cli._parse_args([])
+    cli._apply_env_defaults(args)
+    assert args.thread == 7
+
+
+def test_explicit_thread_beats_posture_thread(monkeypatch) -> None:
+    monkeypatch.setenv("POSTURE_THREAD", "7")
+    args = cli._parse_args(["--thread", "2"])
+    cli._apply_env_defaults(args)
+    assert args.thread == 2
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-1", "2.5"])
+def test_invalid_posture_thread_exits(monkeypatch, value: str) -> None:
+    monkeypatch.setenv("POSTURE_THREAD", value)
+    args = cli._parse_args([])
+    with pytest.raises(SystemExit, match="is not a positive integer"):
+        cli._apply_env_defaults(args)
 
 
 def test_log_parameters_tags_explicit_vs_default(caplog, monkeypatch) -> None:
@@ -166,9 +173,7 @@ def test_collect_source_reports_failed_table_in_summary(
 
     monkeypatch.setattr(cli, "CCM", _raise_source_unknown)
 
-    results = cli._collect_source(
-        "macadmins", {"resources": {}}, tmp_path, history=False
-    )
+    results = cli._collect_source("macadmins", [], tmp_path, history=False)
 
     assert results == [
         {
@@ -297,7 +302,7 @@ def test_collect_source_records_seconds_per_table(monkeypatch, tmp_path: Path) -
     monkeypatch.setattr(cli, "_collect_resource", fake_collect)
 
     results = cli._collect_source(
-        "src", {"resources": {"ok_table": {}, "broken": {}}}, tmp_path, history=False
+        "src", ["ok_table", "broken"], tmp_path, history=False
     )
 
     assert [(r["table"], r["seconds"]) for r in results] == [
@@ -364,3 +369,36 @@ def test_main_posture_history_writes_dated_file(tmp_path: Path, monkeypatch) -> 
 
     assert exit_code == 0
     assert list((tmp_path / "macadmins_macos_releases").glob("*.parquet"))
+
+
+@responses.activate
+def test_main_include_resource_collects_only_that_table(tmp_path: Path) -> None:
+    responses.add(responses.GET, _FEED_URL, json=_FEED, status=200)
+
+    exit_code = cli.main(
+        ["--include", "macadmins.macos_cves", "--output", str(tmp_path)]
+    )
+
+    assert exit_code == 0
+    assert (tmp_path / "macadmins_macos_cves.parquet").is_file()
+    assert not (tmp_path / "macadmins_macos_releases.parquet").exists()
+
+
+@responses.activate
+def test_main_reads_posture_include_and_exclude(tmp_path: Path, monkeypatch) -> None:
+    responses.add(responses.GET, _FEED_URL, json=_FEED, status=200)
+    monkeypatch.setenv("POSTURE_INCLUDE", "macadmins")
+    monkeypatch.setenv("POSTURE_EXCLUDE", "macadmins.macos_releases")
+
+    exit_code = cli.main(["--output", str(tmp_path)])
+
+    assert exit_code == 0
+    assert (tmp_path / "macadmins_macos_cves.parquet").is_file()
+    assert not (tmp_path / "macadmins_macos_releases.parquet").exists()
+
+
+def test_include_flag_beats_posture_include(monkeypatch) -> None:
+    monkeypatch.setenv("POSTURE_INCLUDE", "crowdstrike")
+    args = cli._parse_args(["--include", "macadmins"])
+    cli._apply_env_defaults(args)
+    assert args.include == ["macadmins"]

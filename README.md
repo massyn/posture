@@ -338,10 +338,12 @@ into a warehouse.
 
 ```bash
 posturecollect --include crowdstrike endoflife   # only these sources, regardless of environment
+posturecollect --include crowdstrike.hosts       # only this one table (<source>.<resource>)
+posturecollect --exclude qualys snyk.issues      # everything configured, minus these sources/tables
 posturecollect --output ./data                   # base directory for the parquet files (default: $POSTURE_OUTPUT, else ./output)
 posturecollect --output ./data --history         # one dated file per table per day, instead of overwriting
 posturecollect --no-history                      # overwrite, even if POSTURE_HISTORY=true
-posturecollect --thread 5                        # collect this many sources concurrently (default: 3)
+posturecollect --thread 5                        # collect this many sources concurrently (default: $POSTURE_THREAD, else 3)
 posturecollect --debug                           # verbose debug-level logging
 posturecollect --env .env.nonprod                # read settings from this file instead of .env
 ```
@@ -350,6 +352,15 @@ posturecollect --env .env.nonprod                # read settings from this file 
 `endoflife`, `macadmins`) — a source with nothing to check is never picked
 up by the default environment-variable scan, so name it explicitly to
 collect it.
+
+`--include` and `--exclude` both take `<source>` (every resource of it) or
+`<source>.<resource>` (just that table) entries. `--exclude` is applied after
+`--include` (or after the default environment scan if there's no
+`--include`), and a source left with no tables is skipped. An entry naming an
+unknown source or resource stops the run with an error. Either can also be
+set as `POSTURE_INCLUDE` / `POSTURE_EXCLUDE` in your shell or `.env`
+(comma- or space-separated, e.g. `POSTURE_EXCLUDE=qualys,snyk.issues`); the
+flag wins if both are given.
 
 `--env PATH` uses that file in place of the default `.env`, not on top of
 it: every variable the default `.env` set is cleared first, so a source
@@ -365,6 +376,9 @@ directory, so prod and nonprod runs don't overwrite each other's files.
 `yes`/`no`, `on`/`off`, `1`/`0`). Pass `--no-history` to turn it off for one run when
 the env file has it on. Any other value stops the run with an error rather than
 guessing.
+
+`--thread` can likewise be set as `POSTURE_THREAD` (a positive integer); the flag
+wins if both are given, and anything that isn't a positive integer stops the run.
 
 Every resource is streamed page-by-page straight into its parquet file, so
 memory use stays bounded to a single page regardless of table size — a
