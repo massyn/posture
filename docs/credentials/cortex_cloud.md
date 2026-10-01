@@ -18,7 +18,9 @@ which Cortex product you're licensed for.
   Advanced's nonce/timestamp/hash scheme).
 * Under **Role**, select a read-only role — either a built-in **Viewer**
   role if your tenant has one, or a custom role scoped to read-only access
-  on Asset Management and Issues (the two resources this collector reads).
+  on Asset Management, Issues and Vulnerability Management (the three
+  areas this collector reads). The `vulnerabilities` resource also needs
+  a Cortex Cloud Runtime Security or Posture Management licence.
 * Name the key `CCM - Read Only` and generate it.
 * Copy the **API Key** value immediately — it is only shown once.
 * Note the **API Key ID** shown alongside it (also available later via
@@ -34,6 +36,13 @@ required config:
 | API Key | `token` | `CORTEX_TOKEN` |
 | API Key ID | `api_key_id` | `CORTEX_API_KEY_ID` |
 | Tenant API host (the `api-<fqdn>` shown in your tenant's API settings) | `endpoint` | `CORTEX_ENDPOINT` |
+| *(Optional)* Per-read timeout in seconds for the `vulnerabilities` snapshot stream (default `600`) | `snapshot_timeout` | `CORTEX_SNAPSHOT_TIMEOUT` |
+
+**`vulnerabilities` quota:** the snapshot export behind this resource is
+limited by Cortex to **10 requests per rolling 24 hours**. The
+collector never retries it automatically, so a failed run costs one
+request. Avoid scheduling more than a few full pulls a day, and run
+smoke tests with `record_limit`, which caps the server-side `limit`.
 
 **Caveat:** exact built-in role names (e.g. whether "Viewer" exists
 out-of-the-box vs. requiring a custom role) vary by Cortex tenant

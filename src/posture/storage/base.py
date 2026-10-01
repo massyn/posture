@@ -190,15 +190,16 @@ class Storage(_ConfigResolverMixin, ABC):
     ) -> None:
         """Write the whole of ``df`` as a single file.
 
-        ``schema`` is accepted for signature parity with the table backends
-        (where it pins SQL column types) but ignored here — a file format
-        carries whatever dtypes the DataFrame has. Wiring it into parquet's
-        pyarrow schema is a separate change.
+        ``schema`` pins declared column types in formats that store them
+        (parquet, and s3/gcs, which write parquet) — so the same column has
+        the same type in every file of a multi-file dataset, rather than
+        ``null`` in a file where it happened to be all-null. CSV/JSON store
+        no types and ignore it.
         """
         _check_mode(mode, source=self.env_prefix.lower())
         df = self._add_upload_timestamp(df)
         path = self._path_for(name, mode=mode, paginated=False)
-        self._atomic_write(df, path)
+        self._atomic_write(df, path, schema)
 
     def write_page(
         self,
@@ -216,7 +217,8 @@ class Storage(_ConfigResolverMixin, ABC):
         before writing — the whole ``<name>`` directory in truncate mode, or
         just that day's ``<YYYY>/<MM>/<DD>`` directory in append mode — so
         re-running the same day doesn't accumulate duplicate uuid-named
-        files; later pages in the same run just add to it.
+        files; later pages in the same run just add to it. ``schema`` is
+        applied per file exactly as in ``write()``.
         """
         _check_mode(mode, source=self.env_prefix.lower())
         df = self._add_upload_timestamp(df)
@@ -224,7 +226,7 @@ class Storage(_ConfigResolverMixin, ABC):
             self._clear_dir(self._page_dir(name, mode=mode))
             self._truncated_dirs.add(name)
         path = self._path_for(name, mode=mode, paginated=True)
-        self._atomic_write(df, path)
+        self._atomic_write(df, path, schema)
 
     def _tenancy_name_dir(self, name: str) -> Path:
         return self._base_dir / self._tenancy / name
@@ -255,7 +257,9 @@ class Storage(_ConfigResolverMixin, ABC):
             if child.is_file():
                 child.unlink()
 
-    def _atomic_write(self, df: pd.DataFrame, path: Path) -> None:
+    def _atomic_write(
+        self, df: pd.DataFrame, path: Path, schema: Schema | None
+    ) -> None:
         """Write to a ``.tmp`` sibling first, then rename into place — a
         failure partway through ``_dump`` never leaves a broken/truncated
         file at ``path``, only an orphaned ``.tmp``. Any failure here — from
@@ -264,7 +268,7 @@ class Storage(_ConfigResolverMixin, ABC):
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             tmp_path = path.with_suffix(path.suffix + ".tmp")
-            self._dump(df, tmp_path)
+            self._dump(df, tmp_path, schema)
             tmp_path.replace(path)
         except StorageError:
             raise
@@ -274,8 +278,9 @@ class Storage(_ConfigResolverMixin, ABC):
             ) from exc
 
     @abstractmethod
-    def _dump(self, df: pd.DataFrame, path: Path) -> None:
-        """Write ``df`` to ``path`` in this backend's format."""
+    def _dump(self, df: pd.DataFrame, path: Path, schema: Schema | None) -> None:
+        """Write ``df`` to ``path`` in this backend's format, applying
+        ``schema``'s declared column types where the format stores types."""
 
 
 class TableStorage(_ConfigResolverMixin, ABC):

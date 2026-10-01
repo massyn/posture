@@ -74,7 +74,9 @@ for source in sources:
         name = f"{source}_{table}"
         try:
             rows = 0
-            with store.write_stream(name, mode=mode) as stream:
+            with store.write_stream(
+                name, mode=mode, schema=ccm.column_types(table)
+            ) as stream:
                 for page in ccm.collect_page(table):
                     stream.write(page)
                     rows += len(page)

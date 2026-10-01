@@ -10,7 +10,8 @@ from typing import Any, ClassVar
 import pandas as pd
 
 from posture.exceptions import StorageConfigError, StorageWriteError
-from posture.storage.base import Storage
+from posture.storage.base import Schema, Storage
+from posture.storage.parquet import write_parquet
 
 
 class S3Storage(Storage):
@@ -84,15 +85,17 @@ class S3Storage(Storage):
             return Path(name) / f"{self._tenancy}.parquet"
         return self._page_dir(name, mode=mode) / f"{uuid.uuid4().hex}.parquet"
 
-    def _dump(self, df: pd.DataFrame, path: Path) -> None:
+    def _dump(self, df: pd.DataFrame, path: Path, schema: Schema | None) -> None:
         buffer = io.BytesIO()
-        df.to_parquet(buffer, engine="pyarrow", index=False)
+        write_parquet(df, buffer, schema)
         buffer.seek(0)
         self._client.put_object(Bucket=self._bucket, Key=path.as_posix(), Body=buffer)
 
-    def _atomic_write(self, df: pd.DataFrame, path: Path) -> None:
+    def _atomic_write(
+        self, df: pd.DataFrame, path: Path, schema: Schema | None
+    ) -> None:
         try:
-            self._dump(df, path)
+            self._dump(df, path, schema)
         except Exception as exc:
             raise StorageWriteError(
                 f"Failed to write object '{path.as_posix()}': {exc}",

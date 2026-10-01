@@ -89,10 +89,16 @@ file rather than one file per page:
 from posture import open_storage
 
 store = open_storage("parquet", {"path": "output"})
-with store.write_stream("machine_vulnerabilities") as stream:
+with store.write_stream(
+    "machine_vulnerabilities", schema=ccm.column_types("machine_vulnerabilities")
+) as stream:
     for df in ccm.collect_page("machine_vulnerabilities"):
         stream.write(df)
 ```
+
+Pass `schema=` so each column gets the type declared in the manifest. Without it, the
+file's schema is inferred from the first page, so a column that's empty on page one is
+typed `null` and the first later page with a value in it fails to write.
 
 The file is only finalised (renamed into place) when the `with` block exits without
 an exception — same atomic-write guarantee as every other backend. `write_stream()`
@@ -296,8 +302,9 @@ write_storage(
 
 `Collector.column_types(resource)` returns that mapping — the manifest's declared types
 plus the `_collected_at` timestamp `collect()` appends. `write()`, `write_page()` and
-`write_storage()` all take `schema=`. It applies to `sqlite`/`duckdb`/`postgres`/
-`bigquery`/`snowflake`; the file backends accept and ignore it. Columns not named in
+`write_storage()` all take `schema=` (as does parquet's `write_stream()`). It applies
+to `sqlite`/`duckdb`/`postgres`/`bigquery`/`snowflake` and to the parquet-writing file
+backends (`parquet`/`s3`/`gcs`); `csv`/`json` store no types and ignore it. Columns not named in
 the mapping (a backend's own `tenancy`/`upload_timestamp`, anything you add yourself)
 still fall back to dtype inference. Omitting `schema=` keeps the pure-inference
 behaviour unchanged.
@@ -331,16 +338,33 @@ into a warehouse.
 
 ```bash
 posturecollect --include crowdstrike endoflife   # only these sources, regardless of environment
-posturecollect --output ./data                   # base directory for the parquet files (default: ./output)
+posturecollect --output ./data                   # base directory for the parquet files (default: $POSTURE_OUTPUT, else ./output)
 posturecollect --output ./data --history         # one dated file per table per day, instead of overwriting
+posturecollect --no-history                      # overwrite, even if POSTURE_HISTORY=true
 posturecollect --thread 5                        # collect this many sources concurrently (default: 3)
 posturecollect --debug                           # verbose debug-level logging
+posturecollect --env .env.nonprod                # read settings from this file instead of .env
 ```
 
 `--include` is also the only way to reach a no-auth source (e.g.
 `endoflife`, `macadmins`) — a source with nothing to check is never picked
 up by the default environment-variable scan, so name it explicitly to
 collect it.
+
+`--env PATH` uses that file in place of the default `.env`, not on top of
+it: every variable the default `.env` set is cleared first, so a source
+configured only in `.env` isn't collected during a `.env.nonprod` run.
+Variables exported in your shell still take precedence over either file.
+
+`--output` can also be set as `POSTURE_OUTPUT` in your shell or `.env`. The order is:
+`--output` if given, then `POSTURE_OUTPUT`, then `./output`. Because it's read after
+`--env` has swapped files, `.env` and `.env.nonprod` can each name their own output
+directory, so prod and nonprod runs don't overwrite each other's files.
+
+`--history` works the same way through `POSTURE_HISTORY` (`true`/`false`, also
+`yes`/`no`, `on`/`off`, `1`/`0`). Pass `--no-history` to turn it off for one run when
+the env file has it on. Any other value stops the run with an error rather than
+guessing.
 
 Every resource is streamed page-by-page straight into its parquet file, so
 memory use stays bounded to a single page regardless of table size — a
@@ -356,7 +380,7 @@ Output is one file per `<source>_<resource>`:
 A failure on one source or resource is logged and doesn't stop the rest of
 the run — everything else still gets collected. `posturecollect` exits
 non-zero if anything failed, and prints a summary table (table name, record
-count, status) once every source has finished, so a run's outcome is
+count, seconds taken, status) once every source has finished, so a run's outcome is
 visible at a glance without scrolling back through the log.
 
 ## Supported sources

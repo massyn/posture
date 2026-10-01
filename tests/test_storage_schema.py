@@ -9,12 +9,15 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from posture import CCM
 from posture.exceptions import ResourceUnknown
 from posture.storage import open_storage, write_storage
 from posture.storage.base import resolve_sql_type
+from posture.storage.parquet import arrow_schema
 
 _BOOL_MAP = {"bool": "BOOLEAN", "str": "TEXT"}
 
@@ -172,7 +175,7 @@ def test_duckdb_schema_applied_to_later_added_column(tmp_path: Path) -> None:
     assert _col_type_duckdb(db_path, "t", "added") == "BOOLEAN"
 
 
-def test_file_backend_accepts_and_ignores_schema(tmp_path: Path) -> None:
+def test_csv_backend_accepts_and_ignores_schema(tmp_path: Path) -> None:
     # csv has no typed columns; passing schema must not error.
     write_storage(
         pd.DataFrame({"a": [1]}),
@@ -184,6 +187,42 @@ def test_file_backend_accepts_and_ignores_schema(tmp_path: Path) -> None:
     store = open_storage("csv", {"path": str(tmp_path)})
     store.write_page(pd.DataFrame({"a": [2]}), "t2", schema={"a": "int"})
     assert (tmp_path / "default" / "t.csv").exists()
+
+
+def test_parquet_write_page_types_all_null_page_from_schema(tmp_path: Path) -> None:
+    # Each page is its own file; without schema= the all-null page's file
+    # would type `reason`/`flag` as `null`, unlike the page with values.
+    store = open_storage("parquet", {"path": str(tmp_path)})
+    schema = {"reason": "str", "flag": "bool"}
+    store.write_page(
+        pd.DataFrame({"reason": [None], "flag": [None]}), "t", schema=schema
+    )
+    store.write_page(
+        pd.DataFrame({"reason": ["x"], "flag": [True]}), "t", schema=schema
+    )
+
+    files = list((tmp_path / "default" / "t").glob("*.parquet"))
+    assert len(files) == 2
+    for f in files:
+        file_schema = pq.read_schema(f)
+        assert file_schema.field("reason").type == pa.string()
+        assert file_schema.field("flag").type == pa.bool_()
+
+
+def test_parquet_write_without_schema_still_infers(tmp_path: Path) -> None:
+    store = open_storage("parquet", {"path": str(tmp_path)})
+    store.write(pd.DataFrame({"reason": [None]}), "t")
+    assert (
+        pq.read_schema(tmp_path / "default" / "t.parquet").field("reason").type
+        == pa.null()
+    )
+
+
+def test_arrow_schema_falls_back_on_unknown_or_absent_columns() -> None:
+    df = pd.DataFrame({"a": [None], "b": [1]})
+    result = arrow_schema(df, {"a": "not-a-type"})
+    assert result.field("a").type == pa.null()  # unknown declared type: inferred
+    assert result.field("b").type == pa.int64()  # absent from schema: inferred
 
 
 def test_column_types_reads_manifest_plus_collected_at() -> None:
