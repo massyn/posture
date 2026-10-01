@@ -67,11 +67,12 @@ def store_parquet(
 ) -> int:
     """Stream to one Parquet file, appending each page as a row group.
 
-    ``schema`` is unused here — the Parquet stream takes the page dtypes as
-    given. The table backends below feed it to ``write_page``.
+    ``schema`` pins each declared column's Parquet type, so a column that's
+    all-null on the first page doesn't lock the file to a ``null`` type.
     """
     rows = 0
-    with ParquetStorage({"path": OUTPUT}).write_stream(name, mode=MODE) as stream:
+    store = ParquetStorage({"path": OUTPUT})
+    with store.write_stream(name, mode=MODE, schema=schema) as stream:
         for page in pages:
             stream.write(page)
             rows += len(page)

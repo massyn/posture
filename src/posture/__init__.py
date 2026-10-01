@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Any
 
-from dotenv import find_dotenv, load_dotenv
+from dotenv import dotenv_values, find_dotenv, load_dotenv
 
 from posture._version_check import check_for_update
 from posture.base import Collector
@@ -34,10 +34,15 @@ from posture.storage import open_storage, storage_catalog, write_storage
 logging.getLogger("posture").addHandler(logging.NullHandler())
 
 logger = logging.getLogger("posture")
-load_dotenv(find_dotenv(usecwd=True))
+_dotenv_path = find_dotenv(usecwd=True)
+#: Keys the auto-loaded .env actually set — i.e. not already in the
+#: environment, since load_dotenv never overrides. Lets the CLI's --env swap
+#: in a different file without this one's values leaking into that run.
+_DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
+load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"
 
 __all__ = [
     "CCM",

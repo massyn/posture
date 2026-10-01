@@ -281,6 +281,7 @@
 
 - [assets](collectors/cortex_cloud.md#assets)
 - [issues](collectors/cortex_cloud.md#issues)
+- [vulnerabilities](collectors/cortex_cloud.md#vulnerabilities)
 
 ## [PhriendlyPhishing](collectors/phriendly_phishing.md)
 

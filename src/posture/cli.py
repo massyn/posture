@@ -6,6 +6,7 @@ collector and write it to parquet.
     posturecollect --output ./data --history
     posturecollect --include qualys --debug
     posturecollect --thread 5
+    posturecollect --env .env.nonprod
 
 By default, every registered source with all of its required environment
 variables set is collected (``catalog(filter="environment")`` — a no-auth
@@ -23,11 +24,13 @@ written successfully, so a failure partway through a resource never leaves
 a truncated file behind; the previous run's file (if any) is left untouched
 in that case.
 
-Output layout under ``--output`` (default ``./output``), one file per
+Output layout under ``--output`` (else the ``POSTURE_OUTPUT`` environment
+variable, which can live in ``.env``, else ``./output``), one file per
 ``<source>_<resource>``:
 
 - default: ``<output>/<source>_<resource>.parquet`` (overwritten every run)
-- ``--history``: ``<output>/<source>_<resource>/<YYYY.MM.DD>.parquet`` (one
+- ``--history`` (or ``POSTURE_HISTORY=true``):
+  ``<output>/<source>_<resource>/<YYYY.MM.DD>.parquet`` (one
   dated snapshot per day, overwritten if run again the same day)
 
 A failure on one source or resource is logged and does not stop the rest of
@@ -40,13 +43,22 @@ each source gets its own ``CCM`` instance and writes only to its own
 ``<source>_<resource>.parquet`` file(s), so sources share no mutable state
 and can safely run in parallel. Resources within one source are still
 collected serially.
+
+Credentials and other settings come from environment variables, loaded from
+``.env`` (searched for from the current directory upwards) when ``posture`` is
+imported. ``--env PATH`` uses that file instead: every variable the default
+``.env`` set is removed before ``PATH`` is loaded, so a source configured
+only in ``.env`` isn't silently collected during, say, a non-production run.
+Variables already set in the shell still take precedence over either file.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,9 +66,12 @@ from typing import Any
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+from dotenv import load_dotenv
 
+import posture
 from posture import CCM, catalog
 from posture.exceptions import PostureError
+from posture.storage.parquet import arrow_schema
 
 logger = logging.getLogger("posture.cli")
 
@@ -66,6 +81,34 @@ _ARG_FLAGS = {
     "history": "--history",
     "debug": "--debug",
     "thread": "--thread",
+    "env": "--env",
+}
+
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FALSE_VALUES = {"0", "false", "no", "off"}
+
+
+def _env_bool(env_var: str, value: str) -> bool:
+    """Parse a boolean environment variable, case-insensitively. Anything
+    outside the accepted spellings exits rather than silently guessing."""
+    lowered = value.strip().lower()
+    if lowered in _TRUE_VALUES:
+        return True
+    if lowered in _FALSE_VALUES:
+        return False
+    raise SystemExit(
+        f"{env_var}={value!r} is not a boolean — use one of "
+        f"{', '.join(sorted(_TRUE_VALUES | _FALSE_VALUES))}"
+    )
+
+
+#: Arguments that fall back to an environment variable (which may come from
+#: .env or --env's file) before their built-in default: name -> (env var,
+#: default, parser for the variable's string value). Resolved after --env has
+#: swapped the env file in.
+_ENV_DEFAULTS: dict[str, tuple[str, Any, Any]] = {
+    "output": ("POSTURE_OUTPUT", "output", lambda _var, value: value),
+    "history": ("POSTURE_HISTORY", False, _env_bool),
 }
 
 
@@ -85,17 +128,22 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        default="output",
+        default=None,
         metavar="PATH",
-        help="directory to write parquet files into (default: %(default)s)",
+        help=(
+            "directory to write parquet files into (default: $POSTURE_OUTPUT, "
+            "else ./output)"
+        ),
     )
     parser.add_argument(
         "--history",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=None,
         help=(
             "write one dated file per table per day "
             "(<output>/<table>/<YYYY.MM.DD>.parquet) instead of "
-            "overwriting a single <output>/<table>.parquet"
+            "overwriting a single <output>/<table>.parquet "
+            "(default: $POSTURE_HISTORY, else off; --no-history overrides it)"
         ),
     )
     parser.add_argument(
@@ -110,7 +158,27 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         metavar="N",
         help="number of sources to collect concurrently (default: %(default)s)",
     )
+    parser.add_argument(
+        "--env",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "load environment variables from this file instead of the "
+            "default .env (e.g. .env.nonprod)"
+        ),
+    )
     return parser.parse_args(argv)
+
+
+def _use_env_file(path: Path) -> None:
+    """Replace the variables posture auto-loaded from ``.env`` on import with
+    those from ``path`` (see module docstring)."""
+    if not path.is_file():
+        raise SystemExit(f"--env file not found: {path}")
+    for key in posture._DOTENV_KEYS:
+        os.environ.pop(key, None)
+    load_dotenv(path)
 
 
 def _log_parameters(args: argparse.Namespace, argv: list[str] | None) -> None:
@@ -120,8 +188,24 @@ def _log_parameters(args: argparse.Namespace, argv: list[str] | None) -> None:
     raw_argv = sys.argv[1:] if argv is None else argv
     for name, value in vars(args).items():
         flag = _ARG_FLAGS.get(name)
-        origin = "explicit" if flag and flag in raw_argv else "default"
+        env_var = _ENV_DEFAULTS[name][0] if name in _ENV_DEFAULTS else None
+        # A BooleanOptionalAction flag's --no- form counts as explicit too.
+        if flag and (flag in raw_argv or f"--no-{flag[2:]}" in raw_argv):
+            origin = "explicit"
+        elif env_var and os.environ.get(env_var):
+            origin = f"environment {env_var}"
+        else:
+            origin = "default"
         logger.info("parameter %s = %r (%s)", name, value, origin)
+
+
+def _apply_env_defaults(args: argparse.Namespace) -> None:
+    """Fill each ``_ENV_DEFAULTS`` argument not passed on the command line
+    from its environment variable, else its built-in default."""
+    for name, (env_var, default, parse) in _ENV_DEFAULTS.items():
+        if getattr(args, name) is None:
+            value = os.environ.get(env_var)
+            setattr(args, name, parse(env_var, value) if value else default)
 
 
 def _select_sources(include: list[str] | None) -> dict[str, Any]:
@@ -152,16 +236,22 @@ def _collect_resource(ccm: Any, resource: str, path: Path) -> int:
     Writes to a ``.tmp`` sibling and only renames it into place once every
     page has been written without error — a mid-collection failure never
     leaves a truncated file at ``path``.
+
+    The file schema takes declared columns' types from the manifest, not the
+    first page's dtypes — see ``arrow_schema``.
     """
+    column_types = ccm.column_types(resource)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     writer: pq.ParquetWriter | None = None
     record_count = 0
     try:
         for page in ccm.collect_page(resource):
-            table = pa.Table.from_pandas(page, preserve_index=False)
             if writer is None:
-                writer = pq.ParquetWriter(tmp_path, table.schema)
+                writer = pq.ParquetWriter(tmp_path, arrow_schema(page, column_types))
+            table = pa.Table.from_pandas(
+                page, schema=writer.schema, preserve_index=False
+            )
             writer.write_table(table)
             record_count += len(page)
     finally:
@@ -176,33 +266,53 @@ def _collect_source(
     source: str, info: dict[str, Any], output_dir: Path, *, history: bool
 ) -> list[dict[str, Any]]:
     """Collect every resource of one source, returning one result dict per
-    table (``table``, ``records``, ``status`` — "ok" or "failed: <reason>").
+        table (``table``, ``records``, ``seconds`` — wall-clock time spent on that
+    table, failed or not — and ``status``, "ok" or "failed: <reason>").
 
-    Called from its own thread when ``--thread`` > 1 — each source gets its
-    own ``CCM`` instance and writes only to its own ``<source>_<resource>``
-    file(s), so sources share no mutable state and can run concurrently.
+        Called from its own thread when ``--thread`` > 1 — each source gets its
+        own ``CCM`` instance and writes only to its own ``<source>_<resource>``
+        file(s), so sources share no mutable state and can run concurrently.
     """
     try:
         ccm = CCM(source)
     except (PostureError, ValueError) as exc:
         logger.exception("%s: skipped", source)
-        return [{"table": source, "records": 0, "status": f"failed: {exc}"}]
+        return [
+            {"table": source, "records": 0, "seconds": 0.0, "status": f"failed: {exc}"}
+        ]
 
     results: list[dict[str, Any]] = []
     for resource in info["resources"]:
         stem = f"{source}_{resource}"
         path = _output_path(output_dir, stem, history=history)
         logger.info("%s.%s: collecting", source, resource)
+        started = time.monotonic()
         try:
             record_count = _collect_resource(ccm, resource, path)
         except PostureError as exc:
-            logger.exception("%s.%s: failed", source, resource)
-            results.append({"table": stem, "records": 0, "status": f"failed: {exc}"})
+            seconds = time.monotonic() - started
+            logger.exception("%s.%s: failed after %.1fs", source, resource, seconds)
+            results.append(
+                {
+                    "table": stem,
+                    "records": 0,
+                    "seconds": seconds,
+                    "status": f"failed: {exc}",
+                }
+            )
             continue
+        seconds = time.monotonic() - started
         logger.info(
-            "%s.%s: %d record(s) written to %s", source, resource, record_count, path
+            "%s.%s: %d record(s) written to %s in %.1fs",
+            source,
+            resource,
+            record_count,
+            path,
+            seconds,
         )
-        results.append({"table": stem, "records": record_count, "status": "ok"})
+        results.append(
+            {"table": stem, "records": record_count, "seconds": seconds, "status": "ok"}
+        )
     return results
 
 
@@ -214,13 +324,17 @@ def _log_summary(results: list[dict[str, Any]]) -> None:
         return
     table_width = max(len(r["table"]) for r in results)
     status_width = max(len(r["status"]) for r in results)
-    header = f"{'Table':<{table_width}}  {'Records':>10}  {'Status':<{status_width}}"
+    header = (
+        f"{'Table':<{table_width}}  {'Records':>10}  {'Seconds':>9}  "
+        f"{'Status':<{status_width}}"
+    )
     logger.info("Summary:")
     logger.info(header)
     logger.info("-" * len(header))
     for r in results:
         logger.info(
-            f"{r['table']:<{table_width}}  {r['records']:>10}  {r['status']:<{status_width}}"
+            f"{r['table']:<{table_width}}  {r['records']:>10}  {r['seconds']:>9.1f}  "
+            f"{r['status']:<{status_width}}"
         )
 
 
@@ -232,6 +346,9 @@ def main(argv: list[str] | None = None) -> int:
         datefmt="%Y-%m-%d %H:%M:%S",
         force=True,
     )
+    if args.env is not None:
+        _use_env_file(args.env)
+    _apply_env_defaults(args)
     _log_parameters(args, argv)
 
     output_dir = Path(args.output)
@@ -265,7 +382,12 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as exc:
                 logger.exception("%s: unhandled error", source)
                 all_results.append(
-                    {"table": source, "records": 0, "status": f"failed: {exc}"}
+                    {
+                        "table": source,
+                        "records": 0,
+                        "seconds": 0.0,
+                        "status": f"failed: {exc}",
+                    }
                 )
 
     _log_summary(all_results)

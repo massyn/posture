@@ -116,9 +116,13 @@ tests/
     still correct when a freshly `parse()`d frame is written straight through. The
     manifest is the authority on types; a DataFrame only carries them intact until
     something downstream (a concat with an empty page, a CSV round-trip) flattens the
-    nullable dtype back to `object`. The file backends (`csv`/`json`/`parquet`/`gcs`/
-    `s3`) accept `schema=` and ignore it — a file format stores whatever dtype the
-    frame has. `json` maps to the same text type as `str` for now; native
+    nullable dtype back to `object`. The parquet-writing file backends (`parquet`/
+    `gcs`/`s3`) apply `schema=` too, via `storage/parquet.py`'s `arrow_schema` — one
+    file on its own carries whatever dtype the frame has, but `write_page()` files,
+    append-mode daily files and `write_stream()` row groups are read back as one
+    dataset (a DuckDB glob, an Athena/BigQuery external table), where a column typed
+    `null` in one file and `string` in the next is the same type-flip failure. `csv`/
+    `json` store no types and accept-and-ignore it. `json` maps to the same text type as `str` for now; native
     `JSON`/`JSONB`/`VARIANT` columns are a later change.
 
 ## Schema: declared manifest per resource (allowlist, not flattener)
@@ -856,9 +860,34 @@ why something is built the way it is, not how to configure or call it.
   extension namespaces sampled live (`xdm.identity.*`, `xdm.image.*`,
   `xdm.code.*`, `xdm.software_package.*`, and more) are out of scope for
   this initial cut. `issues` covers both misconfiguration and
-  vulnerability-style findings in one feed (Cortex's own terminology) —
-  there is no separate CVE-only endpoint in the surface explored here,
-  unlike Crowdstrike/Qualys's split `vulnerabilities` resource.
+  vulnerability-style findings in one feed (Cortex's own terminology).
+  `vulnerabilities` (one row per CVE/asset pair) comes from Cortex's
+  separate Vulnerability Management API via its **snapshot** export
+  (`POST /vulnerability-management/v1/vulnerability-finding/snapshot` —
+  no `/public_api` prefix, body in `request_data`), not the paginated
+  `.../vulnerability-finding/search`: search is capped at 1,000 requests
+  per rolling 24h at a 10,000-row max page size (~10M rows/day) with
+  expiring page tokens, too little for tenants with tens of millions of
+  findings. The snapshot returns everything as one NDJSON stream, read in
+  `_SNAPSHOT_BATCH_SIZE`-line pages via a `_SnapshotStream` cursor (the
+  open response + its line iterator) so memory stays bounded. Because it
+  is limited to **10 requests per rolling 24h** and the stream can't be
+  resumed, it deliberately opts out of the base class's retries: the
+  snapshot request isn't retried on 429, 401/403 or a connection
+  error/timeout (any of which may already have consumed quota), and a
+  mid-stream failure isn't retried at all (locked decision #7) — all
+  raise `_SnapshotFailed`, surfaced as `IncompleteCollection`.
+  `record_limit` is sent as the snapshot's server-side `limit` so a smoke
+  test doesn't open the full stream. Optional `snapshot_timeout` config
+  sets the per-read socket timeout (default 600s), since the server runs
+  an XQL query before the first byte. **`vulnerabilities` is not
+  live-verified** — built from the OpenAPI spec only. Open questions: whether
+  Standard keys are accepted (the spec also lists a nonce scheme), the
+  stream's record field names, the undocumented body shape of the
+  "inline JSON" small-result variant (only a bare list or `reply.data` is
+  accepted; anything else fails loudly), and the server's default
+  lookback window applied when no `timeframe` kwarg is given — a bare
+  `collect("vulnerabilities")` may not be the full dataset.
 
 - **Kandji** — Apple-only MDM (macOS/iOS/iPadOS/tvOS), rebranded to "Iru";
   existing tenant hosts still resolve at

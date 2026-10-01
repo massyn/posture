@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from posture.exceptions import StorageConfigError, StorageWriteError
@@ -103,3 +105,13 @@ def test_gcs_write_failure_wrapped_as_storage_write_error(
     with pytest.raises(StorageWriteError) as exc_info:
         store.write(_DF, "hosts", mode="truncate")
     assert exc_info.value.__cause__ is not None
+
+
+def test_gcs_write_page_applies_declared_schema(fake_gcs: _FakeClient) -> None:
+    store = GcsStorage({"bucket": "my-bucket"})
+    store.write_page(
+        pd.DataFrame({"reason": [None]}), "hosts", schema={"reason": "str"}
+    )
+    (blob,) = fake_gcs.buckets["my-bucket"].blobs.values()
+    out = pq.read_table(pa.BufferReader(blob))
+    assert out.schema.field("reason").type == pa.string()

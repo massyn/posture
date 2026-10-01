@@ -52,12 +52,47 @@ initial cut — revisit as per-type derived resources if a specific
 extension namespace turns out to be needed.
 
 ``issues`` covers both misconfiguration and vulnerability-style findings
-in one feed (Cortex's own terminology, not a posture-invented split) —
-unlike Crowdstrike/Qualys's separate vulnerabilities resource, there is no
-distinct CVE-only endpoint in the surface explored here.
+in one feed (Cortex's own terminology, not a posture-invented split).
 
-**Live-verified** (2026-08-19) against a real tenant for both resources'
-response envelopes, field names, and page-size limits — a stronger
+``vulnerabilities`` is the per-asset CVE finding feed (one row per
+CVE/asset pair) from Cortex's separate Vulnerability Management API,
+pulled via its **snapshot** export
+(``POST /vulnerability-management/v1/vulnerability-finding/snapshot`` —
+no ``/public_api`` prefix, body wrapped in ``request_data``). The
+paginated ``.../vulnerability-finding/search`` endpoint was rejected:
+it's capped at 1,000 requests per rolling 24h at a 10,000-row maximum
+page size (~10M rows/day), and its page tokens expire, so a tenant with
+tens of millions of findings can't be pulled in one run. The snapshot
+returns the whole result set as one NDJSON stream (one finding per
+line), read here ``_SNAPSHOT_BATCH_SIZE`` lines per page so memory stays
+bounded. Its own limit is **10 requests per rolling 24h**, which drives
+two deliberate departures from the base class's retry policy:
+
+- The snapshot request is never retried — not on 429 (the quota is gone
+  for hours, not seconds), not on 401/403 (the key is static, so
+  re-authenticating can't help), and not on a connection error or timeout
+  (the server may already have counted the request against the quota).
+- A failure mid-stream is never retried either: the line iterator can't
+  be resumed, and restarting would re-yield already-yielded records
+  (locked decision #7). Both surface as ``IncompleteCollection``.
+
+``snapshot_timeout`` (optional config, seconds) is the per-read socket
+timeout — the wait for each chunk, not the whole download — since the
+server runs an XQL query before the first byte arrives.
+
+``vulnerabilities`` is **not live-verified** — built from Cortex's
+published OpenAPI spec only. Unconfirmed: whether a Standard key is
+accepted (the spec lists a nonce scheme alongside the key), the record
+field names in the stream (the spec only says each line is a
+``VulnerabilityFinding``), the body shape of the "inline JSON" variant
+Cortex returns for small result sets (undocumented — anything other than
+a JSON list or ``reply.data`` fails loudly rather than being guessed
+at), and the server's **default lookback window**: with no ``timeframe``
+kwarg Cortex applies one, so a bare ``collect("vulnerabilities")`` may
+not be the full dataset.
+
+**Live-verified** (2026-08-19) against a real tenant for the ``assets``
+and ``issues`` response envelopes, field names, and page-size limits — a stronger
 guarantee than the "not live-verified" caveat most other collectors in
 this codebase carry (wiz.py, appomni.py, etc.), though the full
 ``xdm.asset.*`` type surface obviously wasn't exhaustively sampled.
@@ -65,8 +100,13 @@ this codebase carry (wiz.py, appomni.py, etc.), though the full
 
 from __future__ import annotations
 
+import json
 import logging
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any, ClassVar
+
+import requests
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
 
@@ -74,9 +114,16 @@ logger = logging.getLogger("posture.collectors.cortex_cloud")
 
 _ASSETS_PATH = "/public_api/v1/assets"
 _ISSUES_PATH = "/public_api/v1/issue/search"
+_VULNERABILITIES_PATH = "/vulnerability-management/v1/vulnerability-finding/snapshot"
 
 _ASSETS_PAGE_SIZE = 1000
 _ISSUES_PAGE_SIZE = 100
+
+# Lines read off the snapshot stream per yielded page — bounds memory, not a
+# server-side page size (the snapshot has none).
+_SNAPSHOT_BATCH_SIZE = 10000
+_SNAPSHOT_CONNECT_TIMEOUT_SECONDS = 30
+_DEFAULT_SNAPSHOT_TIMEOUT_SECONDS = 600
 
 MANIFEST: dict[str, dict[str, Any]] = {
     "assets": {
@@ -154,7 +201,75 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "case_ids": ("case_ids", "json"),
         },
     },
+    "vulnerabilities": {
+        # One row per CVE/asset pair, per Cortex's VulnerabilityFinding schema.
+        # The sparse volume/partition/disk/layer fields are omitted.
+        "endpoint": _VULNERABILITIES_PATH,
+        "columns": {
+            "platform_id": ("platform_id", "str"),
+            "asset_id": ("asset_id", "str"),
+            "asset_name": ("asset_name", "str"),
+            "asset_type": ("asset_type", "str"),
+            "asset_type_class": ("asset_type_class", "str"),
+            "asset_category": ("asset_category", "str"),
+            "asset_group_ids": ("asset_group_ids", "json"),
+            "provider": ("provider", "str"),
+            "cve_id": ("cve_id", "str"),
+            "cve_description": ("cve_description", "str"),
+            "cve_publish_date": ("cve_publish_date", "datetime"),
+            "published_date": ("published_date", "datetime"),
+            "cvss_score": ("cvss_score", "float"),
+            "cvss_severity": ("cvss_severity", "str"),
+            "epss_score": ("epss_score", "float"),
+            "cortex_vulnerability_risk_score": (
+                "cortex_vulnerability_risk_score",
+                "float",
+            ),
+            "cve_risk_factors": ("cve_risk_factors", "json"),
+            "has_kev": ("has_kev", "bool"),
+            "exploitable": ("exploitable", "bool"),
+            "exploit_level": ("exploit_level", "str"),
+            "fix_available": ("fix_available", "bool"),
+            "fix_versions": ("fix_versions", "json"),
+            "fix_date": ("fix_date", "datetime"),
+            "affected_software": ("affected_software", "str"),
+            "internet_exposed": ("internet_exposed", "bool"),
+            "ipv4_addresses": ("ipv4_addresses", "json"),
+            "ipv6_addresses": ("ipv6_addresses", "json"),
+            "operating_system": ("operating_system", "str"),
+            "os_family": ("os_family", "str"),
+            "finding_sources": ("finding_sources", "json"),
+            "has_issue": ("has_issue", "bool"),
+            "issue_id": ("issue_id", "str"),
+            "remediation": ("remediation", "str"),
+            "package_in_use": ("package_in_use", "bool"),
+            "package_version": ("package_version", "str"),
+            "package_type": ("package_type", "str"),
+            "package_purl": ("package_purl", "str"),
+            "origin_package_name": ("origin_package_name", "str"),
+            "file_path": ("file_path", "str"),
+            "image_name": ("image_name", "str"),
+            "first_observed": ("first_observed", "datetime"),
+            "last_observed": ("last_observed", "datetime"),
+        },
+    },
 }
+
+
+class _SnapshotFailed(Exception):
+    """The vulnerabilities snapshot request or its stream failed. Deliberately
+    not one of the base class's retry signals: the snapshot is limited to 10
+    requests per 24h and its stream can't be resumed, so this always
+    propagates (wrapped as IncompleteCollection) instead of being retried."""
+
+
+@dataclass
+class _SnapshotStream:
+    """Pagination cursor for the snapshot: the open response and its line
+    iterator, consumed ``_SNAPSHOT_BATCH_SIZE`` lines per page."""
+
+    response: requests.Response
+    lines: Iterator[bytes]
 
 
 def _nest_dotted_keys(record: dict[str, Any]) -> dict[str, Any]:
@@ -181,6 +296,7 @@ class CortexCloudCollector(Collector):
         "token": True,
         "api_key_id": True,
         "endpoint": True,
+        "snapshot_timeout": False,
     }
     url_config_keys = ("endpoint",)
 
@@ -194,6 +310,9 @@ class CortexCloudCollector(Collector):
     ) -> tuple[list[dict[str, Any]], Any]:
         if resource == "issues":
             return self._fetch_issues_page(kwargs, cursor)
+        if resource == "vulnerabilities":
+            stream = cursor if cursor is not None else self._open_snapshot(kwargs)
+            return self._read_snapshot_batch(stream)
         return self._fetch_assets_page(kwargs, cursor)
 
     def _fetch_assets_page(
@@ -229,6 +348,87 @@ class CortexCloudCollector(Collector):
         records = [_nest_dotted_keys(r) for r in reply["DATA"]]
         next_cursor = search_to if len(records) == _ISSUES_PAGE_SIZE else None
         return records, next_cursor
+
+    def _open_snapshot(self, kwargs: dict[str, Any]) -> _SnapshotStream:
+        request_data: dict[str, Any] = {}
+        if self._record_limit is not None:
+            # Ask the server for no more than the smoke-test cap, rather than
+            # opening the full stream only to abandon it after one batch.
+            request_data["limit"] = self._record_limit
+        request_data.update(kwargs)
+
+        read_timeout = float(
+            self._config.get("snapshot_timeout", _DEFAULT_SNAPSHOT_TIMEOUT_SECONDS)
+        )
+        url = self._config["endpoint"] + _VULNERABILITIES_PATH
+        try:
+            response = self._session.post(
+                url,
+                json={"request_data": request_data},
+                timeout=(_SNAPSHOT_CONNECT_TIMEOUT_SECONDS, read_timeout),
+                stream=True,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise _SnapshotFailed(
+                f"snapshot request failed, not retried (quota is 10/24h): {exc}"
+            ) from exc
+
+        # 401/403 included: the key is static, so the base class's re-auth
+        # retry can't fix it and would only spend more of the quota.
+        if response.status_code != 200:
+            detail = response.text[:500]
+            response.close()
+            hints = {
+                401: " (check token/api_key_id — Advanced keys aren't supported)",
+                403: " (check the key's role can read Vulnerability Management)",
+                429: " (the 10 requests per rolling 24h quota is exhausted)",
+            }
+            hint = hints.get(response.status_code, "")
+            raise _SnapshotFailed(
+                f"snapshot request returned HTTP {response.status_code}{hint}: "
+                f"{detail}"
+            )
+        return _SnapshotStream(response, response.iter_lines())
+
+    def _read_snapshot_batch(
+        self, stream: _SnapshotStream
+    ) -> tuple[list[dict[str, Any]], Any]:
+        content_type = stream.response.headers.get("Content-Type", "")
+        try:
+            if content_type.startswith("application/json"):
+                records = self._parse_inline_snapshot(stream.response)
+                stream.response.close()
+                return records, None
+
+            records = []
+            for line in stream.lines:
+                if not line.strip():
+                    continue
+                records.append(json.loads(line))
+                if len(records) == _SNAPSHOT_BATCH_SIZE:
+                    return records, stream
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            stream.response.close()
+            raise _SnapshotFailed(
+                f"snapshot stream failed mid-read, not retried "
+                f"(the stream can't be resumed): {exc}"
+            ) from exc
+        stream.response.close()
+        return records, None
+
+    @staticmethod
+    def _parse_inline_snapshot(response: requests.Response) -> list[dict[str, Any]]:
+        """The small-result-set variant. Its body shape is undocumented, so
+        only a bare list or Cortex's usual ``reply.data`` envelope is
+        accepted — anything else fails loudly rather than being guessed at."""
+        body = response.json()
+        if isinstance(body, list):
+            return body
+        reply = body.get("reply") if isinstance(body, dict) else None
+        if isinstance(reply, dict) and isinstance(reply.get("data"), list):
+            return reply["data"]
+        shape = sorted(body) if isinstance(body, dict) else type(body).__name__
+        raise _SnapshotFailed(f"unrecognised inline snapshot response shape: {shape}")
 
     def _post(self, url: str, body: dict[str, Any]) -> Any:
         response = self._session.post(url, json=body, timeout=30)

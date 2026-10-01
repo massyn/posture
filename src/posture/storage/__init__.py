@@ -152,8 +152,9 @@ def write_storage(
     ``Collector.column_types``) pins SQL column types for the table backends
     (sqlite/duckdb/postgres/bigquery/snowflake) instead of inferring them
     from ``df``'s dtypes — which otherwise flips an all-null column's type
-    between runs. Ignored by the file backends. ``None`` keeps the pure
-    inference behaviour.
+    between runs, and parquet column types for the parquet/s3/gcs file
+    backends. Ignored by csv/json, which store no types. ``None`` keeps the
+    pure inference behaviour.
     """
     _backend_class(storage)(config).write(df, name, mode=mode, schema=schema)
 

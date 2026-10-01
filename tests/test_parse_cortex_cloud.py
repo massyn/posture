@@ -10,6 +10,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "cortex_cloud"
 
 ASSETS_MANIFEST = MANIFEST["assets"]
 ISSUES_MANIFEST = MANIFEST["issues"]
+VULNERABILITIES_MANIFEST = MANIFEST["vulnerabilities"]
 
 
 def _load(name: str) -> list[dict]:
@@ -42,3 +43,24 @@ def test_issues_page() -> None:
     assert df["observation_time"].dtype == "datetime64[us, UTC]"
     assert df.loc[1, "severity"] == "CRITICAL"
     assert pd.isna(df.loc[1, "description"])  # absent in fixture
+
+
+def test_vulnerabilities_page() -> None:
+    df = parse(
+        _load("vulnerabilities_page.json"),
+        VULNERABILITIES_MANIFEST,
+        resource="vulnerabilities",
+    )
+
+    assert len(df) == 2
+    assert df.loc[0, "cve_id"] == "CVE-2024-3094"
+    assert df.loc[0, "cvss_score"] == 10.0
+    assert df.loc[0, "epss_score"] == 0.86
+    assert bool(df.loc[0, "has_kev"]) is True
+    assert json.loads(df.loc[0, "fix_versions"]) == ["5.6.1"]
+    assert df.loc[0, "issue_id"] == "1001"
+    assert df["first_observed"].dtype == "datetime64[us, UTC]"
+    assert df.loc[0, "cve_publish_date"] == pd.Timestamp("2024-03-29", tz="UTC")
+    assert pd.isna(df.loc[1, "cortex_vulnerability_risk_score"])  # explicit null
+    assert pd.isna(df.loc[1, "asset_name"])  # absent in fixture
+    assert "disk_name" not in df.columns  # deliberately not in the manifest

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import duckdb
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from posture.exceptions import PostureError, StorageConfigError, StorageWriteError
@@ -187,6 +189,34 @@ def test_parquet_write_stream_empty_writes_nothing(tmp_path: Path) -> None:
         pass
     out = tmp_path / "default" / "hosts.parquet"
     assert not out.exists()
+
+
+def test_parquet_write_stream_schema_types_all_null_first_page(
+    tmp_path: Path,
+) -> None:
+    # Without schema=, page one's all-null `reason` would be typed `null` and
+    # page two's string value would be rejected.
+    store = ParquetStorage({"path": str(tmp_path)})
+    page1 = pd.DataFrame({"id": [1], "reason": [None]})
+    page2 = pd.DataFrame({"id": [2], "reason": ["fixed"]})
+    with store.write_stream("hosts", schema={"id": "int", "reason": "str"}) as stream:
+        stream.write(page1)
+        stream.write(page2)
+
+    table = pq.read_table(tmp_path / "default" / "hosts.parquet")
+    assert str(table.schema.field("reason").type) == "string"
+    assert table.column("reason").to_pylist() == [None, "fixed"]
+    # Columns the schema doesn't name keep their inferred type.
+    assert pa.types.is_timestamp(table.schema.field("upload_timestamp").type)
+
+
+def test_parquet_write_stream_without_schema_rejects_all_null_first_page(
+    tmp_path: Path,
+) -> None:
+    store = ParquetStorage({"path": str(tmp_path)})
+    with pytest.raises(StorageWriteError), store.write_stream("hosts") as stream:
+        stream.write(pd.DataFrame({"reason": [None]}))
+        stream.write(pd.DataFrame({"reason": ["fixed"]}))
 
 
 def test_parquet_write_stream_invalid_mode(tmp_path: Path) -> None:
