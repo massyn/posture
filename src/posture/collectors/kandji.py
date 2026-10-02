@@ -94,6 +94,8 @@ _FANOUT_SPECS: dict[str, tuple[str, str | None]] = {
 # (mac section, mac key) -> (windows section, windows key). Values are
 # carried verbatim — memory is "16 GB LPDDR5" on a Mac but bare megabytes
 # ("32768") on Windows, and ip_address is the Wi-Fi IPv4 address only.
+# Windows carries no MDM check-in timestamp in /details, so last_check_in
+# takes the agent check-in — the device's last contact either way.
 _WINDOWS_DETAIL_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
     ("general", "model"): ("general", "device_model"),
     ("general", "system_version"): ("general", "full_software_version"),
@@ -105,6 +107,7 @@ _WINDOWS_DETAIL_ALIASES: dict[tuple[str, str], tuple[str, str]] = {
     ("kandji_agent", "agent_installed"): ("kandji_agent", "is_agent_installed"),
     ("kandji_agent", "agent_version"): ("kandji_agent", "version"),
     ("kandji_agent", "last_check_in"): ("kandji_agent", "last_check_in_datetime"),
+    ("mdm", "last_check_in"): ("kandji_agent", "last_check_in_datetime"),
     ("network", "local_hostname"): ("network", "dns_computer_name"),
     ("network", "ip_address"): ("network", "wifi_ipv4_address"),
 }

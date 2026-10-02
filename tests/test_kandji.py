@@ -105,6 +105,7 @@ def test_device_details_maps_windows_fields_to_common_columns() -> None:
     assert bool(row["agent_installed"]) is True
     assert row["agent_version"] == "1.22.3.0"
     assert row["agent_last_check_in"].year == 2026
+    assert row["last_check_in"] == row["agent_last_check_in"]
     assert row["local_hostname"] == "WIN-1"
     assert row["ip_address"] == "192.168.0.70"
     assert row["filevault_enabled"] is pd.NA
