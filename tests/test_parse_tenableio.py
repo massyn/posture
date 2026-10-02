@@ -40,3 +40,9 @@ def test_vulnerabilities_page() -> None:
     assert json.loads(df.loc[0, "cve"]) == ["CVE-2026-0001", "CVE-2026-0002"]
     assert df.loc[0, "port"] == 443
     assert pd.isna(df.loc[1, "port"])
+    assert bool(df.loc[0, "exploit_available"]) is True
+    assert bool(df.loc[0, "has_patch"]) is False
+    assert df.loc[0, "publication_date"] == pd.Timestamp("2025-12-15", tz="UTC")
+    assert pd.isna(df.loc[1, "exploit_available"])
+    assert pd.isna(df.loc[1, "has_patch"])
+    assert pd.isna(df.loc[1, "publication_date"])

@@ -76,6 +76,9 @@ for table in ccm.tables():
 | `cvss_base_score` | `float` |
 | `cvss3_base_score` | `float` |
 | `cve` | `json` |
+| `exploit_available` | `bool` |
+| `has_patch` | `bool` |
+| `publication_date` | `datetime` |
 | `state` | `str` |
 | `port` | `int` |
 | `protocol` | `str` |
