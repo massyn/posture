@@ -100,6 +100,8 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "cloud_provider": ("service_provider", "str"),
             "cloud_account_id": ("service_provider_account_id", "str"),
             "cloud_instance_id": ("instance_id", "str"),
+            "tags": ("tags", "json"),
+            "groups": ("groups", "json"),
         },
     },
     "host_groups": {
