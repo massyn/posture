@@ -93,6 +93,8 @@ for table in ccm.tables():
 | `cloud_provider` | `str` |
 | `cloud_account_id` | `str` |
 | `cloud_instance_id` | `str` |
+| `tags` | `json` |
+| `groups` | `json` |
 
 ### vulnerabilities
 
