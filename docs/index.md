@@ -68,6 +68,14 @@
 - [cve_cpe](collectors/cve_db.md#cve_cpe)
 - [cve_summary](collectors/cve_db.md#cve_summary)
 
+## [CyberArk Privileged Access Manager](collectors/cyberark.md)
+
+[Credentials](credentials/cyberark.md)
+
+- [accounts](collectors/cyberark.md#accounts)
+- [safe_members](collectors/cyberark.md#safe_members)
+- [safes](collectors/cyberark.md#safes)
+
 ## [DNSimple](collectors/dnsimple.md)
 
 [Credentials](credentials/dnsimple.md)

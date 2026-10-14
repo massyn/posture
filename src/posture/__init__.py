@@ -42,7 +42,7 @@ _DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
 load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.11.0"
+__version__ = "1.12.0"
 
 __all__ = [
     "CCM",
@@ -78,6 +78,7 @@ def _register_sources() -> None:
     from posture.collectors.crowdstrike_cspm import CrowdstrikeCspmCollector
     from posture.collectors.crowdstrike_identity import CrowdstrikeIdentityCollector
     from posture.collectors.cve_db import CveDbCollector
+    from posture.collectors.cyberark import CyberarkCollector
     from posture.collectors.defender_for_cloud import DefenderForCloudCollector
     from posture.collectors.dnsimple import DnsimpleCollector
     from posture.collectors.drata import DrataCollector
@@ -140,6 +141,7 @@ def _register_sources() -> None:
     _SOURCES["crowdstrike_cspm"] = CrowdstrikeCspmCollector
     _SOURCES["crowdstrike_identity"] = CrowdstrikeIdentityCollector
     _SOURCES["cve_db"] = CveDbCollector
+    _SOURCES["cyberark"] = CyberarkCollector
     _SOURCES["defender_for_cloud"] = DefenderForCloudCollector
     _SOURCES["dnsimple"] = DnsimpleCollector
     _SOURCES["drata"] = DrataCollector
