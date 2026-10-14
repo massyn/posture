@@ -1302,6 +1302,24 @@ why something is built the way it is, not how to configure or call it.
   with a 600s timeout. Verify against a real deployment before relying on
   this collector.
 
+- **Qualys TotalAppSec** (`qualys_tas`) — raw `requests` against the WAS v3
+  search API (`/qps/rest/3.0/search/was/webapp` and `.../finding`), no
+  vendor SDK. Separate from `qualys.py` by decision: VMDR's v2 API is XML
+  over GET with a follow-up-URL cursor, WAS search is JSON over POST with a
+  `ServiceRequest` body — same host and Basic auth, nothing else shared. So
+  it has its own `QUALYS_TAS_*` env vars, even when the values match
+  `QUALYS_*`. WAS v4 (July 2026) was skipped because its public reference
+  was too thin to build against; subscription-level OAuth is rejected by
+  every WAS endpoint. Pagination is `hasMoreRecords` + `lastId`, the next
+  page re-sending the criteria plus `id GREATER lastId`; more-records with
+  no `lastId` raises rather than ending early with a partial snapshot. QPS
+  reports some failures as HTTP 200 with a non-`SUCCESS` `responseCode`, so
+  every body is checked. The `filters` kwarg is a list of Qualys criteria
+  dicts, passed through verbatim. **Caveat:** Qualys's search samples are
+  XML; the JSON envelope comes from its separate JSON-support page. No
+  live subscription was available — verify field names and the `list`
+  wrappers on `tags`/`cwe`/`owasp`/`wasc` before relying on it.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

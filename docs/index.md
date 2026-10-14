@@ -328,6 +328,13 @@
 - [vulnerabilities](collectors/qualys.md#vulnerabilities)
 - [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
 
+## [Qualys TotalAppSec](collectors/qualys_tas.md)
+
+[Credentials](credentials/qualys_tas.md)
+
+- [findings](collectors/qualys_tas.md#findings)
+- [webapps](collectors/qualys_tas.md#webapps)
+
 ## [Rapid7 InsightVM](collectors/rapid7_insightvm.md)
 
 [Credentials](credentials/rapid7_insightvm.md)

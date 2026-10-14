@@ -105,6 +105,7 @@ def _register_sources() -> None:
     from posture.collectors.plerion import PlerionCollector
     from posture.collectors.precise import PreciseCollector
     from posture.collectors.qualys import QualysCollector
+    from posture.collectors.qualys_tas import QualysTasCollector
     from posture.collectors.rapid7_insightvm import Rapid7InsightVMCollector
     from posture.collectors.recorded_future import RecordedFutureCollector
     from posture.collectors.runzero import RunzeroCollector
@@ -162,6 +163,7 @@ def _register_sources() -> None:
     _SOURCES["plerion"] = PlerionCollector
     _SOURCES["precise"] = PreciseCollector
     _SOURCES["qualys"] = QualysCollector
+    _SOURCES["qualys_tas"] = QualysTasCollector
     _SOURCES["rapid7_insightvm"] = Rapid7InsightVMCollector
     _SOURCES["recorded_future"] = RecordedFutureCollector
     _SOURCES["runzero"] = RunzeroCollector
