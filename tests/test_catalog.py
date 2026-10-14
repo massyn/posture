@@ -46,6 +46,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "precise",
         "qualys",
         "qualys_compliance",
+        "qualys_gav",
         "qualys_tas",
         "rapid7_insightvm",
         "recorded_future",

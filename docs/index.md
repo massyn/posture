@@ -328,6 +328,14 @@
 - [vulnerabilities](collectors/qualys.md#vulnerabilities)
 - [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
 
+## [Qualys Global AssetView](collectors/qualys_gav.md)
+
+[Credentials](credentials/qualys_gav.md)
+
+- [asset_open_ports](collectors/qualys_gav.md#asset_open_ports)
+- [asset_software](collectors/qualys_gav.md#asset_software)
+- [assets](collectors/qualys_gav.md#assets)
+
 ## [Qualys Policy Compliance](collectors/qualys_compliance.md)
 
 [Credentials](credentials/qualys_compliance.md)

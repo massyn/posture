@@ -1341,6 +1341,23 @@ why something is built the way it is, not how to configure or call it.
   shape is assumed from the other v2 list APIs, and exception details aren't
   collected because the docs give no element names for them.
 
+- **Qualys Global AssetView** (`qualys_gav`) — raw `requests` against the
+  shared GAV/CSAM asset search API (`POST /rest/2.0/search/am/asset`), no
+  vendor SDK. A third Qualys API family: it lives on the subscription's
+  gateway host (`gateway_url`, required) with JWT auth, so it has its own
+  collector and `QUALYS_GAV_*` config, the same decision as `qualys_tas`.
+  `POST {gateway_url}/auth` (`token=true`) returns the JWT as plain text;
+  tokens last four hours, so `_authenticate` sets `_token_expires_at` for the
+  base class's proactive refresh. Pagination is `pageSize` (max 300) and
+  `lastSeenAssetId`, with `hasMore` 1/0; more-assets with no
+  `lastSeenAssetId` raises rather than ending early. `asset_software` and
+  `asset_open_ports` are derived from `assets`' nested lists, so `assets`'
+  raw records are cached to disk. kwargs: `filters` (CSAM criteria, passed
+  through as the JSON filter body) and `asset_last_updated`. **Caveat:**
+  built from public docs and release notes with no live subscription; the
+  nested software/open-port field names are the least certain part, and
+  whether free GAV (rather than CSAM) is granted this API is unstated.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and
