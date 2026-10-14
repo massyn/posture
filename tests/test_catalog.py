@@ -13,6 +13,7 @@ def test_catalog_lists_all_registered_sources() -> None:
     assert set(result) == {
         "appomni",
         "azure_entra",
+        "bigfix",
         "cloudflare",
         "cortex_cloud",
         "crowdstrike",

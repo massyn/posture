@@ -42,7 +42,7 @@ _DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
 load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.10.0"
+__version__ = "1.11.0"
 
 __all__ = [
     "CCM",
@@ -71,6 +71,7 @@ def _register_sources() -> None:
         return
     from posture.collectors.appomni import AppOmniCollector
     from posture.collectors.azure_entra import AzureEntraCollector
+    from posture.collectors.bigfix import BigfixCollector
     from posture.collectors.cloudflare import CloudflareCollector
     from posture.collectors.cortex_cloud import CortexCloudCollector
     from posture.collectors.crowdstrike import CrowdstrikeCollector
@@ -129,6 +130,7 @@ def _register_sources() -> None:
 
     _SOURCES["appomni"] = AppOmniCollector
     _SOURCES["azure_entra"] = AzureEntraCollector
+    _SOURCES["bigfix"] = BigfixCollector
     _SOURCES["cloudflare"] = CloudflareCollector
     _SOURCES["cortex_cloud"] = CortexCloudCollector
     _SOURCES["crowdstrike"] = CrowdstrikeCollector

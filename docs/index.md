@@ -134,6 +134,14 @@
 - [roles](collectors/google_workspace.md#roles)
 - [users](collectors/google_workspace.md#users)
 
+## [HCL BigFix](collectors/bigfix.md)
+
+[Credentials](credentials/bigfix.md)
+
+- [computers](collectors/bigfix.md#computers)
+- [fixlet_results](collectors/bigfix.md#fixlet_results)
+- [fixlets](collectors/bigfix.md#fixlets)
+
 ## [Healthchecks.io](collectors/healthchecks.md)
 
 [Credentials](credentials/healthchecks.md)

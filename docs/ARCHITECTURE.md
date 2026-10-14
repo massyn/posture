@@ -1279,6 +1279,29 @@ why something is built the way it is, not how to configure or call it.
   `requests` doesn't expose them) and cipher/protocol strength
   (`sslyze`/`testssl.sh` territory) are out of scope.
 
+- **HCL BigFix** — raw `requests` against a self-hosted root server's REST
+  API, no vendor SDK. `endpoint` is required (the root server's base URL
+  with its port, normally `:52311`); auth is HTTP Basic as a console
+  operator, whose visibility bounds every result. Every resource is one
+  Session Relevance query POSTed to `/api/query?output=json` rather than a
+  walk of the XML resource endpoints; each relevance tuple comes back as a
+  positional list and is zipped into a dict with its field names at fetch
+  time (`_QUERIES` declares each resource's field names and expressions
+  together). Optional inspectors are wrapped in `if exists ... then ...
+  else ""`, because one singular expression on a nonexistent object fails
+  the whole query. The `whose` kwarg is a relevance clause ANDed onto the
+  resource's default filter. TLS is collector-local by decision, not a
+  base-class concern: `ca_bundle` (PEM path) or `insecure` (mutually
+  exclusive) feed an explicit per-request `verify=`, since requests lets
+  `REQUESTS_CA_BUNDLE` silently override `session.verify` but never an
+  explicit `verify=`. Promote to `base.py` only if a second self-hosted
+  collector needs the same. **Caveat:** built from HCL's public REST API
+  and relevance documentation with no live root server available — the
+  JSON tuple shape and inspector names are unverified, and
+  `fixlet_results` is one unpaginated request (`/api/query` has no paging)
+  with a 600s timeout. Verify against a real deployment before relying on
+  this collector.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and
