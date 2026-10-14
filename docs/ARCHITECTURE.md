@@ -1320,6 +1320,27 @@ why something is built the way it is, not how to configure or call it.
   live subscription was available — verify field names and the `list`
   wrappers on `tags`/`cwe`/`owasp`/`wasc` before relying on it.
 
+- **Qualys Policy Compliance** (`qualys_compliance`, covering Secure
+  Configuration) — a subclass of `QualysCollector`, by decision: Policy
+  Compliance lives on the same v2-style XML API as VMDR, so auth, 409 and
+  rate-limit handling, streaming XML-to-dict and the `WARNING/URL` cursor are
+  inherited, and it keeps `env_prefix` `QUALYS` so one set of `QUALYS_*`
+  credentials drives both. The PCRS posture-streaming JSON API was rejected:
+  it needs a separate gateway host and JWT flow, and Qualys's docs contradict
+  each other on whether its supported versions still cover SCA.
+  `compliance_policies` uses `/api/4.0/fo/compliance/policy/` (v2/v3 EOL
+  December 2026); `compliance_policy_controls` is derived from its
+  `CONTROL_LIST` (`CONTROL` added to `qualys.py`'s `_ALWAYS_LIST_TAGS`).
+  `compliance_posture` (`/api/2.0/fo/compliance/posture/info/`) requires a
+  policy and only truncates with a single `policy_id`, so it walks policies
+  one at a time with a `(policy index, follow-up URL)` cursor; policy ids come
+  from `compliance_policies` (`requires`) unless the `policy_ids` kwarg names
+  them. The policy id is injected into each posture record at fetch time, and
+  Qualys's `N/A` date placeholder is mapped to null there too. **Caveat:**
+  built from public docs with no live subscription; the posture `WARNING/URL`
+  shape is assumed from the other v2 list APIs, and exception details aren't
+  collected because the docs give no element names for them.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

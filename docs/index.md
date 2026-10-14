@@ -328,6 +328,14 @@
 - [vulnerabilities](collectors/qualys.md#vulnerabilities)
 - [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
 
+## [Qualys Policy Compliance](collectors/qualys_compliance.md)
+
+[Credentials](credentials/qualys_compliance.md)
+
+- [compliance_policies](collectors/qualys_compliance.md#compliance_policies)
+- [compliance_policy_controls](collectors/qualys_compliance.md#compliance_policy_controls)
+- [compliance_posture](collectors/qualys_compliance.md#compliance_posture)
+
 ## [Qualys TotalAppSec](collectors/qualys_tas.md)
 
 [Credentials](credentials/qualys_tas.md)

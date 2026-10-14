@@ -93,11 +93,12 @@ _REQUEST_TIMEOUT_SECONDS = 600
 _FATAL_409_CODES = {"2003", "1960"}
 
 # Qualys XML wraps repeated children in a "_LIST" element (HOST_LIST/HOST,
-# VULN_LIST/VULN, DETECTION_LIST/DETECTION, CVE_LIST/CVE, TAGS/TAG) but
-# collapses that wrapper to a single bare child element when only one is
-# present. These tags are always coerced to a list so parse.py's
-# record_path traversal doesn't have to special-case cardinality.
-_ALWAYS_LIST_TAGS = {"HOST", "VULN", "DETECTION", "CVE", "TAG"}
+# VULN_LIST/VULN, DETECTION_LIST/DETECTION, CVE_LIST/CVE, TAGS/TAG, and
+# qualys_compliance.py's CONTROL_LIST/CONTROL) but collapses that wrapper to
+# a single bare child element when only one is present. These tags are always
+# coerced to a list so parse.py's record_path traversal doesn't have to
+# special-case cardinality.
+_ALWAYS_LIST_TAGS = {"HOST", "VULN", "DETECTION", "CVE", "TAG", "CONTROL"}
 
 MANIFEST: dict[str, dict[str, Any]] = {
     "hosts": {
