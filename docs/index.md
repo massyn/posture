@@ -134,6 +134,14 @@
 - [roles](collectors/google_workspace.md#roles)
 - [users](collectors/google_workspace.md#users)
 
+## [HCL BigFix](collectors/bigfix.md)
+
+[Credentials](credentials/bigfix.md)
+
+- [computers](collectors/bigfix.md#computers)
+- [fixlet_results](collectors/bigfix.md#fixlet_results)
+- [fixlets](collectors/bigfix.md#fixlets)
+
 ## [Healthchecks.io](collectors/healthchecks.md)
 
 [Credentials](credentials/healthchecks.md)
@@ -319,6 +327,29 @@
 - [hosts](collectors/qualys.md#hosts)
 - [vulnerabilities](collectors/qualys.md#vulnerabilities)
 - [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
+
+## [Qualys Global AssetView](collectors/qualys_gav.md)
+
+[Credentials](credentials/qualys_gav.md)
+
+- [asset_open_ports](collectors/qualys_gav.md#asset_open_ports)
+- [asset_software](collectors/qualys_gav.md#asset_software)
+- [assets](collectors/qualys_gav.md#assets)
+
+## [Qualys Policy Compliance](collectors/qualys_compliance.md)
+
+[Credentials](credentials/qualys_compliance.md)
+
+- [compliance_policies](collectors/qualys_compliance.md#compliance_policies)
+- [compliance_policy_controls](collectors/qualys_compliance.md#compliance_policy_controls)
+- [compliance_posture](collectors/qualys_compliance.md#compliance_posture)
+
+## [Qualys TotalAppSec](collectors/qualys_tas.md)
+
+[Credentials](credentials/qualys_tas.md)
+
+- [findings](collectors/qualys_tas.md#findings)
+- [webapps](collectors/qualys_tas.md#webapps)
 
 ## [Rapid7 InsightVM](collectors/rapid7_insightvm.md)
 

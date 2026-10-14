@@ -1279,6 +1279,85 @@ why something is built the way it is, not how to configure or call it.
   `requests` doesn't expose them) and cipher/protocol strength
   (`sslyze`/`testssl.sh` territory) are out of scope.
 
+- **HCL BigFix** — raw `requests` against a self-hosted root server's REST
+  API, no vendor SDK. `endpoint` is required (the root server's base URL
+  with its port, normally `:52311`); auth is HTTP Basic as a console
+  operator, whose visibility bounds every result. Every resource is one
+  Session Relevance query POSTed to `/api/query?output=json` rather than a
+  walk of the XML resource endpoints; each relevance tuple comes back as a
+  positional list and is zipped into a dict with its field names at fetch
+  time (`_QUERIES` declares each resource's field names and expressions
+  together). Optional inspectors are wrapped in `if exists ... then ...
+  else ""`, because one singular expression on a nonexistent object fails
+  the whole query. The `whose` kwarg is a relevance clause ANDed onto the
+  resource's default filter. TLS is collector-local by decision, not a
+  base-class concern: `ca_bundle` (PEM path) or `insecure` (mutually
+  exclusive) feed an explicit per-request `verify=`, since requests lets
+  `REQUESTS_CA_BUNDLE` silently override `session.verify` but never an
+  explicit `verify=`. Promote to `base.py` only if a second self-hosted
+  collector needs the same. **Caveat:** built from HCL's public REST API
+  and relevance documentation with no live root server available — the
+  JSON tuple shape and inspector names are unverified, and
+  `fixlet_results` is one unpaginated request (`/api/query` has no paging)
+  with a 600s timeout. Verify against a real deployment before relying on
+  this collector.
+
+- **Qualys TotalAppSec** (`qualys_tas`) — raw `requests` against the WAS v3
+  search API (`/qps/rest/3.0/search/was/webapp` and `.../finding`), no
+  vendor SDK. Separate from `qualys.py` by decision: VMDR's v2 API is XML
+  over GET with a follow-up-URL cursor, WAS search is JSON over POST with a
+  `ServiceRequest` body — same host and Basic auth, nothing else shared. So
+  it has its own `QUALYS_TAS_*` env vars, even when the values match
+  `QUALYS_*`. WAS v4 (July 2026) was skipped because its public reference
+  was too thin to build against; subscription-level OAuth is rejected by
+  every WAS endpoint. Pagination is `hasMoreRecords` + `lastId`, the next
+  page re-sending the criteria plus `id GREATER lastId`; more-records with
+  no `lastId` raises rather than ending early with a partial snapshot. QPS
+  reports some failures as HTTP 200 with a non-`SUCCESS` `responseCode`, so
+  every body is checked. The `filters` kwarg is a list of Qualys criteria
+  dicts, passed through verbatim. **Caveat:** Qualys's search samples are
+  XML; the JSON envelope comes from its separate JSON-support page. No
+  live subscription was available — verify field names and the `list`
+  wrappers on `tags`/`cwe`/`owasp`/`wasc` before relying on it.
+
+- **Qualys Policy Compliance** (`qualys_compliance`, covering Secure
+  Configuration) — a subclass of `QualysCollector`, by decision: Policy
+  Compliance lives on the same v2-style XML API as VMDR, so auth, 409 and
+  rate-limit handling, streaming XML-to-dict and the `WARNING/URL` cursor are
+  inherited, and it keeps `env_prefix` `QUALYS` so one set of `QUALYS_*`
+  credentials drives both. The PCRS posture-streaming JSON API was rejected:
+  it needs a separate gateway host and JWT flow, and Qualys's docs contradict
+  each other on whether its supported versions still cover SCA.
+  `compliance_policies` uses `/api/4.0/fo/compliance/policy/` (v2/v3 EOL
+  December 2026); `compliance_policy_controls` is derived from its
+  `CONTROL_LIST` (`CONTROL` added to `qualys.py`'s `_ALWAYS_LIST_TAGS`).
+  `compliance_posture` (`/api/2.0/fo/compliance/posture/info/`) requires a
+  policy and only truncates with a single `policy_id`, so it walks policies
+  one at a time with a `(policy index, follow-up URL)` cursor; policy ids come
+  from `compliance_policies` (`requires`) unless the `policy_ids` kwarg names
+  them. The policy id is injected into each posture record at fetch time, and
+  Qualys's `N/A` date placeholder is mapped to null there too. **Caveat:**
+  built from public docs with no live subscription; the posture `WARNING/URL`
+  shape is assumed from the other v2 list APIs, and exception details aren't
+  collected because the docs give no element names for them.
+
+- **Qualys Global AssetView** (`qualys_gav`) — raw `requests` against the
+  shared GAV/CSAM asset search API (`POST /rest/2.0/search/am/asset`), no
+  vendor SDK. A third Qualys API family: it lives on the subscription's
+  gateway host (`gateway_url`, required) with JWT auth, so it has its own
+  collector and `QUALYS_GAV_*` config, the same decision as `qualys_tas`.
+  `POST {gateway_url}/auth` (`token=true`) returns the JWT as plain text;
+  tokens last four hours, so `_authenticate` sets `_token_expires_at` for the
+  base class's proactive refresh. Pagination is `pageSize` (max 300) and
+  `lastSeenAssetId`, with `hasMore` 1/0; more-assets with no
+  `lastSeenAssetId` raises rather than ending early. `asset_software` and
+  `asset_open_ports` are derived from `assets`' nested lists, so `assets`'
+  raw records are cached to disk. kwargs: `filters` (CSAM criteria, passed
+  through as the JSON filter body) and `asset_last_updated`. **Caveat:**
+  built from public docs and release notes with no live subscription; the
+  nested software/open-port field names are the least certain part, and
+  whether free GAV (rather than CSAM) is granted this API is unstated.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

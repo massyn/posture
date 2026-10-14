@@ -42,7 +42,7 @@ _DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
 load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.10.0"
+__version__ = "1.11.0"
 
 __all__ = [
     "CCM",
@@ -71,6 +71,7 @@ def _register_sources() -> None:
         return
     from posture.collectors.appomni import AppOmniCollector
     from posture.collectors.azure_entra import AzureEntraCollector
+    from posture.collectors.bigfix import BigfixCollector
     from posture.collectors.cloudflare import CloudflareCollector
     from posture.collectors.cortex_cloud import CortexCloudCollector
     from posture.collectors.crowdstrike import CrowdstrikeCollector
@@ -104,6 +105,9 @@ def _register_sources() -> None:
     from posture.collectors.plerion import PlerionCollector
     from posture.collectors.precise import PreciseCollector
     from posture.collectors.qualys import QualysCollector
+    from posture.collectors.qualys_compliance import QualysComplianceCollector
+    from posture.collectors.qualys_gav import QualysGavCollector
+    from posture.collectors.qualys_tas import QualysTasCollector
     from posture.collectors.rapid7_insightvm import Rapid7InsightVMCollector
     from posture.collectors.recorded_future import RecordedFutureCollector
     from posture.collectors.runzero import RunzeroCollector
@@ -129,6 +133,7 @@ def _register_sources() -> None:
 
     _SOURCES["appomni"] = AppOmniCollector
     _SOURCES["azure_entra"] = AzureEntraCollector
+    _SOURCES["bigfix"] = BigfixCollector
     _SOURCES["cloudflare"] = CloudflareCollector
     _SOURCES["cortex_cloud"] = CortexCloudCollector
     _SOURCES["crowdstrike"] = CrowdstrikeCollector
@@ -160,6 +165,9 @@ def _register_sources() -> None:
     _SOURCES["plerion"] = PlerionCollector
     _SOURCES["precise"] = PreciseCollector
     _SOURCES["qualys"] = QualysCollector
+    _SOURCES["qualys_compliance"] = QualysComplianceCollector
+    _SOURCES["qualys_gav"] = QualysGavCollector
+    _SOURCES["qualys_tas"] = QualysTasCollector
     _SOURCES["rapid7_insightvm"] = Rapid7InsightVMCollector
     _SOURCES["recorded_future"] = RecordedFutureCollector
     _SOURCES["runzero"] = RunzeroCollector

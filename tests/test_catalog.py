@@ -13,6 +13,7 @@ def test_catalog_lists_all_registered_sources() -> None:
     assert set(result) == {
         "appomni",
         "azure_entra",
+        "bigfix",
         "cloudflare",
         "cortex_cloud",
         "crowdstrike",
@@ -44,6 +45,9 @@ def test_catalog_lists_all_registered_sources() -> None:
         "plerion",
         "precise",
         "qualys",
+        "qualys_compliance",
+        "qualys_gav",
+        "qualys_tas",
         "rapid7_insightvm",
         "recorded_future",
         "runzero",
