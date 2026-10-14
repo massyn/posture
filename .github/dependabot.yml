@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # pyproject.toml: core dependencies, optional extras and the dev group.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+
+  # Actions used by .github/workflows/publish.yml.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
