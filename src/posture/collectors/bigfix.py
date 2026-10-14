@@ -45,10 +45,10 @@ long request timeout. Verify against a real deployment before relying on it.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Any, ClassVar
 
 from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
+from posture.collectors._tls import resolve_verify
 
 logger = logging.getLogger("posture.collectors.bigfix")
 
@@ -63,9 +63,6 @@ _QUERY_TIMEOUT_SECONDS = 600
 # as "Tue, 13 Oct 2026".
 _TIME_FORMAT = {"format": "%a, %d %b %Y %H:%M:%S %z"}
 _DATE_FORMAT = {"format": "%a, %d %b %Y"}
-
-_TRUE_STRINGS = frozenset({"true", "1", "yes"})
-_FALSE_STRINGS = frozenset({"false", "0", "no", ""})
 
 # Fixlets (not Tasks/Analyses) currently relevant on at least one computer.
 _RELEVANT_FIXLETS = "fixlet flag of it and applicable computer count of it > 0"
@@ -208,40 +205,8 @@ class BigfixCollector(Collector):
     ) -> None:
         super().__init__(config, record_limit=record_limit)
         self._base_url = self._config["endpoint"]
-        # Passed on every request rather than set as session.verify: requests
-        # lets a REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE env var silently override
-        # session.verify, but never an explicit per-request verify=.
-        self._verify: bool | str = True
-
-        insecure = self._config.get("insecure", False)
-        if isinstance(insecure, str):
-            lowered = insecure.strip().lower()
-            if lowered not in _TRUE_STRINGS | _FALSE_STRINGS:
-                raise ValueError(
-                    f"Invalid 'insecure' value {insecure!r}: expected true or false "
-                    "(env var BIGFIX_INSECURE)"
-                )
-            insecure = lowered in _TRUE_STRINGS
-        ca_bundle = self._config.get("ca_bundle")
-
-        if insecure and ca_bundle:
-            raise ValueError(
-                "Config 'insecure' and 'ca_bundle' are mutually exclusive: set one "
-                "or the other (env vars BIGFIX_INSECURE / BIGFIX_CA_BUNDLE)"
-            )
-        if ca_bundle:
-            if not Path(ca_bundle).is_file():
-                raise ValueError(
-                    f"Config 'ca_bundle' file not found: {ca_bundle} "
-                    "(env var BIGFIX_CA_BUNDLE)"
-                )
-            self._verify = str(ca_bundle)
-        elif insecure:
-            logger.warning(
-                "TLS certificate verification disabled for BigFix",
-                extra={"source": "bigfix"},
-            )
-            self._verify = False
+        # Passed as verify= on every request; see collectors/_tls.py.
+        self._verify = resolve_verify(self._config, self.env_prefix)
 
     def _authenticate(self) -> None:
         self._session.auth = (self._config["username"], self._config["password"])

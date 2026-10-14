@@ -20,6 +20,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "crowdstrike_cspm",
         "crowdstrike_identity",
         "cve_db",
+        "cyberark",
         "defender_for_cloud",
         "dnsimple",
         "drata",

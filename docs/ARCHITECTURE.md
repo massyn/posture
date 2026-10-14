@@ -1294,8 +1294,8 @@ why something is built the way it is, not how to configure or call it.
   base-class concern: `ca_bundle` (PEM path) or `insecure` (mutually
   exclusive) feed an explicit per-request `verify=`, since requests lets
   `REQUESTS_CA_BUNDLE` silently override `session.verify` but never an
-  explicit `verify=`. Promote to `base.py` only if a second self-hosted
-  collector needs the same. **Caveat:** built from HCL's public REST API
+  explicit `verify=`. Shared with `cyberark` via `collectors/_tls.py`
+  (`resolve_verify`) rather than `base.py`, by decision. **Caveat:** built from HCL's public REST API
   and relevance documentation with no live root server available — the
   JSON tuple shape and inspector names are unverified, and
   `fixlet_results` is one unpaginated request (`/api/query` has no paging)
@@ -1357,6 +1357,26 @@ why something is built the way it is, not how to configure or call it.
   built from public docs and release notes with no live subscription; the
   nested software/open-port field names are the least certain part, and
   whether free GAV (rather than CSAM) is granted this API is unstated.
+
+- **CyberArk Privileged Access Manager** (`cyberark`) — raw `requests`
+  against the PAM web services (`{base_url}/PasswordVault/API`), no vendor
+  SDK. One collector for both deployments, by decision: the API surface is
+  the same, only auth differs, chosen by config. `identity_url` set selects
+  Privilege Cloud Shared Services — an Identity OAuth confidential-client
+  service user exchanged at `/oauth2/platformtoken`, `expires_in` driving
+  proactive refresh; `identity_url` is its own key because the Identity
+  tenant id often differs from the Privilege Cloud subdomain. Unset selects
+  the PVWA Logon API (`/API/auth/{logon_type}/Logon`, `concurrentSession`,
+  bare token in `Authorization`), re-authenticated on the 401 an inactivity
+  timeout produces. TLS uses the shared `collectors/_tls.py`. Passwords are
+  never retrieved. `accounts`/`safes` follow `nextLink` (relative to
+  `/PasswordVault/`) rather than counting against `count`, reported
+  unreliable for accounts. `safe_members` fans out one `nextLink`-paginated
+  call per safe via `_resumable_fanout`, with `safes` `requires`-cached.
+  **Caveat:** built from CyberArk's public references and third-party
+  integration docs with no live tenant; field names and the `nextLink`
+  shape need verifying. The service identity only sees safes it is a member
+  of, which bounds the snapshot.
 
 ## Version bumps
 
