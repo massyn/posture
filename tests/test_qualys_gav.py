@@ -126,8 +126,9 @@ def test_token_expiry_is_tracked_for_proactive_refresh() -> None:
 def test_bad_credentials_raise_authentication_error() -> None:
     responses.add(responses.POST, AUTH_URL, status=401)
 
+    ccm = CCM("qualys_gav", CONFIG)
     with pytest.raises(AuthenticationError):
-        CCM("qualys_gav", CONFIG).collect("assets")
+        ccm.collect("assets")
 
 
 @responses.activate
@@ -137,5 +138,6 @@ def test_more_assets_without_cursor_raises() -> None:
         responses.POST, SEARCH_URL, json=_page([ASSET], has_more=1), status=200
     )
 
+    ccm = CCM("qualys_gav", CONFIG)
     with pytest.raises(IncompleteCollection, match="lastSeenAssetId"):
-        CCM("qualys_gav", CONFIG).collect("assets")
+        ccm.collect("assets")

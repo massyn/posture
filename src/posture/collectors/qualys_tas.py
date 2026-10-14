@@ -165,6 +165,23 @@ class QualysTasCollector(Collector):
         if criteria:
             request["filters"] = {"Criteria": criteria}
 
+        body = self._post_search(path, request, resource)
+        records = [item[entity] for item in body.get("data") or []]
+        if str(body.get("hasMoreRecords", "false")).lower() != "true":
+            return records, None
+        last_id = body.get("lastId")
+        if last_id is None:
+            # Ending here would silently hand back a partial snapshot.
+            raise ValueError(
+                f"Qualys TotalAppSec reported more '{resource}' records but no lastId"
+            )
+        return records, last_id
+
+    def _post_search(
+        self, path: str, request: dict[str, Any], resource: str
+    ) -> dict[str, Any]:
+        """POST one search and return its ServiceResponse, raising for both
+        HTTP-level failures and QPS's HTTP-200 non-SUCCESS responseCodes."""
         response = self._session.post(
             self._base_url + path,
             json={"ServiceRequest": request},
@@ -187,14 +204,4 @@ class QualysTasCollector(Collector):
             if code in ("UNAUTHORIZED", "INSUFFICIENT_PRIVILEGES"):
                 raise PermissionDeniedSignal(message)
             raise requests.HTTPError(message, response=response)
-
-        records = [item[entity] for item in body.get("data") or []]
-        if str(body.get("hasMoreRecords", "false")).lower() != "true":
-            return records, None
-        last_id = body.get("lastId")
-        if last_id is None:
-            # Ending here would silently hand back a partial snapshot.
-            raise ValueError(
-                f"Qualys TotalAppSec reported more '{resource}' records but no lastId"
-            )
-        return records, last_id
+        return body

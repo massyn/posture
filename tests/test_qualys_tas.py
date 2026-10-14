@@ -129,8 +129,9 @@ def test_non_success_response_code_raises() -> None:
         status=200,
     )
 
+    ccm = CCM("qualys_tas", _CONFIG)
     with pytest.raises(IncompleteCollection, match="bad criteria"):
-        CCM("qualys_tas", _CONFIG).collect("findings")
+        ccm.collect("findings")
 
 
 @responses.activate
@@ -142,10 +143,12 @@ def test_more_records_without_last_id_raises() -> None:
         status=200,
     )
 
+    ccm = CCM("qualys_tas", _CONFIG)
     with pytest.raises(IncompleteCollection, match="no lastId"):
-        CCM("qualys_tas", _CONFIG).collect("findings")
+        ccm.collect("findings")
 
 
 def test_unknown_kwarg_raises() -> None:
+    ccm = CCM("qualys_tas", _CONFIG)
     with pytest.raises(IncompleteCollection, match="Unsupported kwargs"):
-        CCM("qualys_tas", _CONFIG).collect("findings", qql="severity:5")
+        ccm.collect("findings", qql="severity:5")

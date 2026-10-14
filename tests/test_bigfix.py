@@ -155,16 +155,18 @@ def test_whose_kwarg_is_anded_onto_the_default_filter() -> None:
 
 
 def test_unknown_kwarg_raises() -> None:
+    ccm = CCM("bigfix", _CONFIG)
     with pytest.raises(IncompleteCollection, match="Unsupported kwargs"):
-        CCM("bigfix", _CONFIG).collect("computers", relevance="names of bes sites")
+        ccm.collect("computers", relevance="names of bes sites")
 
 
 @responses.activate
 def test_unauthorized_raises_incomplete_collection() -> None:
     responses.add(responses.POST, _QUERY_URL, status=401)
 
+    ccm = CCM("bigfix", _CONFIG)
     with pytest.raises(IncompleteCollection):
-        CCM("bigfix", _CONFIG).collect("computers")
+        ccm.collect("computers")
 
 
 @responses.activate
