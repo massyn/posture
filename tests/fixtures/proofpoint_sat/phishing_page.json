@@ -1,0 +1,51 @@
+[
+  {
+    "id": "a1b2c3",
+    "type": "phishing",
+    "attributes": {
+      "userfirstname": "Alice",
+      "userlastname": "Example",
+      "useremailaddress": "alice@example.com",
+      "useractiveflag": true,
+      "userdeleteddate": null,
+      "sso_id": "alice",
+      "usertags": {"Department": "Finance"},
+      "senttimestamp": "2026-09-01T08:00:00.000Z",
+      "eventtimestamp": "2026-09-01T08:15:30.000Z",
+      "eventtype": "Email Click",
+      "campaignname": "Q3 Invoice Phish",
+      "campaigntype": "Phishing",
+      "campaignstatus": "Completed",
+      "campaignstartdate": "2026-09-01",
+      "campaignenddate": "2026-09-14",
+      "autoenrollment": false,
+      "templatename": "Overdue Invoice",
+      "templatesubject": "Invoice #4471 overdue",
+      "assessmentisarchived": false
+    }
+  },
+  {
+    "id": "d4e5f6",
+    "type": "phishing",
+    "attributes": {
+      "userfirstname": "Bob",
+      "userlastname": "Example",
+      "useremailaddress": "bob@example.com",
+      "useractiveflag": false,
+      "userdeleteddate": "2026-09-20T00:00:00.000Z",
+      "sso_id": null,
+      "senttimestamp": "2026-09-01T08:00:00.000Z",
+      "eventtimestamp": null,
+      "eventtype": "No Action",
+      "campaignname": "Q3 Invoice Phish",
+      "campaigntype": "Phishing",
+      "campaignstatus": "Completed",
+      "campaignstartdate": "2026-09-01",
+      "campaignenddate": "2026-09-14",
+      "autoenrollment": false,
+      "templatename": "Overdue Invoice",
+      "templatesubject": "Invoice #4471 overdue",
+      "assessmentisarchived": false
+    }
+  }
+]
