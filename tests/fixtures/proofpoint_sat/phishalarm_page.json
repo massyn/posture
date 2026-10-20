@@ -1,0 +1,20 @@
+[
+  {
+    "id": "pa-1",
+    "type": "phishalarm",
+    "attributes": {
+      "userfirstname": "Alice",
+      "userlastname": "Example",
+      "useremailaddress": "alice@example.com",
+      "useractiveflag": true,
+      "campaignname": "Q3 Invoice Phish",
+      "action": "Reported",
+      "emailtype": "Simulated Phish",
+      "receiveddate": "2026-09-01T08:00:00.000Z",
+      "reporteddate": "2026-09-01T09:30:00.000Z",
+      "elapsedhours": "1.5",
+      "os": "Windows",
+      "emailclientversion": "Outlook 16.0"
+    }
+  }
+]

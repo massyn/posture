@@ -1378,6 +1378,25 @@ why something is built the way it is, not how to configure or call it.
   shape need verifying. The service identity only sees safes it is a member
   of, which bounds the snapshot.
 
+- **Proofpoint Security Awareness Training** (`proofpoint_sat`) — raw
+  `requests` against the PSAT (ZenGuide) Results API v0.3.0
+  (`https://<regional host>/api/reporting/v0.3.0`), no vendor SDK. Static
+  API key in the `x-apikey-token` header. The host is region-specific with
+  no discovery, so `region` (`us`/`eu`/`ap`/`ca`/`in`, default `us`) picks
+  it; an unknown region raises at construction rather than silently falling
+  back to `us`. All five resources (`users`, `training`, `phishing`,
+  `cyberstrength`, `phishalarm`) are top-level report endpoints with a
+  JSON:API envelope — rows are `{id, type, attributes}`, so every column
+  path is under `attributes.`. Pagination is `page[number]`/`page[size]`,
+  continuing while `links.next` is present or `meta.count` says rows
+  remain. `user_tag_enable=TRUE` is a default param so rows carry the
+  tenant's custom user tags; kwargs pass straight through in PSAT's
+  `filter[_...]` dialect and win. `phishing_extended` is left out: it is
+  disabled by default in tenants. **Caveat:** built from Proofpoint's
+  community `psat-api` client and third-party integration docs with no
+  live tenant; field names, date formats and the pagination envelope need
+  verifying.
+
 ## Version bumps
 
 The version number is duplicated in two places — `pyproject.toml`'s `version` and

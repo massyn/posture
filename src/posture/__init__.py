@@ -42,7 +42,7 @@ _DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
 load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.12.0"
+__version__ = "1.12.1"
 
 __all__ = [
     "CCM",
@@ -105,6 +105,7 @@ def _register_sources() -> None:
     from posture.collectors.phriendly_phishing import PhriendlyPhishingCollector
     from posture.collectors.plerion import PlerionCollector
     from posture.collectors.precise import PreciseCollector
+    from posture.collectors.proofpoint_sat import ProofpointSatCollector
     from posture.collectors.qualys import QualysCollector
     from posture.collectors.qualys_compliance import QualysComplianceCollector
     from posture.collectors.qualys_gav import QualysGavCollector
@@ -166,6 +167,7 @@ def _register_sources() -> None:
     _SOURCES["phriendly_phishing"] = PhriendlyPhishingCollector
     _SOURCES["plerion"] = PlerionCollector
     _SOURCES["precise"] = PreciseCollector
+    _SOURCES["proofpoint_sat"] = ProofpointSatCollector
     _SOURCES["qualys"] = QualysCollector
     _SOURCES["qualys_compliance"] = QualysComplianceCollector
     _SOURCES["qualys_gav"] = QualysGavCollector

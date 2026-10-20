@@ -1,0 +1,32 @@
+[
+  {
+    "id": "t-1",
+    "type": "training",
+    "attributes": {
+      "userfirstname": "Alice",
+      "userlastname": "Example",
+      "useremailaddress": "alice@example.com",
+      "useractiveflag": true,
+      "userassignmentstatus": "Completed",
+      "assignmentname": "2026 Annual Awareness",
+      "assignmentstartdate": "2026-07-01",
+      "assignmentduedate": "2026-07-31",
+      "assignmentstatus": "Active",
+      "assignmentmethod": "Manual",
+      "duration": "00:12:00",
+      "isautoenroll": false,
+      "modulename_admin": "Phishing Fundamentals",
+      "modulename_user": "Phishing Fundamentals",
+      "moduletype": "Interactive",
+      "moduleattemptdate": "2026-07-03T10:00:00.000Z",
+      "secondsinmoduleattempt": "684",
+      "moduleattemptstatus": "Completed",
+      "moduleattemptscore": "90.5",
+      "moduleattemptscorecorrect": 9,
+      "moduleattemptscoreanswered": 10,
+      "assignmentdeleted": false,
+      "userremovedfromassignment": false,
+      "isfreeplay": false
+    }
+  }
+]

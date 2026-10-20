@@ -45,6 +45,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "phriendly_phishing",
         "plerion",
         "precise",
+        "proofpoint_sat",
         "qualys",
         "qualys_compliance",
         "qualys_gav",

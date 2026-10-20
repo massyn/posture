@@ -328,6 +328,16 @@
 - [profile_tracks](collectors/precise.md#profile_tracks)
 - [profiles](collectors/precise.md#profiles)
 
+## [Proofpoint Security Awareness Training](collectors/proofpoint_sat.md)
+
+[Credentials](credentials/proofpoint_sat.md)
+
+- [cyberstrength](collectors/proofpoint_sat.md#cyberstrength)
+- [phishalarm](collectors/proofpoint_sat.md#phishalarm)
+- [phishing](collectors/proofpoint_sat.md#phishing)
+- [training](collectors/proofpoint_sat.md#training)
+- [users](collectors/proofpoint_sat.md#users)
+
 ## [Qualys](collectors/qualys.md)
 
 [Credentials](credentials/qualys.md)
