@@ -217,17 +217,24 @@ def build() -> None:
         for name, info in sorted(storage_catalog().items())
     ]
 
+    # newline="\n": write LF on every OS — Windows would otherwise translate to CRLF.
     (_DOCS_DIR / "index.md").write_text(
-        _INDEX_TEMPLATE.render(sources=sources, backends=backends), encoding="utf-8"
+        _INDEX_TEMPLATE.render(sources=sources, backends=backends),
+        encoding="utf-8",
+        newline="\n",
     )
 
     for source in sources:
         page = _COLLECTOR_TEMPLATE.render(source=source)
-        (_COLLECTORS_DIR / f"{source['name']}.md").write_text(page, encoding="utf-8")
+        (_COLLECTORS_DIR / f"{source['name']}.md").write_text(
+            page, encoding="utf-8", newline="\n"
+        )
 
     for backend in backends:
         page = _STORAGE_TEMPLATE.render(backend=backend)
-        (_STORAGE_DIR / f"{backend['name']}.md").write_text(page, encoding="utf-8")
+        (_STORAGE_DIR / f"{backend['name']}.md").write_text(
+            page, encoding="utf-8", newline="\n"
+        )
 
     missing_credentials = [s["name"] for s in sources if not s["credentials_doc"]]
     linked_credentials = len(sources) - len(missing_credentials)
