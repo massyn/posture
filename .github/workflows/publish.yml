@@ -8,12 +8,14 @@ on:
 
 jobs:
   version-check:
+    # Dependabot PRs only touch dev dependencies and CI actions, which don't warrant a release.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -68,10 +70,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Notify Slack (build started)
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "::warning::SLACK_WEBHOOK secret is not set; skipping Slack notification"
+            exit 0
+          fi
           curl -sf -X POST -H 'Content-type: application/json' \
             --data "{
               \"attachments\": [{
@@ -85,10 +93,11 @@ jobs:
                 }]
               }]
             }" \
-            "${{ secrets.SLACK_WEBHOOK }}"
+            "$SLACK_WEBHOOK" \
+            || echo "::warning::Slack notification failed"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -113,10 +122,10 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -133,7 +142,7 @@ jobs:
         run: python -m build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1 (v1.14.2)
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1 (v1.14.3)
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
@@ -200,7 +209,13 @@ jobs:
           fi
 
       - name: Notify Slack (build result)
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "::warning::SLACK_WEBHOOK secret is not set; skipping Slack notification"
+            exit 0
+          fi
           curl -sf -X POST -H 'Content-type: application/json' \
             --data "{
               \"attachments\": [{
@@ -214,4 +229,5 @@ jobs:
                 }]
               }]
             }" \
-            "${{ secrets.SLACK_WEBHOOK }}"
+            "$SLACK_WEBHOOK" \
+            || echo "::warning::Slack notification failed"
