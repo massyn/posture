@@ -57,7 +57,8 @@ refused, check the subscription's entitlement.
 This collector talks to the subscription's **gateway** host, not the
 `qualysapi` host the other Qualys collectors use. It is listed under **Help**
 > **About** in the Qualys portal, and follows the platform's pattern, e.g.
-`https://gateway.qg1.apps.qualys.com` for US Platform 1.
+`https://gateway.qg1.apps.qualys.com` for US Platform 1. The [platform table](qualys.md#find-the-api-server-url) lists
+the gateway for every platform.
 
 ## Record the credentials
 

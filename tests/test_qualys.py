@@ -289,3 +289,46 @@ def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
 
     # exactly one request — no rate-limit retry loop for a fatal 409
     assert call_count == 1
+
+
+@responses.activate
+def test_vulnerability_detections_use_v5_endpoint() -> None:
+    # /api/2.0 host detection is Qualys End-of-Service; the 5.0 response adds
+    # only optional elements, so the same paths still parse.
+    body = b"""<?xml version="1.0"?>
+<HOST_LIST_VM_DETECTION_OUTPUT>
+  <RESPONSE>
+    <HOST_LIST>
+      <HOST>
+        <ID>1</ID><IP>10.0.0.1</IP>
+        <DETECTION_LIST>
+          <DETECTION>
+            <UNIQUE_VULN_ID>9</UNIQUE_VULN_ID><QID>38170</QID>
+            <TYPE>Confirmed</TYPE><SEVERITY>5</SEVERITY>
+            <CVE>CVE-2024-0001</CVE>
+            <MITRE_TACTIC_ID>TA0001</MITRE_TACTIC_ID>
+            <STATUS>Active</STATUS>
+          </DETECTION>
+        </DETECTION_LIST>
+      </HOST>
+    </HOST_LIST>
+  </RESPONSE>
+</HOST_LIST_VM_DETECTION_OUTPUT>"""
+    responses.add(
+        responses.GET,
+        BASE_URL + "/api/5.0/fo/asset/host/vm/detection/",
+        body=body,
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+    df = ccm.collect("vulnerability_detections")
+
+    assert len(df) == 1
+    assert df.iloc[0]["host_id"] == "1"
+    assert df.iloc[0]["qid"] == "38170"
+    assert df.iloc[0]["severity"] == 5
+    assert df.iloc[0]["status"] == "Active"

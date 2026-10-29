@@ -31,7 +31,7 @@ creating the user.
 
 The collector calls three VMDR APIs: host list (`/api/5.0/fo/asset/host/`),
 KnowledgeBase (`/api/4.0/fo/knowledge_base/vuln/`) and host list detection
-(`/api/2.0/fo/asset/host/vm/detection/`). The **Reader** role can call all
+(`/api/5.0/fo/asset/host/vm/detection/`). The **Reader** role can call all
 three, but only returns hosts in the asset groups assigned to the user. A
 Reader with no asset groups authenticates fine and returns empty tables,
 with no error to say so. Getting the scope right is the step most often
@@ -80,7 +80,12 @@ the user list and in the activation email.
 ## Activate the account
 
 A new account cannot make API calls until it has completed its first login
-and accepted the Qualys EULA. Until then every request fails authentication.
+and accepted the Qualys EULA. Until then Qualys answers every request with
+HTTP 409 and code `2003` ("Registration must be completed before API
+requests will be served"), which the collector reports as an
+`AuthenticationError`. Code `2000 Bad Login/Password` is a different
+problem: wrong credentials, API access not ticked, or no API on the
+subscription (see above).
 
 * Open the **Registration** email sent to the address above and follow the
   link to retrieve the username and initial password. The link works once
@@ -99,11 +104,28 @@ this one does.
 ## Find the API server URL
 
 The API server depends on the platform your subscription is hosted on. It
-is listed under **Help** > **About** in the portal (**Qualys API Server**),
-e.g. `https://qualysapi.qualys.com` for US Platform 1 or
-`https://qualysapi.qg2.apps.qualys.com` for US Platform 2. On some platforms
-the portal host (`qualysguard...`) answers API calls too, but use the listed
-API server where there is one.
+is listed under **Help** > **About** in the portal (**Qualys API Server**).
+You can also match the portal address you log in to against this table; the
+gateway column is for the [Global AssetView collector](qualys_gav.md):
+
+| Platform | API server (`base_url`) | Gateway (`gateway_url`) |
+| --- | --- | --- |
+| US 1 | `https://qualysapi.qualys.com` | `https://gateway.qg1.apps.qualys.com` |
+| US 2 | `https://qualysapi.qg2.apps.qualys.com` | `https://gateway.qg2.apps.qualys.com` |
+| US 3 | `https://qualysapi.qg3.apps.qualys.com` | `https://gateway.qg3.apps.qualys.com` |
+| US 4 | `https://qualysapi.qg4.apps.qualys.com` | `https://gateway.qg4.apps.qualys.com` |
+| EU 1 | `https://qualysapi.qualys.eu` | `https://gateway.qg1.apps.qualys.eu` |
+| EU 2 | `https://qualysapi.qg2.apps.qualys.eu` | `https://gateway.qg2.apps.qualys.eu` |
+| EU 3 | `https://qualysapi.qg3.apps.qualys.it` | `https://gateway.qg3.apps.qualys.it` |
+| India | `https://qualysapi.qg1.apps.qualys.in` | `https://gateway.qg1.apps.qualys.in` |
+| Canada | `https://qualysapi.qg1.apps.qualys.ca` | `https://gateway.qg1.apps.qualys.ca` |
+| UAE | `https://qualysapi.qg1.apps.qualys.ae` | `https://gateway.qg1.apps.qualys.ae` |
+| UK | `https://qualysapi.qg1.apps.qualys.co.uk` | `https://gateway.qg1.apps.qualys.co.uk` |
+| Australia | `https://qualysapi.qg1.apps.qualys.com.au` | `https://gateway.qg1.apps.qualys.com.au` |
+| KSA | `https://qualysapi.qg1.apps.qualysksa.com` | `https://gateway.qg1.apps.qualysksa.com` |
+
+On some platforms the portal host (`qualysguard...`) answers API calls too,
+but use the API server from **Help** > **About** or the table above.
 
 ## Record the credentials
 

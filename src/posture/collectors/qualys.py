@@ -1,7 +1,7 @@
 """Qualys VMDR collector.
 
-Raw ``requests`` against the Qualys API v2 (``/api/2.0/fo/...``) — no vendor
-SDK; it is generic REST once its two quirks are handled locally:
+Raw ``requests`` against the Qualys VM/PC ``/api/N.0/fo/...`` API family — no
+vendor SDK; it is generic REST once its two quirks are handled locally:
 
 1. **XML, not JSON.** Every v2 endpoint returns XML. ``_xml_to_dict``
    converts each ``<HOST>``/``<VULN>``/``<DETECTION>`` element into a plain
@@ -66,7 +66,11 @@ _HOST_LIST_ENDPOINT = "/api/5.0/fo/asset/host/"
 # /api/4.0 — same request params and XML response shape, only the path
 # version changed.
 _KB_ENDPOINT = "/api/4.0/fo/knowledge_base/vuln/"
-_HOST_DETECTION_ENDPOINT = "/api/2.0/fo/asset/host/vm/detection/"
+# /api/2.0/fo/asset/host/vm/detection/ carries the same EOS warning in favour
+# of /api/5.0. The 5.0 output DTD only adds optional elements (MITRE, detection
+# sources, TruRisk status, ALICLOUD metadata); every path read here is
+# unchanged.
+_HOST_DETECTION_ENDPOINT = "/api/5.0/fo/asset/host/vm/detection/"
 
 _PAGE_SIZE = 1000
 
