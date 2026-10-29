@@ -70,11 +70,10 @@ _HOST_LIST_ENDPOINT = "/api/5.0/fo/asset/host/"
 # /api/4.0 — same request params and XML response shape, only the path
 # version changed.
 _KB_ENDPOINT = "/api/4.0/fo/knowledge_base/vuln/"
-# /api/2.0/fo/asset/host/vm/detection/ carries the same EOS warning in favour
-# of /api/5.0. The 5.0 output DTD only adds optional elements (MITRE, detection
-# sources, TruRisk status, ALICLOUD metadata); every path read here is
-# unchanged.
-_HOST_DETECTION_ENDPOINT = "/api/5.0/fo/asset/host/vm/detection/"
+# /api/2.0/fo/asset/host/vm/detection/ carries the same EOS warning, naming
+# /api/4.0 as its replacement — same request params, and every path read here
+# is unchanged.
+_HOST_DETECTION_ENDPOINT = "/api/4.0/fo/asset/host/vm/detection/"
 
 _PAGE_SIZE = 1000
 

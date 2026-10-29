@@ -8,9 +8,8 @@ details, business unit, activation and password policy are all covered on
 that page), then add the Global AssetView access below and set the same
 username and password under the `QUALYS_GAV_*` environment variables.
 
-**Unverified:** these steps follow Qualys's public documentation and have
-not been checked against a live subscription. Menu labels vary between
-Qualys releases, so verify each step on your own subscription.
+Menu labels vary between Qualys releases, so the exact wording on your
+subscription may differ.
 
 ## What the collector needs
 
@@ -55,10 +54,11 @@ refused, check the subscription's entitlement.
 ## Find the gateway URL
 
 This collector talks to the subscription's **gateway** host, not the
-`qualysapi` host the other Qualys collectors use. It is listed under **Help**
-> **About** in the Qualys portal, and follows the platform's pattern, e.g.
-`https://gateway.qg1.apps.qualys.com` for US Platform 1. The [platform table](qualys.md#find-the-api-server-url) lists
-the gateway for every platform.
+`qualysapi` host the other Qualys collectors use. **Help** > **About** in
+the portal does not list it, but it follows the platform's pattern, e.g.
+`https://gateway.qg1.apps.qualys.com` for US Platform 1. The [platform
+table](qualys.md#find-the-api-server-url) lists the gateway for every
+platform.
 
 ## Record the credentials
 

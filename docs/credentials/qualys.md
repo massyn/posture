@@ -8,9 +8,8 @@ The other Qualys collectors ([Policy Compliance](qualys_compliance.md),
 user and add their own module access on top, so start here even if you only
 need one of them.
 
-**Unverified:** these steps follow Qualys's public documentation and have
-not been checked against a live subscription. Menu labels vary between
-Qualys releases, so verify each step on your own subscription.
+Menu labels vary between Qualys releases, so the exact wording on your
+subscription may differ.
 
 ## Check the subscription has API access
 
@@ -31,7 +30,7 @@ creating the user.
 
 The collector calls three VMDR APIs: host list (`/api/5.0/fo/asset/host/`),
 KnowledgeBase (`/api/4.0/fo/knowledge_base/vuln/`) and host list detection
-(`/api/5.0/fo/asset/host/vm/detection/`). The **Reader** role can call all
+(`/api/4.0/fo/asset/host/vm/detection/`). The **Reader** role can call all
 three, but only returns hosts in the asset groups assigned to the user. A
 Reader with no asset groups authenticates fine and returns empty tables,
 with no error to say so. Getting the scope right is the step most often
@@ -100,10 +99,14 @@ this one does.
 
 ## Find the API server URL
 
-The API server depends on the platform your subscription is hosted on. It
-is listed under **Help** > **About** in the portal (**Qualys API Server**).
-You can also match the portal address you log in to against this table; the
-gateway column is for the [Global AssetView collector](qualys_gav.md):
+The API server depends on the platform your subscription is hosted on. To
+find it in the portal, open **Help** > **About** and look under **Qualys
+Scanner Appliances** > **Security Operations Center (SOC)**: the host
+starting `qualysapi.` is the API server (e.g.
+`qualysapi.qg1.apps.qualys.com.au:443`; drop the `:443`). The page has no
+separate "API server" label, and does not list the gateway. You can also
+match the portal address you log in to against this table; the gateway
+column is for the [Global AssetView collector](qualys_gav.md):
 
 | Platform | API server (`base_url`) | Gateway (`gateway_url`) |
 | --- | --- | --- |
@@ -122,7 +125,7 @@ gateway column is for the [Global AssetView collector](qualys_gav.md):
 | KSA | `https://qualysapi.qg1.apps.qualysksa.com` | `https://gateway.qg1.apps.qualysksa.com` |
 
 On some platforms the portal host (`qualysguard...`) answers API calls too,
-but use the API server from **Help** > **About** or the table above.
+but use the `qualysapi.` host from **Help** > **About** or the table above.
 
 ## Troubleshooting
 

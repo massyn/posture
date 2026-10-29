@@ -8,9 +8,8 @@ user there first (user role, business unit, asset groups, activation and API
 server URL are all covered on that page), then add the Policy Compliance
 access below.
 
-**Unverified:** these steps follow Qualys's public documentation and have
-not been checked against a live subscription. Menu labels vary between
-Qualys releases, so verify each step on your own subscription.
+Menu labels vary between Qualys releases, so the exact wording on your
+subscription may differ.
 
 ## What the collector needs
 

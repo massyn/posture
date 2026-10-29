@@ -1315,10 +1315,8 @@ why something is built the way it is, not how to configure or call it.
   no `lastId` raises rather than ending early with a partial snapshot. QPS
   reports some failures as HTTP 200 with a non-`SUCCESS` `responseCode`, so
   every body is checked. The `filters` kwarg is a list of Qualys criteria
-  dicts, passed through verbatim. **Caveat:** Qualys's search samples are
-  XML; the JSON envelope comes from its separate JSON-support page. No
-  live subscription was available — verify field names and the `list`
-  wrappers on `tags`/`cwe`/`owasp`/`wasc` before relying on it.
+  dicts, passed through verbatim. Qualys's search samples are XML; the
+  JSON envelope comes from its separate JSON-support page.
 
 - **Qualys Policy Compliance** (`qualys_compliance`, covering Secure
   Configuration) — a subclass of `QualysCollector`, by decision: Policy
@@ -1336,10 +1334,8 @@ why something is built the way it is, not how to configure or call it.
   one at a time with a `(policy index, follow-up URL)` cursor; policy ids come
   from `compliance_policies` (`requires`) unless the `policy_ids` kwarg names
   them. The policy id is injected into each posture record at fetch time, and
-  Qualys's `N/A` date placeholder is mapped to null there too. **Caveat:**
-  built from public docs with no live subscription; the posture `WARNING/URL`
-  shape is assumed from the other v2 list APIs, and exception details aren't
-  collected because the docs give no element names for them.
+  Qualys's `N/A` date placeholder is mapped to null there too. Exception
+  details aren't collected because the docs give no element names for them.
 
 - **Qualys Global AssetView** (`qualys_gav`) — raw `requests` against the
   shared GAV/CSAM asset search API (`POST /rest/2.0/search/am/asset`), no
@@ -1353,10 +1349,7 @@ why something is built the way it is, not how to configure or call it.
   `lastSeenAssetId` raises rather than ending early. `asset_software` and
   `asset_open_ports` are derived from `assets`' nested lists, so `assets`'
   raw records are cached to disk. kwargs: `filters` (CSAM criteria, passed
-  through as the JSON filter body) and `asset_last_updated`. **Caveat:**
-  built from public docs and release notes with no live subscription; the
-  nested software/open-port field names are the least certain part, and
-  whether free GAV (rather than CSAM) is granted this API is unstated.
+  through as the JSON filter body) and `asset_last_updated`.
 
 - **CyberArk Privileged Access Manager** (`cyberark`) — raw `requests`
   against the PAM web services (`{base_url}/PasswordVault/API`), no vendor

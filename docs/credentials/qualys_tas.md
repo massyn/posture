@@ -8,9 +8,8 @@ details, business unit, activation, password policy and API server URL are
 all covered on that page), then add the TotalAppSec access below and set the
 same values under the `QUALYS_TAS_*` environment variables.
 
-**Unverified:** these steps follow Qualys's public documentation and have
-not been checked against a live subscription. Menu labels vary between
-Qualys releases, so verify each step on your own subscription.
+Menu labels vary between Qualys releases, so the exact wording on your
+subscription may differ.
 
 ## What the collector needs
 

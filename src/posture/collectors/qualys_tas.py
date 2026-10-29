@@ -34,13 +34,6 @@ credentials cannot succeed and each attempt counts towards Qualys's
 failed-login lockout.
 
 Resources: ``webapps``, ``findings``.
-
-**Caveat:** built from Qualys's public WAS API documentation, whose search
-samples are XML; the JSON envelope (``ServiceResponse.data[].<Entity>``) comes
-from the separate JSON-support page. No live subscription was available to
-verify this collector. Verify field names/nesting (notably the ``list``
-wrappers on ``tags``/``cwe``/``owasp``/``wasc``) against a real response
-before relying on it.
 """
 
 from __future__ import annotations

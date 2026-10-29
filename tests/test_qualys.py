@@ -373,9 +373,9 @@ def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
 
 
 @responses.activate
-def test_vulnerability_detections_use_v5_endpoint() -> None:
-    # /api/2.0 host detection is Qualys End-of-Service; the 5.0 response adds
-    # only optional elements, so the same paths still parse.
+def test_vulnerability_detections_use_v4_endpoint() -> None:
+    # /api/2.0 host detection is Qualys End-of-Service; Qualys's EOS warning
+    # names /api/4.0 as the replacement.
     body = b"""<?xml version="1.0"?>
 <HOST_LIST_VM_DETECTION_OUTPUT>
   <RESPONSE>
@@ -397,7 +397,7 @@ def test_vulnerability_detections_use_v5_endpoint() -> None:
 </HOST_LIST_VM_DETECTION_OUTPUT>"""
     responses.add(
         responses.GET,
-        BASE_URL + "/api/5.0/fo/asset/host/vm/detection/",
+        BASE_URL + "/api/4.0/fo/asset/host/vm/detection/",
         body=body,
         content_type="text/xml",
     )
