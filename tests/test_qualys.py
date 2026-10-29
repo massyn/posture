@@ -314,12 +314,10 @@ def test_409_registration_error_fails_immediately_without_retrying() -> None:
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
 
-    try:
+    with pytest.raises(IncompleteCollection) as excinfo:
         ccm.collect("hosts")
-        assert False, "expected IncompleteCollection"
-    except IncompleteCollection as exc:
-        assert "2003" in str(exc)
-        assert "Registration must be completed" in str(exc)
+    assert "2003" in str(excinfo.value)
+    assert "Registration must be completed" in str(excinfo.value)
 
     # exactly one request — no rate-limit retry loop for a fatal 409
     assert call_count == 1
@@ -361,12 +359,10 @@ def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
 
-    try:
+    with pytest.raises(IncompleteCollection) as excinfo:
         ccm.collect("hosts")
-        assert False, "expected IncompleteCollection"
-    except IncompleteCollection as exc:
-        assert "1960" in str(exc)
-        assert "currently running instance" in str(exc)
+    assert "1960" in str(excinfo.value)
+    assert "currently running instance" in str(excinfo.value)
 
     # exactly one request — no rate-limit retry loop for a fatal 409
     assert call_count == 1
