@@ -2,40 +2,50 @@
 
 [← back to collector docs](../collectors/qualys_gav.md)
 
-These steps create a dedicated user account with read-only access to Global
-AssetView / CyberSecurity Asset Management (CSAM) for the CCM integration.
-If you have already created the `ccm_readonly` user for the [Qualys VMDR
-collector](qualys.md), you can reuse it: give it the access below and set the
-same username and password under the `QUALYS_GAV_*` environment variables.
+This collector can reuse the API user created for the [Qualys VMDR
+collector](qualys.md). Create and activate the user there first (user
+details, business unit, activation and password policy are all covered on
+that page), then add the Global AssetView access below and set the same
+username and password under the `QUALYS_GAV_*` environment variables.
 
-**Unverified:** these steps follow Qualys's public documentation and have
-not been checked against a live subscription. Menu labels vary between
-Qualys releases — verify each step on your own subscription.
+Menu labels vary between Qualys releases, so the exact wording on your
+subscription may differ.
 
-## Create the user account
+## What the collector needs
 
-If the `ccm_readonly` user doesn't exist yet:
+The collector authenticates against the gateway (`POST /auth`) and calls the
+asset search API (`/rest/2.0/search/am/asset`). Global AssetView / CSAM does
+not use VMDR asset groups: access comes from a **role** that grants API and
+read permissions, and visibility from the user's **tag scope**, both set in
+the **Administration** module rather than the VMDR user wizard.
 
-* Log in to your Qualys subscription as an administrator.
-* Navigate to **Users** > **Users** and select **New** > **User**.
-* Fill in the following fields:
-    * **First name**: `CCM`
-    * **Last name**: `Read Only`
-    * **Email**: enter an appropriate service account email address
-    * **Username**: `ccm_readonly`
-    * **Password**: generate a strong password and store it securely
-* Under **User Role**, select **Reader**.
-* Make sure **API** access is allowed for the user.
+## Create a read-only role
+
+You need a Manager, or a user with the Edit User permission.
+
+* Open the **Administration** module and go to **Role Management**.
+* Select **Create Role** and name it, e.g. `CCM Asset Reader`.
+* Grant only these permissions:
+    * **Access Permissions**: **API Access**.
+    * **CSAM** (or **Global AssetView**) module: **Module Access** and the
+      asset **read/view** permissions.
+    * **Asset Management**: read/view assets. Leave create, edit, delete and
+      tag management unticked.
 * Select **Save**.
 
-## Grant Global AssetView access
+Create a new role rather than adding these permissions to an existing one:
+editing a shared role changes the permissions of every user who has it.
 
-* Edit the `ccm_readonly` user's roles and permissions and give it access to
-  the **Global AssetView** (or **CyberSecurity Asset Management**) module,
-  including its API permission.
-* Give the user's asset scope every asset the collection should cover —
-  typically all assets. A user scoped to a subset produces a snapshot of that
-  subset only, with no error to say so.
+## Assign the role and scope
+
+* In **Administration** > **User Management**, edit the `CCM Read Only`
+  user.
+* **Roles**: add the `CCM Asset Reader` role.
+* **Scope**: give the user every asset the collection should cover,
+  typically **Full Scope** (all assets). If you scope by tags instead, the
+  user sees only assets carrying one of those tags. A user scoped to a
+  subset produces a snapshot of that subset only, with no error to say so.
+* Select **Save**.
 
 Qualys doesn't state whether the free Global AssetView tier includes this
 API or only paid CSAM; if authentication succeeds but the asset search is
@@ -44,17 +54,19 @@ refused, check the subscription's entitlement.
 ## Find the gateway URL
 
 This collector talks to the subscription's **gateway** host, not the
-`qualysapi` host the other Qualys collectors use. It is listed under **Help**
-> **About** in the Qualys portal, and follows the platform's pattern, e.g.
-`https://gateway.qg1.apps.qualys.com` for US Platform 1.
+`qualysapi` host the other Qualys collectors use. **Help** > **About** in
+the portal does not list it, but it follows the platform's pattern, e.g.
+`https://gateway.qg1.apps.qualys.com` for US Platform 1. The [platform
+table](qualys.md#find-the-api-server-url) lists the gateway for every
+platform.
 
 ## Record the credentials
 
-Store the following values securely — these map directly to the collector's
+Store the following values securely. These map directly to the collector's
 required config:
 
 | Value | Config key | Environment variable |
 | --- | --- | --- |
 | Gateway URL (e.g. `https://gateway.qg1.apps.qualys.com`) | `gateway_url` | `QUALYS_GAV_GATEWAY_URL` |
-| Username | `username` | `QUALYS_GAV_USERNAME` |
-| Password | `password` | `QUALYS_GAV_PASSWORD` |
+| Username (generated by Qualys) | `username` | `QUALYS_GAV_USERNAME` |
+| Password (set at first login) | `password` | `QUALYS_GAV_PASSWORD` |

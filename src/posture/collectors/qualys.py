@@ -1,7 +1,7 @@
 """Qualys VMDR collector.
 
-Raw ``requests`` against the Qualys API v2 (``/api/2.0/fo/...``) — no vendor
-SDK; it is generic REST once its two quirks are handled locally:
+Raw ``requests`` against the Qualys VM/PC ``/api/N.0/fo/...`` API family — no
+vendor SDK; it is generic REST once its two quirks are handled locally:
 
 1. **XML, not JSON.** Every v2 endpoint returns XML. ``_xml_to_dict``
    converts each ``<HOST>``/``<VULN>``/``<DETECTION>`` element into a plain
@@ -19,7 +19,11 @@ SDK; it is generic REST once its two quirks are handled locally:
 
 Auth is HTTP Basic (session-lifetime, no token to refresh) plus the
 mandatory ``X-Requested-With`` header Qualys' v2 API rejects requests
-without. A 409 usually signals Qualys' concurrency limit, mapped to the same
+without. A 401 (CODE 2000) or account-level 403 (CODE 2002/2012) is raised
+straight away as ``AuthenticationError`` with Qualys's CODE and TEXT, not
+retried: with no token to refresh, re-sending the same credentials cannot
+succeed and each attempt counts towards Qualys's failed-login lockout.
+A 409 usually signals Qualys' concurrency limit, mapped to the same
 ``RateLimitedSignal`` the base class already retries on (reactive handling)
 — but Qualys also reuses HTTP 409 for permanent, non-throttling account
 errors (e.g. CODE 2003, "registration must be completed before API requests
@@ -53,7 +57,7 @@ import time
 from typing import Any, ClassVar
 from xml.etree import ElementTree
 
-from posture.base import Collector, RateLimitedSignal, UnauthorizedSignal
+from posture.base import Collector, PermissionDeniedSignal, RateLimitedSignal
 from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.qualys")
@@ -66,7 +70,10 @@ _HOST_LIST_ENDPOINT = "/api/5.0/fo/asset/host/"
 # /api/4.0 — same request params and XML response shape, only the path
 # version changed.
 _KB_ENDPOINT = "/api/4.0/fo/knowledge_base/vuln/"
-_HOST_DETECTION_ENDPOINT = "/api/2.0/fo/asset/host/vm/detection/"
+# /api/2.0/fo/asset/host/vm/detection/ carries the same EOS warning, naming
+# /api/4.0 as its replacement — same request params, and every path read here
+# is unchanged.
+_HOST_DETECTION_ENDPOINT = "/api/4.0/fo/asset/host/vm/detection/"
 
 _PAGE_SIZE = 1000
 
@@ -83,6 +90,8 @@ _REQUEST_TIMEOUT_SECONDS = 600
 # concurrency limit. CODE 2003 = "Registration must be completed before API
 # requests will be served for this account" — a setup problem the retry
 # budget cannot resolve, so it's treated as fatal rather than throttling.
+# CODE 2011 = "SecureID authentication is required for this account, so API
+# access is blocked" — likewise permanent.
 # CODE 1960 = "This API cannot be run again until N currently running
 # instance(s) have finished" — a per-API single-concurrent-run limit (not
 # the general concurrency limit the 409 retry path already handles), raised
@@ -90,7 +99,28 @@ _REQUEST_TIMEOUT_SECONDS = 600
 # outside this collector, or a prior run that never terminated). Retrying
 # just burns the rate-limit budget waiting on a run this process doesn't
 # control and has no way to wait for, so it's treated as fatal too.
-_FATAL_409_CODES = {"2003", "1960"}
+_FATAL_409_CODES = {"2003", "2011", "1960"}
+
+# Hints for the account-level CODEs in Qualys's API error table (appendix D):
+# 2000 arrives as HTTP 401, 2002/2012 as 403, the rest as 409. None of them
+# resolves by retrying.
+_ACCOUNT_ERROR_HINTS = {
+    "2000": "check the username (the login Qualys generated, not the display "
+    "name) and password, that API access is ticked under the user's role, and "
+    "that the subscription includes the API (Qualys Community Edition does "
+    "not)",
+    "2002": "the user account is inactive; reactivate it in the Qualys portal",
+    "2003": "check the account's registration/activation status in the Qualys "
+    "portal — this is not a rate limit and will not resolve by retrying",
+    "2011": "SecureID is enabled for this account, which blocks API access; "
+    "use an account without SecureID",
+    "2012": "the subscription's licence does not include this API; ask Qualys "
+    "support or your account manager to enable API access",
+    "1960": "another instance of this API is already running on this Qualys "
+    "account and must finish before this one can — this is not a rate limit "
+    "and will not resolve by retrying",
+}
+_AUTH_403_CODES = {"2002", "2012"}
 
 # Qualys XML wraps repeated children in a "_LIST" element (HOST_LIST/HOST,
 # VULN_LIST/VULN, DETECTION_LIST/DETECTION, CVE_LIST/CVE, TAGS/TAG, and
@@ -305,9 +335,25 @@ class QualysCollector(Collector):
         )
         self._record_rate_limit_headers(response.headers)
 
-        if response.status_code == 401:
+        if response.status_code in (401, 403):
+            error_code, error_text = _parse_simple_return_error(response.content)
             response.close()
-            raise UnauthorizedSignal()
+            message = (
+                f"Qualys rejected the request (HTTP {response.status_code}, "
+                f"CODE {error_code}): {error_text or 'no message'}"
+            )
+            # Basic auth has no session or token to refresh, so re-sending the
+            # same credentials can never succeed, and every rejected attempt
+            # counts towards Qualys's failed-login lockout. Fail on the first.
+            if response.status_code == 401 or error_code in _AUTH_403_CODES:
+                raise AuthenticationError(
+                    message,
+                    source="qualys",
+                    hint=_ACCOUNT_ERROR_HINTS.get(
+                        error_code, _ACCOUNT_ERROR_HINTS["2000"]
+                    ),
+                )
+            raise PermissionDeniedSignal(message)
         if response.status_code == 409:
             error_code, error_text = _parse_simple_return_error(response.content)
             # Headers/body go into the message text itself, not `extra` —
@@ -323,21 +369,11 @@ class QualysCollector(Collector):
                 extra={"source": "qualys"},
             )
             if error_code in _FATAL_409_CODES:
-                hint = (
-                    "another instance of this API is already running on "
-                    "this Qualys account and must finish before this one "
-                    "can — this is not a rate limit and will not resolve "
-                    "by retrying"
-                    if error_code == "1960"
-                    else "check the account's registration/activation status "
-                    "in the Qualys portal — this is not a rate limit and "
-                    "will not resolve by retrying"
-                )
                 raise AuthenticationError(
                     f"Qualys rejected the request (CODE {error_code}): "
                     f"{error_text or 'no message'}",
                     source="qualys",
-                    hint=hint,
+                    hint=_ACCOUNT_ERROR_HINTS[error_code],
                 )
             wait = response.headers.get("X-RateLimit-ToWait-Sec")
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)

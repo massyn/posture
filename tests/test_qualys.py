@@ -1,8 +1,10 @@
 from urllib.parse import parse_qsl, urlparse
 
+import pytest
 import responses
 
 from posture import CCM, IncompleteCollection
+from posture.exceptions import AuthenticationError
 
 BASE_URL = "https://qualysapi.example.com"
 HOSTS_URL = BASE_URL + "/api/5.0/fo/asset/host/"
@@ -67,13 +69,51 @@ def test_hosts_pagination_follows_warning_url_cursor() -> None:
     assert ccm.report("hosts")["pages"] == 2
 
 
+def _simple_return(code: str, text: str) -> bytes:
+    return f"""<?xml version="1.0"?>
+<SIMPLE_RETURN>
+  <RESPONSE>
+    <CODE>{code}</CODE>
+    <TEXT>{text}</TEXT>
+  </RESPONSE>
+</SIMPLE_RETURN>""".encode()
+
+
 @responses.activate
-def test_persistent_401_raises_incomplete_collection_not_a_crash() -> None:
+def test_401_fails_on_first_attempt_with_qualys_code() -> None:
     # Basic auth has no separate login call to validate credentials against —
-    # a bad username/password only surfaces once the first real request 401s,
-    # and base.py retries re-authentication a bounded number of times before
-    # giving up. It must give up cleanly (IncompleteCollection), not raise
-    # the raw HTTPError/UnauthorizedSignal.
+    # a bad username/password only surfaces once the first real request 401s.
+    # Re-sending the same credentials can't succeed and each attempt counts
+    # towards Qualys's failed-login lockout, so there must be exactly one
+    # request, and Qualys's CODE/TEXT must survive into the error.
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=401,
+        body=_simple_return("2000", "Bad Login/Password"),
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "wrong", "base_url": BASE_URL},
+    )
+
+    with pytest.raises(IncompleteCollection) as excinfo:
+        ccm.collect("hosts")
+
+    exc = excinfo.value
+    assert exc.source == "qualys"
+    assert exc.resource == "hosts"
+    assert "CODE 2000" in str(exc)
+    assert "Bad Login/Password" in str(exc)
+    assert isinstance(exc.__cause__, AuthenticationError)
+    assert "Community Edition" in exc.__cause__.hint
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_401_without_body_still_fails_fast() -> None:
     responses.add(responses.GET, HOSTS_URL, status=401)
 
     ccm = CCM(
@@ -81,12 +121,53 @@ def test_persistent_401_raises_incomplete_collection_not_a_crash() -> None:
         {"username": "u", "password": "wrong", "base_url": BASE_URL},
     )
 
-    try:
+    with pytest.raises(IncompleteCollection, match="HTTP 401"):
         ccm.collect("hosts")
-        assert False, "expected IncompleteCollection"
-    except IncompleteCollection as exc:
-        assert exc.source == "qualys"
-        assert exc.resource == "hosts"
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_403_licence_not_authorised_is_an_authentication_error() -> None:
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=403,
+        body=_simple_return("2012", "User license is not authorized to run this API."),
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+
+    with pytest.raises(IncompleteCollection, match="CODE 2012") as excinfo:
+        ccm.collect("hosts")
+    assert isinstance(excinfo.value.__cause__, AuthenticationError)
+    assert "licence" in excinfo.value.__cause__.hint
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_409_secureid_required_is_fatal() -> None:
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=409,
+        body=_simple_return(
+            "2011", "SecureID authentication is required for this account"
+        ),
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+
+    with pytest.raises(IncompleteCollection, match="CODE 2011"):
+        ccm.collect("hosts")
+    assert len(responses.calls) == 1
 
 
 @responses.activate
@@ -233,12 +314,10 @@ def test_409_registration_error_fails_immediately_without_retrying() -> None:
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
 
-    try:
+    with pytest.raises(IncompleteCollection) as excinfo:
         ccm.collect("hosts")
-        assert False, "expected IncompleteCollection"
-    except IncompleteCollection as exc:
-        assert "2003" in str(exc)
-        assert "Registration must be completed" in str(exc)
+    assert "2003" in str(excinfo.value)
+    assert "Registration must be completed" in str(excinfo.value)
 
     # exactly one request — no rate-limit retry loop for a fatal 409
     assert call_count == 1
@@ -280,12 +359,53 @@ def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
 
-    try:
+    with pytest.raises(IncompleteCollection) as excinfo:
         ccm.collect("hosts")
-        assert False, "expected IncompleteCollection"
-    except IncompleteCollection as exc:
-        assert "1960" in str(exc)
-        assert "currently running instance" in str(exc)
+    assert "1960" in str(excinfo.value)
+    assert "currently running instance" in str(excinfo.value)
 
     # exactly one request — no rate-limit retry loop for a fatal 409
     assert call_count == 1
+
+
+@responses.activate
+def test_vulnerability_detections_use_v4_endpoint() -> None:
+    # /api/2.0 host detection is Qualys End-of-Service; Qualys's EOS warning
+    # names /api/4.0 as the replacement.
+    body = b"""<?xml version="1.0"?>
+<HOST_LIST_VM_DETECTION_OUTPUT>
+  <RESPONSE>
+    <HOST_LIST>
+      <HOST>
+        <ID>1</ID><IP>10.0.0.1</IP>
+        <DETECTION_LIST>
+          <DETECTION>
+            <UNIQUE_VULN_ID>9</UNIQUE_VULN_ID><QID>38170</QID>
+            <TYPE>Confirmed</TYPE><SEVERITY>5</SEVERITY>
+            <CVE>CVE-2024-0001</CVE>
+            <MITRE_TACTIC_ID>TA0001</MITRE_TACTIC_ID>
+            <STATUS>Active</STATUS>
+          </DETECTION>
+        </DETECTION_LIST>
+      </HOST>
+    </HOST_LIST>
+  </RESPONSE>
+</HOST_LIST_VM_DETECTION_OUTPUT>"""
+    responses.add(
+        responses.GET,
+        BASE_URL + "/api/4.0/fo/asset/host/vm/detection/",
+        body=body,
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+    df = ccm.collect("vulnerability_detections")
+
+    assert len(df) == 1
+    assert df.iloc[0]["host_id"] == "1"
+    assert df.iloc[0]["qid"] == "38170"
+    assert df.iloc[0]["severity"] == 5
+    assert df.iloc[0]["status"] == "Active"

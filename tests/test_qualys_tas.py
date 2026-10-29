@@ -4,7 +4,7 @@ import pytest
 import responses
 
 from posture import CCM
-from posture.exceptions import IncompleteCollection
+from posture.exceptions import AuthenticationError, IncompleteCollection
 
 _BASE = "https://qualysapi.qualys.com"
 _FINDING_URL = f"{_BASE}/qps/rest/3.0/search/was/finding"
@@ -152,3 +152,44 @@ def test_unknown_kwarg_raises() -> None:
     ccm = CCM("qualys_tas", _CONFIG)
     with pytest.raises(IncompleteCollection, match="Unsupported kwargs"):
         ccm.collect("findings", qql="severity:5")
+
+
+@responses.activate
+def test_401_fails_on_first_attempt() -> None:
+    responses.add(responses.POST, _FINDING_URL, status=401, body="Unauthorized")
+
+    ccm = CCM("qualys_tas", _CONFIG)
+    with pytest.raises(IncompleteCollection, match="HTTP 401") as excinfo:
+        ccm.collect("findings")
+    assert isinstance(excinfo.value.__cause__, AuthenticationError)
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_invalid_credentials_response_code_is_an_authentication_error() -> None:
+    responses.add(
+        responses.POST,
+        _FINDING_URL,
+        json={
+            "ServiceResponse": {
+                "responseCode": "INVALID_CREDENTIALS",
+                "responseErrorDetails": {"errorMessage": "Bad credentials"},
+            }
+        },
+        status=200,
+    )
+
+    ccm = CCM("qualys_tas", _CONFIG)
+    with pytest.raises(IncompleteCollection, match="INVALID_CREDENTIALS") as excinfo:
+        ccm.collect("findings")
+    assert isinstance(excinfo.value.__cause__, AuthenticationError)
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_requests_carry_x_requested_with() -> None:
+    responses.add(responses.POST, _FINDING_URL, json=_service_response("Finding", []))
+
+    CCM("qualys_tas", _CONFIG).collect("findings")
+
+    assert responses.calls[0].request.headers["X-Requested-With"] == "posture"

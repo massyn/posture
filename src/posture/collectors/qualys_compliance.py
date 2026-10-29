@@ -36,11 +36,8 @@ through as Qualys query parameters (e.g. ``status="Failed"``,
 ``criticality_values="4,5"``), same as ``qualys.py``. ``compliance_posture``
 additionally takes ``policy_ids`` — a list of policy ids to restrict the run to.
 
-**Caveat:** built from Qualys's public Policy Compliance API documentation;
-no live subscription was available. The posture ``WARNING/URL`` element is
-assumed to match the other v2 list APIs (the docs describe it but don't show
-it), and exception details are not collected because the docs give no element
-names for them. Verify against a real subscription before relying on it.
+Exception details are not collected: Qualys's docs give no element names for
+them.
 """
 
 from __future__ import annotations

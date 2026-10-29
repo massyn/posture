@@ -27,13 +27,6 @@ kwargs: ``filters`` — a list of CSAM criteria dicts (``{"field": ...,
 "operator": ..., "value": ...}``) sent as the JSON filter body, passed through
 verbatim; ``asset_last_updated`` — an ``assetLastUpdated`` UTC timestamp
 (``yyyy-MM-ddTHH:mmZ``) returning only assets updated since.
-
-**Caveat:** built from Qualys's public CSAM API documentation and release
-notes; no live subscription was available. The asset-level fields come from
-documented samples, but the nested ``softwareListData``/``openPortListData``
-field names are the least certain part, and whether the free GAV tier (rather
-than paid CSAM) is granted this API isn't stated by Qualys. Verify against a
-real subscription before relying on it.
 """
 
 from __future__ import annotations
