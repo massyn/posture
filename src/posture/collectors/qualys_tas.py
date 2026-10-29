@@ -27,6 +27,11 @@ Errors: QPS reports some failures as HTTP 200 with a non-``SUCCESS``
 ``responseCode`` (and ``responseErrorDetails``) rather than an HTTP status,
 so the body is checked on every response. A 409 is Qualys's concurrency
 limit, retried via ``RateLimitedSignal`` honouring ``X-RateLimit-ToWait-Sec``.
+A 401, or an ``INVALID_CREDENTIALS`` responseCode (the check Qualys's own WAS
+Burp extension makes), raises ``AuthenticationError`` straight away rather
+than retrying: Basic auth has no token to refresh, so re-sending the same
+credentials cannot succeed and each attempt counts towards Qualys's
+failed-login lockout.
 
 Resources: ``webapps``, ``findings``.
 
@@ -45,17 +50,20 @@ from typing import Any, ClassVar
 
 import requests
 
-from posture.base import (
-    Collector,
-    PermissionDeniedSignal,
-    RateLimitedSignal,
-    UnauthorizedSignal,
-)
+from posture.base import Collector, PermissionDeniedSignal, RateLimitedSignal
+from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.qualys_tas")
 
 _WEBAPP_SEARCH_PATH = "/qps/rest/3.0/search/was/webapp"
 _FINDING_SEARCH_PATH = "/qps/rest/3.0/search/was/finding"
+
+_AUTH_HINT = (
+    "check QUALYS_TAS_USERNAME (the login Qualys generated, not the display "
+    "name) and QUALYS_TAS_PASSWORD, that API access is allowed for the user, "
+    "and that the subscription includes the API (Qualys Community Edition "
+    "does not)"
+)
 
 # Qualys QPS caps limitResults at 1000 per request.
 _PAGE_SIZE = 1000
@@ -142,6 +150,9 @@ class QualysTasCollector(Collector):
 
     def _authenticate(self) -> None:
         self._session.auth = (self._config["username"], self._config["password"])
+        # Required by Qualys's VM/PC API for Basic auth; the WAS docs don't
+        # list it, but it is harmless there and qualysapi sends it on WAS too.
+        self._session.headers["X-Requested-With"] = "posture"
         self._session.headers["Accept"] = "application/json"
         self._session.headers["Content-Type"] = "application/json"
 
@@ -193,7 +204,12 @@ class QualysTasCollector(Collector):
             ) or response.headers.get("Retry-After")
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)
         if response.status_code == 401:
-            raise UnauthorizedSignal()
+            raise AuthenticationError(
+                f"Qualys TotalAppSec rejected the credentials (HTTP 401) for "
+                f"'{resource}': {response.text[:200]}",
+                source="qualys_tas",
+                hint=_AUTH_HINT,
+            )
         response.raise_for_status()
 
         body = response.json()["ServiceResponse"]
@@ -201,6 +217,8 @@ class QualysTasCollector(Collector):
         if code != "SUCCESS":
             detail = (body.get("responseErrorDetails") or {}).get("errorMessage", "")
             message = f"Qualys TotalAppSec returned {code} for '{resource}': {detail}"
+            if code == "INVALID_CREDENTIALS":
+                raise AuthenticationError(message, source="qualys_tas", hint=_AUTH_HINT)
             if code in ("UNAUTHORIZED", "INSUFFICIENT_PRIVILEGES"):
                 raise PermissionDeniedSignal(message)
             raise requests.HTTPError(message, response=response)

@@ -67,8 +67,9 @@ You need a Manager (or a user with the User Administrator role).
   instead). New asset groups created later are not added automatically.
 * **Permissions**: leave every management permission unticked. The
   collector only reads.
-* **Security**: leave two-factor authentication and **SAML SSO** unticked.
-  The collector uses HTTP Basic authentication, which neither supports. If
+* **Security**: leave two-factor authentication (VIP or SecureID) and
+  **SAML SSO** unticked. The collector uses HTTP Basic authentication, which
+  none of them supports. If
   your subscription enforces SSO for all users, ask your Qualys administrator
   to exempt this account.
 * Select **Save**.
@@ -80,12 +81,8 @@ the user list and in the activation email.
 ## Activate the account
 
 A new account cannot make API calls until it has completed its first login
-and accepted the Qualys EULA. Until then Qualys answers every request with
-HTTP 409 and code `2003` ("Registration must be completed before API
-requests will be served"), which the collector reports as an
-`AuthenticationError`. Code `2000 Bad Login/Password` is a different
-problem: wrong credentials, API access not ticked, or no API on the
-subscription (see above).
+and accepted the Qualys EULA. Until then every request fails with code
+`2003` (see [Troubleshooting](#troubleshooting)).
 
 * Open the **Registration** email sent to the address above and follow the
   link to retrieve the username and initial password. The link works once
@@ -126,6 +123,24 @@ gateway column is for the [Global AssetView collector](qualys_gav.md):
 
 On some platforms the portal host (`qualysguard...`) answers API calls too,
 but use the API server from **Help** > **About** or the table above.
+
+## Troubleshooting
+
+The collector stops on the first account-level error rather than retrying,
+since retrying the same credentials cannot succeed and every failed attempt
+counts towards Qualys's failed-login lockout. The error carries Qualys's own
+code and text, which map to these causes (from Qualys's API error table):
+
+| HTTP | Code | Qualys text | Usual cause |
+| --- | --- | --- | --- |
+| 401 | `2000` | Bad Login/Password | Wrong username or password, **API** not ticked for the user, or no API on the subscription (Community Edition) |
+| 403 | `2002` | User account is inactive | The account has been deactivated |
+| 403 | `2012` | User license is not authorized to run this API | The subscription's licence does not include this API |
+| 409 | `2003` | Registration must be completed before API requests will be served | The account has not completed its first login and EULA |
+| 409 | `2011` | SecureID authentication is required for this account | SecureID is enabled on the account, which blocks the API |
+
+`2000` with a username and password that work in the portal almost always
+means the API is not enabled, for the user or for the subscription.
 
 ## Record the credentials
 

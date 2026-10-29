@@ -1,8 +1,10 @@
 from urllib.parse import parse_qsl, urlparse
 
+import pytest
 import responses
 
 from posture import CCM, IncompleteCollection
+from posture.exceptions import AuthenticationError
 
 BASE_URL = "https://qualysapi.example.com"
 HOSTS_URL = BASE_URL + "/api/5.0/fo/asset/host/"
@@ -67,13 +69,51 @@ def test_hosts_pagination_follows_warning_url_cursor() -> None:
     assert ccm.report("hosts")["pages"] == 2
 
 
+def _simple_return(code: str, text: str) -> bytes:
+    return f"""<?xml version="1.0"?>
+<SIMPLE_RETURN>
+  <RESPONSE>
+    <CODE>{code}</CODE>
+    <TEXT>{text}</TEXT>
+  </RESPONSE>
+</SIMPLE_RETURN>""".encode()
+
+
 @responses.activate
-def test_persistent_401_raises_incomplete_collection_not_a_crash() -> None:
+def test_401_fails_on_first_attempt_with_qualys_code() -> None:
     # Basic auth has no separate login call to validate credentials against —
-    # a bad username/password only surfaces once the first real request 401s,
-    # and base.py retries re-authentication a bounded number of times before
-    # giving up. It must give up cleanly (IncompleteCollection), not raise
-    # the raw HTTPError/UnauthorizedSignal.
+    # a bad username/password only surfaces once the first real request 401s.
+    # Re-sending the same credentials can't succeed and each attempt counts
+    # towards Qualys's failed-login lockout, so there must be exactly one
+    # request, and Qualys's CODE/TEXT must survive into the error.
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=401,
+        body=_simple_return("2000", "Bad Login/Password"),
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "wrong", "base_url": BASE_URL},
+    )
+
+    with pytest.raises(IncompleteCollection) as excinfo:
+        ccm.collect("hosts")
+
+    exc = excinfo.value
+    assert exc.source == "qualys"
+    assert exc.resource == "hosts"
+    assert "CODE 2000" in str(exc)
+    assert "Bad Login/Password" in str(exc)
+    assert isinstance(exc.__cause__, AuthenticationError)
+    assert "Community Edition" in exc.__cause__.hint
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_401_without_body_still_fails_fast() -> None:
     responses.add(responses.GET, HOSTS_URL, status=401)
 
     ccm = CCM(
@@ -81,12 +121,53 @@ def test_persistent_401_raises_incomplete_collection_not_a_crash() -> None:
         {"username": "u", "password": "wrong", "base_url": BASE_URL},
     )
 
-    try:
+    with pytest.raises(IncompleteCollection, match="HTTP 401"):
         ccm.collect("hosts")
-        assert False, "expected IncompleteCollection"
-    except IncompleteCollection as exc:
-        assert exc.source == "qualys"
-        assert exc.resource == "hosts"
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_403_licence_not_authorised_is_an_authentication_error() -> None:
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=403,
+        body=_simple_return("2012", "User license is not authorized to run this API."),
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+
+    with pytest.raises(IncompleteCollection, match="CODE 2012") as excinfo:
+        ccm.collect("hosts")
+    assert isinstance(excinfo.value.__cause__, AuthenticationError)
+    assert "licence" in excinfo.value.__cause__.hint
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_409_secureid_required_is_fatal() -> None:
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=409,
+        body=_simple_return(
+            "2011", "SecureID authentication is required for this account"
+        ),
+        content_type="text/xml",
+    )
+
+    ccm = CCM(
+        "qualys",
+        {"username": "u", "password": "p", "base_url": BASE_URL},
+    )
+
+    with pytest.raises(IncompleteCollection, match="CODE 2011"):
+        ccm.collect("hosts")
+    assert len(responses.calls) == 1
 
 
 @responses.activate
