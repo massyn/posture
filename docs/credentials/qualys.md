@@ -2,29 +2,100 @@
 
 [← back to collector docs](../collectors/qualys.md)
 
-These steps create a dedicated user account with read-only access for the
-CCM integration.
+These steps create a dedicated, read-only API user for the CCM integration.
+The other Qualys collectors ([Policy Compliance](qualys_compliance.md),
+[Global AssetView](qualys_gav.md), [TotalAppSec](qualys_tas.md)) reuse this
+user and add their own module access on top, so start here even if you only
+need one of them.
+
+**Unverified:** these steps follow Qualys's public documentation and have
+not been checked against a live subscription. Menu labels vary between
+Qualys releases, so verify each step on your own subscription.
+
+## What the collector needs
+
+The collector calls three VMDR APIs: host list (`/api/5.0/fo/asset/host/`),
+KnowledgeBase (`/api/4.0/fo/knowledge_base/vuln/`) and host list detection
+(`/api/2.0/fo/asset/host/vm/detection/`). The **Reader** role can call all
+three, but only returns hosts in the asset groups assigned to the user. A
+Reader with no asset groups authenticates fine and returns empty tables,
+with no error to say so. Getting the scope right is the step most often
+missed.
 
 ## Create the user account
 
-* Log in to your Qualys subscription as an administrator.
-* Navigate to **Users** > **Users** and select **New** > **User**.
-* Fill in the following fields:
+You need a Manager (or a user with the User Administrator role).
+
+* Log in to the Qualys portal and open the **Users** (User Management)
+  module, then select **Create User** > **Create Reader User** (older
+  releases: **Users** > **New** > **User**).
+* **General Information**: Qualys requires every one of these, even for a
+  service account:
     * **First name**: `CCM`
     * **Last name**: `Read Only`
-    * **Email**: enter an appropriate service account email address
-    * **Username**: `ccm_readonly`
-    * **Password**: generate a strong password and store it securely
-* Under **User Role**, select **Reader**.
+    * **Title**: e.g. `Service account`
+    * **Phone**
+    * **Email**: a mailbox you control. The activation email goes here, and
+      the account cannot be used until it is activated (below).
+    * **Address 1** and **Country**
+* **Locale**: leave the defaults, or set your time zone.
+* **User Role**:
+    * **User Role**: `Reader`.
+    * **Allow access to**: tick **API**. Tick **GUI** too if you want to
+      complete activation in the browser; you can untick it afterwards.
+    * **Business Unit**: leave as **Unassigned** unless the collection should
+      only cover one business unit. A user inside a business unit can only be
+      given that unit's asset groups, and sees only those hosts.
+* **Asset Groups**: assign every asset group the collection should cover.
+  To cover the whole subscription, assign the **All** asset group (if your
+  subscription does not let you assign it, assign every asset group
+  instead). New asset groups created later are not added automatically.
+* **Permissions**: leave every management permission unticked. The
+  collector only reads.
+* **Security**: leave two-factor authentication and **SAML SSO** unticked.
+  The collector uses HTTP Basic authentication, which neither supports. If
+  your subscription enforces SSO for all users, ask your Qualys administrator
+  to exempt this account.
 * Select **Save**.
+
+Qualys generates the **username** itself (usually a company prefix plus
+letters from the name, e.g. `acme_cr`); you cannot choose it. It is shown in
+the user list and in the activation email.
+
+## Activate the account
+
+A new account cannot make API calls until it has completed its first login
+and accepted the Qualys EULA. Until then every request fails authentication.
+
+* Open the **Registration** email sent to the address above and follow the
+  link to retrieve the username and initial password. The link works once
+  only; if it has expired, use **Forgot password** on the login page.
+* Log in to the portal as the new user, accept the EULA, and set a new strong
+  password when prompted. Store it securely.
+* If you created the user without GUI access, complete the first login with
+  Qualys's `acceptEULA.php` API call instead.
+* Optionally edit the user again and untick **GUI** so the account is API
+  only.
+
+Check your subscription's password policy (**Users** > **Setup** >
+**Security**): if passwords expire, the collector stops authenticating when
+this one does.
+
+## Find the API server URL
+
+The API server depends on the platform your subscription is hosted on, and
+is not the same host as the portal. It is listed under **Help** > **About**
+in the portal (**Qualys API Server**), e.g. `https://qualysapi.qualys.com`
+for US Platform 1 or `https://qualysapi.qg2.apps.qualys.com` for US
+Platform 2.
 
 ## Record the credentials
 
-Store the following values securely — these map directly to the collector's
+Store the following values securely. These map directly to the collector's
 required config:
 
 | Value | Config key | Environment variable |
 | --- | --- | --- |
-| Platform URL (e.g. `https://qualysapi.qualys.com`) | `base_url` | `QUALYS_BASE_URL` |
-| Username | `username` | `QUALYS_USERNAME` |
-| Password | `password` | `QUALYS_PASSWORD` |
+| API server URL (e.g. `https://qualysapi.qualys.com`) | `base_url` | `QUALYS_BASE_URL` |
+| Username (generated by Qualys) | `username` | `QUALYS_USERNAME` |
+| Password (set at first login) | `password` | `QUALYS_PASSWORD` |
