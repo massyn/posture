@@ -12,6 +12,21 @@ need one of them.
 not been checked against a live subscription. Menu labels vary between
 Qualys releases, so verify each step on your own subscription.
 
+## Check the subscription has API access
+
+API access is a subscription feature, not just a user setting. **Qualys
+Community Edition** (the free tier, shown as "Community Edition" next to the
+Qualys logo in the portal) has no API access, and some paid subscriptions
+don't include it either. On a subscription without the API, every API call
+fails with HTTP 401 and code `2000 Bad Login/Password`, even with a username
+and password that log in to the portal fine. No user, role or config change
+fixes it.
+
+Community Edition also has a single user and no **Users** module, so the
+steps below cannot be followed there. If you are unsure whether your
+subscription has the API, ask Qualys support or your account manager before
+creating the user.
+
 ## What the collector needs
 
 The collector calls three VMDR APIs: host list (`/api/5.0/fo/asset/host/`),
@@ -83,11 +98,12 @@ this one does.
 
 ## Find the API server URL
 
-The API server depends on the platform your subscription is hosted on, and
-is not the same host as the portal. It is listed under **Help** > **About**
-in the portal (**Qualys API Server**), e.g. `https://qualysapi.qualys.com`
-for US Platform 1 or `https://qualysapi.qg2.apps.qualys.com` for US
-Platform 2.
+The API server depends on the platform your subscription is hosted on. It
+is listed under **Help** > **About** in the portal (**Qualys API Server**),
+e.g. `https://qualysapi.qualys.com` for US Platform 1 or
+`https://qualysapi.qg2.apps.qualys.com` for US Platform 2. On some platforms
+the portal host (`qualysguard...`) answers API calls too, but use the listed
+API server where there is one.
 
 ## Record the credentials
 
