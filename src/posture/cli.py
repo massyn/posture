@@ -8,6 +8,10 @@ collector and write it to parquet.
     posturecollect --include qualys --debug
     posturecollect --thread 5
     posturecollect --env .env.nonprod
+    posturecollect --catalog --include qualys
+    posturecollect --variables --include qualys
+    posturecollect --schema crowdstrike.hosts
+    posturecollect --dry-run --exclude qualys
 
 By default, every registered source with all of its required environment
 variables set is collected (``catalog(filter="environment")`` — a no-auth
@@ -56,6 +60,13 @@ imported. ``--env PATH`` uses that file instead: every variable the default
 ``.env`` set is removed before ``PATH`` is loaded, so a source configured
 only in ``.env`` isn't silently collected during, say, a non-production run.
 Variables already set in the shell still take precedence over either file.
+
+``--catalog``, ``--variables``, ``--schema`` and ``--dry-run`` print a
+listing and exit without collecting anything (see ``posture._inspect``).
+``--catalog`` and ``--variables`` describe every registered source, narrowed
+by ``--include``/``--exclude``; ``--schema SOURCE.RESOURCE`` lists one
+table's columns and types; ``--dry-run`` lists the ``source.resource`` tables
+a real run would collect with the same environment and flags.
 """
 
 from __future__ import annotations
@@ -76,6 +87,12 @@ from dotenv import load_dotenv
 
 import posture
 from posture import CCM
+from posture._inspect import (
+    catalog_lines,
+    dry_run_lines,
+    schema_lines,
+    variables_lines,
+)
 from posture._selection import select_tables, split_list
 from posture.exceptions import PostureError
 from posture.storage.parquet import arrow_schema
@@ -90,6 +107,7 @@ _ARG_FLAGS = {
     "debug": "--debug",
     "thread": "--thread",
     "env": "--env",
+    "dry_run": "--dry-run",
 }
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -203,6 +221,38 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help=(
             "load environment variables from this file instead of the "
             "default .env (e.g. .env.nonprod)"
+        ),
+    )
+    listing = parser.add_mutually_exclusive_group()
+    listing.add_argument(
+        "--catalog",
+        action="store_true",
+        help=(
+            "list every source and its tables (narrowed by --include/--exclude) "
+            "and whether each source is configured, then exit"
+        ),
+    )
+    listing.add_argument(
+        "--variables",
+        action="store_true",
+        help=(
+            "list the required and optional environment variables of every "
+            "source (narrowed by --include/--exclude) and whether each is set, "
+            "then exit"
+        ),
+    )
+    listing.add_argument(
+        "--schema",
+        default=None,
+        metavar="SOURCE.RESOURCE",
+        help="list the columns and types of this one table, then exit",
+    )
+    listing.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "list the source.table entries this run would collect, without "
+            "collecting anything"
         ),
     )
     return parser.parse_args(argv)
@@ -371,8 +421,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.env is not None:
         _use_env_file(args.env)
     _apply_env_defaults(args)
-    _log_parameters(args, argv)
 
+    if args.schema is not None:
+        print(*schema_lines(args.schema), sep="\n")
+        return 0
+    if args.catalog or args.variables:
+        tables = select_tables(args.include, args.exclude, every_source=True)
+        lines = catalog_lines(tables) if args.catalog else variables_lines(tables)
+        print(*lines, sep="\n")
+        return 0
+
+    _log_parameters(args, argv)
     output_dir = Path(args.output)
     sources = select_tables(args.include, args.exclude)
 
@@ -381,6 +440,10 @@ def main(argv: list[str] | None = None) -> int:
             "No sources to collect — set the required environment "
             "variable(s) for a source, or check --include/--exclude"
         )
+        return 0
+
+    if args.dry_run:
+        print(*dry_run_lines(sources), sep="\n")
         return 0
 
     logger.info(

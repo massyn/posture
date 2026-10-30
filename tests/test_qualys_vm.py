@@ -62,11 +62,11 @@ def test_hosts_pagination_follows_warning_url_cursor() -> None:
         "qualys",
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
-    df = ccm.collect("hosts")
+    df = ccm.collect("vm_hosts")
 
     assert len(df) == 2
     assert set(df["host_id"]) == {"1", "2"}
-    assert ccm.report("hosts")["pages"] == 2
+    assert ccm.report("vm_hosts")["pages"] == 2
 
 
 def _simple_return(code: str, text: str) -> bytes:
@@ -100,11 +100,11 @@ def test_401_fails_on_first_attempt_with_qualys_code() -> None:
     )
 
     with pytest.raises(IncompleteCollection) as excinfo:
-        ccm.collect("hosts")
+        ccm.collect("vm_hosts")
 
     exc = excinfo.value
     assert exc.source == "qualys"
-    assert exc.resource == "hosts"
+    assert exc.resource == "vm_hosts"
     assert "CODE 2000" in str(exc)
     assert "Bad Login/Password" in str(exc)
     assert isinstance(exc.__cause__, AuthenticationError)
@@ -122,7 +122,7 @@ def test_401_without_body_still_fails_fast() -> None:
     )
 
     with pytest.raises(IncompleteCollection, match="HTTP 401"):
-        ccm.collect("hosts")
+        ccm.collect("vm_hosts")
     assert len(responses.calls) == 1
 
 
@@ -142,7 +142,7 @@ def test_403_licence_not_authorised_is_an_authentication_error() -> None:
     )
 
     with pytest.raises(IncompleteCollection, match="CODE 2012") as excinfo:
-        ccm.collect("hosts")
+        ccm.collect("vm_hosts")
     assert isinstance(excinfo.value.__cause__, AuthenticationError)
     assert "licence" in excinfo.value.__cause__.hint
     assert len(responses.calls) == 1
@@ -166,7 +166,7 @@ def test_409_secureid_required_is_fatal() -> None:
     )
 
     with pytest.raises(IncompleteCollection, match="CODE 2011"):
-        ccm.collect("hosts")
+        ccm.collect("vm_hosts")
     assert len(responses.calls) == 1
 
 
@@ -191,18 +191,18 @@ def test_409_concurrency_limit_is_retried_with_wait_header(monkeypatch) -> None:
         "qualys",
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
-    df = ccm.collect("hosts")
+    df = ccm.collect("vm_hosts")
 
     assert len(df) == 1
     assert df.loc[0, "host_id"] == "2"
-    assert ccm.report("hosts")["rate_limited_count"] == 1
+    assert ccm.report("vm_hosts")["rate_limited_count"] == 1
 
 
 @responses.activate
 def test_exhausted_window_paces_next_request_before_firing(monkeypatch) -> None:
     sleep_calls = []
     monkeypatch.setattr(
-        "posture.collectors.qualys.time.sleep", lambda s: sleep_calls.append(s)
+        "posture.collectors.qualys.fo_api.time.sleep", lambda s: sleep_calls.append(s)
     )
 
     call_count = 0
@@ -223,7 +223,7 @@ def test_exhausted_window_paces_next_request_before_firing(monkeypatch) -> None:
         "qualys",
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
-    df = ccm.collect("hosts")
+    df = ccm.collect("vm_hosts")
 
     # first request reports the window exhausted -> the second request (the
     # id_min=2 follow-up page) must be paced before firing, not sent
@@ -233,7 +233,7 @@ def test_exhausted_window_paces_next_request_before_firing(monkeypatch) -> None:
 
 
 @responses.activate
-def test_vulnerabilities_kb_request_omits_truncation_limit() -> None:
+def test_knowledgebase_request_omits_truncation_limit() -> None:
     # KnowledgeBase (/api/4.0/fo/knowledge_base/vuln/) isn't a truncated list
     # API like asset/host/* — sending truncation_limit gets a 400 back.
     kb_url = BASE_URL + "/api/4.0/fo/knowledge_base/vuln/"
@@ -251,14 +251,14 @@ def test_vulnerabilities_kb_request_omits_truncation_limit() -> None:
         "qualys",
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
-    df = ccm.collect("vulnerabilities")
+    df = ccm.collect("vm_knowledgebase")
 
     assert len(df) == 1
     assert df.loc[0, "qid"] == "38170"
 
 
 @responses.activate
-def test_vulnerabilities_kwargs_override_built_in_defaults() -> None:
+def test_knowledgebase_kwargs_override_built_in_defaults() -> None:
     # Operators must be able to narrow a KnowledgeBase pull (e.g. to a QID
     # range or a tighter `details` scope) at their discretion — kwargs win
     # over this collector's own defaults for the same param name.
@@ -278,7 +278,7 @@ def test_vulnerabilities_kwargs_override_built_in_defaults() -> None:
         "qualys",
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
-    ccm.collect("vulnerabilities", details="Basic", ids="38170")
+    ccm.collect("vm_knowledgebase", details="Basic", ids="38170")
 
     assert seen_params["details"] == "Basic"
     assert seen_params["ids"] == "38170"
@@ -315,7 +315,7 @@ def test_409_registration_error_fails_immediately_without_retrying() -> None:
     )
 
     with pytest.raises(IncompleteCollection) as excinfo:
-        ccm.collect("hosts")
+        ccm.collect("vm_hosts")
     assert "2003" in str(excinfo.value)
     assert "Registration must be completed" in str(excinfo.value)
 
@@ -360,7 +360,7 @@ def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
     )
 
     with pytest.raises(IncompleteCollection) as excinfo:
-        ccm.collect("hosts")
+        ccm.collect("vm_hosts")
     assert "1960" in str(excinfo.value)
     assert "currently running instance" in str(excinfo.value)
 
@@ -369,7 +369,7 @@ def test_409_single_instance_limit_fails_immediately_without_retrying() -> None:
 
 
 @responses.activate
-def test_vulnerability_detections_use_v4_endpoint() -> None:
+def test_detections_use_v4_endpoint() -> None:
     # /api/2.0 host detection is Qualys End-of-Service; Qualys's EOS warning
     # names /api/4.0 as the replacement.
     body = b"""<?xml version="1.0"?>
@@ -402,7 +402,7 @@ def test_vulnerability_detections_use_v4_endpoint() -> None:
         "qualys",
         {"username": "u", "password": "p", "base_url": BASE_URL},
     )
-    df = ccm.collect("vulnerability_detections")
+    df = ccm.collect("vm_detections")
 
     assert len(df) == 1
     assert df.iloc[0]["host_id"] == "1"

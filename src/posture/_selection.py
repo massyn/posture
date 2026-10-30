@@ -4,7 +4,9 @@ include/exclude lists.
 Each entry is ``<source>`` (every resource of that source) or
 ``<source>.<resource>`` (just that one). With no include list, the starting
 set is every source with its required environment variables set
-(``catalog(filter="environment")``); an include list replaces that entirely
+(``catalog(filter="environment")``), or every registered source when the
+caller asks for them all (``--catalog``/``--variables``, which describe what
+exists rather than what would run); an include list replaces that entirely
 and bypasses the environment check. The exclude list is then subtracted from
 whichever starting set applies, and a source left with no resources is
 dropped. Any entry naming an unknown source or resource exits rather than
@@ -52,13 +54,20 @@ def _parse_entries(flag: str, entries: list[str], all_sources: dict[str, Any]) -
 
 
 def select_tables(
-    include: list[str] | None, exclude: list[str] | None
+    include: list[str] | None,
+    exclude: list[str] | None,
+    *,
+    every_source: bool = False,
 ) -> dict[str, list[str]]:
-    """Return ``source -> resources`` to collect, per the module docstring."""
+    """Return ``source -> resources`` to collect, per the module docstring.
+    ``every_source`` starts from every registered source instead of the
+    environment-configured ones when there is no include list."""
     all_sources = catalog()
     excluded = _parse_entries("--exclude", exclude or [], all_sources)
     if include is None:
-        included: _Spec = dict.fromkeys(catalog(filter="environment"))
+        included: _Spec = dict.fromkeys(
+            all_sources if every_source else catalog(filter="environment")
+        )
     else:
         included = _parse_entries("--include", include, all_sources)
 

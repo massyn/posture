@@ -109,7 +109,7 @@ store = store_parquet
 # 1. SCOPE — call one of these from the RUNTIME block at the bottom.
 # ---------------------------------------------------------------------------
 def extract_table(source: str, table: str) -> None:
-    """One table from one collector, e.g. extract_table("qualys", "host_detections")."""
+    """One table from one collector, e.g. extract_table("qualys", "vm_detections")."""
     _run(CCM(source), source, table)
 
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     )
     # Usage:  python extract_template.py            -> everything
     #         python extract_template.py crowdstrike        -> one collector
-    #         python extract_template.py qualys.host_detections  -> one table
+    #         python extract_template.py qualys.vm_detections  -> one table
     arg = sys.argv[1] if len(sys.argv) > 1 else "all"
     if arg == "all":
         extract_all()
