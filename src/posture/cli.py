@@ -12,6 +12,7 @@ collector and write it to parquet.
     posturecollect --variables --include qualys
     posturecollect --schema crowdstrike.hosts
     posturecollect --dry-run --exclude qualys
+    posturecollect --version
 
 By default, every registered source with all of its required environment
 variables set is collected (``catalog(filter="environment")`` — a no-auth
@@ -156,6 +157,12 @@ _ENV_DEFAULTS: dict[str, tuple[str, Any, Any]] = {
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="posturecollect", description=__doc__.split("\n\n", 1)[0]
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=posture.__version__,
+        help="show the installed posture version and exit",
     )
     parser.add_argument(
         "--include",

@@ -6,6 +6,7 @@ import pyarrow.parquet as pq
 import pytest
 import responses
 
+import posture
 from posture import cli
 from posture.exceptions import PostureError
 from posture.parse import parse
@@ -486,3 +487,11 @@ def test_dry_run_lists_tables_without_collecting(tmp_path: Path, capsys) -> None
 def test_listing_flags_are_mutually_exclusive() -> None:
     with pytest.raises(SystemExit):
         cli.main(["--catalog", "--dry-run"])
+
+
+def test_version_prints_the_package_version(capsys) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main(["--version"])
+
+    assert excinfo.value.code == 0
+    assert capsys.readouterr().out.strip() == posture.__version__
