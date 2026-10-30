@@ -20,11 +20,15 @@ handled locally:
 
 Auth is HTTP Basic (no token to refresh) plus the mandatory
 ``X-Requested-With`` header, set session-wide by the collector. A 401 (CODE
-2000) or account-level 403 (CODE 2002/2012) is raised straight away as
-``AuthenticationError`` with Qualys's CODE and TEXT, not retried: re-sending
-the same credentials cannot succeed and each attempt counts towards Qualys's
-failed-login lockout. Any other 403 is a ``PermissionDeniedSignal``, failing
-only the table that asked for it (a module the subscription doesn't licence).
+2000) or account-level 403 (CODE 2002/2012) is raised straight away with
+Qualys's CODE and TEXT, not retried: re-sending the same credentials cannot
+succeed and each attempt counts towards Qualys's failed-login lockout. The
+ones that reject the user rather than one API (``_ACCOUNT_REJECTED_CODES``)
+are ``CredentialsRejected``, which stops the collector sending any further
+request this run; 2012 (this API not licensed) is a plain
+``AuthenticationError`` failing only its own table. Any other 403 is a
+``PermissionDeniedSignal``, failing only the table that asked for it (a
+module the subscription doesn't licence).
 
 A 409 usually signals Qualys's concurrency limit, mapped to the
 ``RateLimitedSignal`` the base class retries on — but Qualys also reuses HTTP
@@ -54,6 +58,7 @@ from xml.etree import ElementTree
 import requests
 
 from posture.base import PermissionDeniedSignal, RateLimitedSignal
+from posture.collectors.qualys.errors import CredentialsRejected
 from posture.exceptions import AuthenticationError
 
 logger = logging.getLogger("posture.collectors.qualys")
@@ -104,6 +109,10 @@ _ACCOUNT_ERROR_HINTS = {
     "and will not resolve by retrying",
 }
 _AUTH_403_CODES = {"2002", "2012"}
+# The CODEs that reject the user or account rather than one API (2012 is
+# one API not licensed, 1960 one API busy): no request as this user can
+# succeed, so they raise CredentialsRejected. 2000 always arrives as a 401.
+_ACCOUNT_REJECTED_CODES = {"2002", "2003", "2011"}
 
 # Qualys XML wraps repeated children in a "_LIST" element (HOST_LIST/HOST,
 # VULN_LIST/VULN, DETECTION_LIST/DETECTION, CVE_LIST/CVE, TAGS/TAG,
@@ -214,7 +223,13 @@ class FoApi:
             # same credentials can never succeed, and every rejected attempt
             # counts towards Qualys's failed-login lockout. Fail on the first.
             if response.status_code == 401 or error_code in _AUTH_403_CODES:
-                raise AuthenticationError(
+                error = (
+                    CredentialsRejected
+                    if response.status_code == 401
+                    or error_code in _ACCOUNT_REJECTED_CODES
+                    else AuthenticationError
+                )
+                raise error(
                     message,
                     source="qualys",
                     hint=_ACCOUNT_ERROR_HINTS.get(
@@ -237,7 +252,12 @@ class FoApi:
                 extra={"source": "qualys"},
             )
             if error_code in _FATAL_409_CODES:
-                raise AuthenticationError(
+                error = (
+                    CredentialsRejected
+                    if error_code in _ACCOUNT_REJECTED_CODES
+                    else AuthenticationError
+                )
+                raise error(
                     f"Qualys rejected the request (CODE {error_code}): "
                     f"{error_text or 'no message'}",
                     source="qualys",

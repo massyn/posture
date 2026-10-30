@@ -26,7 +26,7 @@ Errors: QPS reports some failures as HTTP 200 with a non-``SUCCESS``
 so the body is checked on every response. A 409 is Qualys's concurrency
 limit, retried via ``RateLimitedSignal`` honouring ``X-RateLimit-ToWait-Sec``.
 A 401, or an ``INVALID_CREDENTIALS`` responseCode (the check Qualys's own WAS
-Burp extension makes), raises ``AuthenticationError`` straight away rather
+Burp extension makes), raises ``CredentialsRejected`` straight away rather
 than retrying: Basic auth has no token to refresh, so re-sending the same
 credentials cannot succeed and each attempt counts towards Qualys's
 failed-login lockout.
@@ -39,7 +39,7 @@ from typing import Any
 import requests
 
 from posture.base import PermissionDeniedSignal, RateLimitedSignal
-from posture.exceptions import AuthenticationError
+from posture.collectors.qualys.errors import CredentialsRejected
 
 _WEBAPP_SEARCH_PATH = "/qps/rest/3.0/search/was/webapp"
 _FINDING_SEARCH_PATH = "/qps/rest/3.0/search/was/finding"
@@ -173,7 +173,7 @@ class WebappsApi:
             ) or response.headers.get("Retry-After")
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)
         if response.status_code == 401:
-            raise AuthenticationError(
+            raise CredentialsRejected(
                 f"Qualys TotalAppSec rejected the credentials (HTTP 401) for "
                 f"'{resource}': {response.text[:200]}",
                 source="qualys",
@@ -187,7 +187,7 @@ class WebappsApi:
             detail = (body.get("responseErrorDetails") or {}).get("errorMessage", "")
             message = f"Qualys TotalAppSec returned {code} for '{resource}': {detail}"
             if code == "INVALID_CREDENTIALS":
-                raise AuthenticationError(message, source="qualys", hint=_AUTH_HINT)
+                raise CredentialsRejected(message, source="qualys", hint=_AUTH_HINT)
             if code in ("UNAUTHORIZED", "INSUFFICIENT_PRIVILEGES"):
                 raise PermissionDeniedSignal(message)
             raise requests.HTTPError(message, response=response)

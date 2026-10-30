@@ -594,7 +594,13 @@ why something is built the way it is, not how to configure or call it.
 
   Every family authenticates its own requests (Basic auth passed per
   request, the gateway JWT fetched lazily on the first asset request), so a
-  module the subscription doesn't licence fails only its own tables. Column
+  module the subscription doesn't licence fails only its own tables. The
+  exception is a rejection of the user itself (`CredentialsRejected` in
+  `errors.py`: a 401, or an inactive, unregistered or SecureID account):
+  every family logs in as the same user, so after the first one the
+  collector sends no further requests in that run and fails each later
+  table at once. Otherwise one bad password would cost a failed login per
+  table, each counting towards Qualys's lockout. Column
   names are aligned across tables: ids are `str` (`host_id`, `qid`,
   `webapp_id`, `asset_id`, ...), and dates follow one vocabulary
   (`first_found`/`last_found`/`last_tested`/`last_updated`, `created`,

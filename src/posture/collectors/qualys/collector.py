@@ -15,6 +15,13 @@ This class only routes each table to the module that fetches it. Every
 family authenticates its own requests, and the gateway JWT is only fetched
 when an ``assets`` table is collected, so a module the subscription doesn't
 licence fails its own tables and nothing else.
+
+The exception is the user itself being refused (``CredentialsRejected``: bad
+login, inactive or unregistered account). Every family logs in as the same
+user, so after the first such rejection this instance sends no further
+requests and fails each later table straight away: retrying elsewhere cannot
+succeed, and every rejected attempt counts towards Qualys's failed-login
+lockout.
 """
 
 from __future__ import annotations
@@ -23,6 +30,7 @@ from typing import Any, ClassVar
 
 from posture.base import Collector
 from posture.collectors.qualys import assets, compliance, vm, webapps
+from posture.collectors.qualys.errors import CredentialsRejected
 from posture.collectors.qualys.fo_api import FoApi
 
 
@@ -61,6 +69,7 @@ class QualysCollector(Collector):
             assets.AssetsApi(self._session, gateway_url, credentials),
         )
         self._routes = {resource: api for api in apis for resource in api.resources}
+        self._credentials_rejected: CredentialsRejected | None = None
 
     def _authenticate(self) -> None:
         # Each API family authenticates its own requests (see the module
@@ -74,4 +83,17 @@ class QualysCollector(Collector):
         api = self._routes.get(resource)
         if api is None:
             raise ValueError(f"Unsupported resource '{resource}'")
-        return api.fetch_page(resource, kwargs, cursor)
+        rejected = self._credentials_rejected
+        if rejected is not None:
+            raise CredentialsRejected(
+                f"Not sent: Qualys already rejected these credentials in this "
+                f"run, and another attempt would count towards its failed-login "
+                f"lockout ({rejected})",
+                source="qualys",
+                hint=rejected.hint,
+            ) from rejected
+        try:
+            return api.fetch_page(resource, kwargs, cursor)
+        except CredentialsRejected as exc:
+            self._credentials_rejected = exc
+            raise

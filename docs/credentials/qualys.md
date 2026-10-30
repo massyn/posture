@@ -219,8 +219,15 @@ but use the `qualysapi.` host from **Help** > **About** or the table above.
 
 A table fails on the first account-level error rather than retrying,
 since retrying the same credentials cannot succeed and every failed attempt
-counts towards Qualys's failed-login lockout. The error carries Qualys's own
-code and text, which map to these causes (from Qualys's API error table):
+counts towards Qualys's failed-login lockout. When the error rejects the user
+itself (`2000`, `2002`, `2003`, `2011`, or a 401 from the gateway login), the
+collector also sends no further requests in that run: every later Qualys
+table fails at once with "already rejected these credentials" and the
+original error, so one bad password costs one failed login, not one per
+table. `2012` refuses only that API, so the other tables still collect.
+
+The error carries Qualys's own code and text, which map to these causes
+(from Qualys's API error table):
 
 | HTTP | Code | Qualys text | Usual cause |
 | --- | --- | --- | --- |

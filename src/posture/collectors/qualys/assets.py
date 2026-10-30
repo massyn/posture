@@ -18,7 +18,9 @@ Auth: ``POST {gateway_url}/auth`` with the username/password form fields and
 asset request, so a subscription without CSAM never logs in to the gateway
 and the other Qualys tables are unaffected. Tokens last four hours and are
 refreshed ahead of expiry; a 401 mid-run drops the token and raises
-``UnauthorizedSignal``, so the base class's retry fetches a fresh one.
+``UnauthorizedSignal``, so the base class's retry fetches a fresh one. A 401
+from ``/auth`` itself is ``CredentialsRejected`` (the username or password is
+wrong for every Qualys table); a 400 or 403 there fails only these tables.
 
 Pagination: ``pageSize`` (max 300) and ``lastSeenAssetId``; each response
 carries ``hasMore`` (1/0) and the ``lastSeenAssetId`` to resume from, which
@@ -44,6 +46,7 @@ from urllib.parse import urlparse
 import requests
 
 from posture.base import RateLimitedSignal, UnauthorizedSignal
+from posture.collectors.qualys.errors import CredentialsRejected
 from posture.exceptions import AuthenticationError
 
 _AUTH_PATH = "/auth"
@@ -224,7 +227,12 @@ class AssetsApi:
             timeout=60,
         )
         if response.status_code in (400, 401, 403):
-            raise AuthenticationError(
+            error = (
+                CredentialsRejected
+                if response.status_code == 401
+                else AuthenticationError
+            )
+            raise error(
                 f"Qualys gateway authentication failed (HTTP {response.status_code})",
                 source="qualys",
                 hint="check QUALYS_USERNAME/QUALYS_PASSWORD, that the user has "

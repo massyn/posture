@@ -3,12 +3,14 @@ import responses
 
 from posture import CCM
 from posture.collectors.qualys.assets import gateway_url_for
-from posture.exceptions import IncompleteCollection
+from posture.collectors.qualys.errors import CredentialsRejected
+from posture.exceptions import AuthenticationError, IncompleteCollection
 
 BASE_URL = "https://qualysapi.qg2.apps.qualys.com"
 CONFIG = {"username": "u", "password": "p", "base_url": BASE_URL}
 HOSTS_URL = BASE_URL + "/api/5.0/fo/asset/host/"
 FINDING_URL = BASE_URL + "/qps/rest/3.0/search/was/finding"
+WEBAPP_URL = BASE_URL + "/qps/rest/3.0/search/was/webapp"
 
 HOSTS_XML = b"""<?xml version="1.0"?>
 <HOST_LIST_OUTPUT>
@@ -88,3 +90,73 @@ def test_unlicensed_module_fails_its_table_and_not_the_others() -> None:
 
     assert list(hosts["host_id"]) == ["1"]
     assert all("gateway" not in call.request.url for call in responses.calls)
+
+
+def _simple_return(code: str, text: str) -> bytes:
+    return (
+        f"<SIMPLE_RETURN><RESPONSE><CODE>{code}</CODE><TEXT>{text}</TEXT>"
+        f"</RESPONSE></SIMPLE_RETURN>"
+    ).encode()
+
+
+@responses.activate
+def test_rejected_credentials_stop_every_later_request() -> None:
+    # One bad login, then nothing: every further attempt would count towards
+    # Qualys's failed-login lockout, whichever API family it went to.
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        body=_simple_return("2000", "Bad Login/Password"),
+        status=401,
+    )
+
+    ccm = CCM("qualys", CONFIG)
+    with pytest.raises(IncompleteCollection, match="Bad Login") as first:
+        ccm.collect("vm_hosts")
+    assert isinstance(first.value.__cause__, CredentialsRejected)
+
+    for table in ("webapps_findings", "assets", "compliance_policies", "vm_hosts"):
+        with pytest.raises(IncompleteCollection, match="already rejected") as later:
+            ccm.collect(table)
+        assert isinstance(later.value.__cause__, CredentialsRejected)
+        assert "Bad Login" in str(later.value)
+    assert len(responses.calls) == 1
+
+
+@responses.activate
+def test_rejected_gateway_login_stops_the_other_families() -> None:
+    gateway = "https://gateway.qg2.apps.qualys.com"
+    responses.add(responses.POST, gateway + "/auth", status=401)
+
+    ccm = CCM("qualys", CONFIG)
+    with pytest.raises(IncompleteCollection):
+        ccm.collect("assets")
+    with pytest.raises(IncompleteCollection, match="already rejected"):
+        ccm.collect("vm_hosts")
+
+    assert [call.request.url for call in responses.calls] == [gateway + "/auth"]
+
+
+@responses.activate
+def test_api_not_licensed_does_not_stop_the_other_tables() -> None:
+    # CODE 2012 refuses one API, not the user: the guard stays off.
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        body=_simple_return("2012", "User license is not authorized"),
+        status=403,
+    )
+    responses.add(
+        responses.POST,
+        WEBAPP_URL,
+        json={"ServiceResponse": {"responseCode": "SUCCESS", "data": []}},
+    )
+
+    ccm = CCM("qualys", CONFIG)
+    with pytest.raises(IncompleteCollection, match="CODE 2012") as excinfo:
+        ccm.collect("vm_hosts")
+    cause = excinfo.value.__cause__
+    assert isinstance(cause, AuthenticationError)
+    assert not isinstance(cause, CredentialsRejected)
+
+    assert ccm.collect("webapps").empty
