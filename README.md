@@ -356,6 +356,7 @@ posturecollect --catalog --include qualys        # just these sources/tables (--
 posturecollect --variables --include qualys      # required and optional env vars per source, and whether each is set
 posturecollect --schema crowdstrike.hosts        # the columns and types of one table
 posturecollect --dry-run                         # the source.table entries this run would collect, without collecting
+posturecollect --version                         # the installed posture version
 ```
 
 `--catalog` and `--variables` cover every registered source, configured or
