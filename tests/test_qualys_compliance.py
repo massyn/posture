@@ -71,7 +71,7 @@ def _params(request) -> dict:
 def test_policies_and_derived_controls() -> None:
     responses.add(responses.GET, POLICY_URL, body=POLICY_XML, content_type="text/xml")
 
-    ccm = CCM("qualys_compliance", CONFIG)
+    ccm = CCM("qualys", CONFIG)
     policies = ccm.collect("compliance_policies")
     controls = ccm.collect("compliance_policy_controls")
 
@@ -103,13 +103,13 @@ def test_posture_walks_every_policy_and_follows_warning_urls() -> None:
         responses.GET, POSTURE_URL, callback=posture, content_type="text/xml"
     )
 
-    df = CCM("qualys_compliance", CONFIG).collect("compliance_posture")
+    df = CCM("qualys", CONFIG).collect("compliance_posture")
 
     assert list(df["posture_id"]) == ["1", "2", "3"]
     assert list(df["policy_id"]) == ["100", "100", "200"]
     assert df.loc[0, "status"] == "Failed"
-    assert df.loc[0, "first_fail_date"].isoformat() == "2026-09-01T10:00:00+00:00"
-    assert df["first_pass_date"].isna().all()
+    assert df.loc[0, "first_failed"].isoformat() == "2026-09-01T10:00:00+00:00"
+    assert df["first_passed"].isna().all()
 
 
 @responses.activate
@@ -124,7 +124,7 @@ def test_policy_ids_kwarg_skips_policy_list_and_passes_filters() -> None:
         responses.GET, POSTURE_URL, callback=posture, content_type="text/xml"
     )
 
-    df = CCM("qualys_compliance", CONFIG).collect(
+    df = CCM("qualys", CONFIG).collect(
         "compliance_posture", policy_ids=[200], status="Failed"
     )
 

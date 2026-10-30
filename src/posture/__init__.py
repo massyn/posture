@@ -42,7 +42,7 @@ _DOTENV_KEYS = frozenset(dotenv_values(_dotenv_path)) - frozenset(os.environ)
 load_dotenv(_dotenv_path)
 logger.debug("loaded .env via python-dotenv")
 
-__version__ = "1.13.0"
+__version__ = "1.14.0"
 
 __all__ = [
     "CCM",
@@ -107,9 +107,6 @@ def _register_sources() -> None:
     from posture.collectors.precise import PreciseCollector
     from posture.collectors.proofpoint_sat import ProofpointSatCollector
     from posture.collectors.qualys import QualysCollector
-    from posture.collectors.qualys_compliance import QualysComplianceCollector
-    from posture.collectors.qualys_gav import QualysGavCollector
-    from posture.collectors.qualys_tas import QualysTasCollector
     from posture.collectors.rapid7_insightvm import Rapid7InsightVMCollector
     from posture.collectors.recorded_future import RecordedFutureCollector
     from posture.collectors.runzero import RunzeroCollector
@@ -169,9 +166,6 @@ def _register_sources() -> None:
     _SOURCES["precise"] = PreciseCollector
     _SOURCES["proofpoint_sat"] = ProofpointSatCollector
     _SOURCES["qualys"] = QualysCollector
-    _SOURCES["qualys_compliance"] = QualysComplianceCollector
-    _SOURCES["qualys_gav"] = QualysGavCollector
-    _SOURCES["qualys_tas"] = QualysTasCollector
     _SOURCES["rapid7_insightvm"] = Rapid7InsightVMCollector
     _SOURCES["recorded_future"] = RecordedFutureCollector
     _SOURCES["runzero"] = RunzeroCollector

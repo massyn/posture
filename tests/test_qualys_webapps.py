@@ -66,16 +66,16 @@ def test_findings_paginate_on_last_id() -> None:
         status=200,
     )
 
-    ccm = CCM("qualys_tas", _CONFIG)
-    df = ccm.collect("findings")
+    ccm = CCM("qualys", _CONFIG)
+    df = ccm.collect("webapps_findings")
 
-    assert list(df["id"]) == [11, 12]
-    assert df.loc[0, "cvss_v3_base"] == 6.1
+    assert list(df["finding_id"]) == ["11", "12"]
+    assert df.loc[0, "cvss3_base"] == 6.1
     assert df.loc[0, "cwe"] == "[79]"
     assert df.loc[0, "webapp_name"] == "Shop"
     assert bool(df.loc[0, "potential"]) is False
-    assert df.loc[0, "first_detected_date"].isoformat() == "2026-09-01T10:00:00+00:00"
-    assert ccm.report("findings")["pages"] == 2
+    assert df.loc[0, "first_found"].isoformat() == "2026-09-01T10:00:00+00:00"
+    assert ccm.report("webapps_findings")["pages"] == 2
 
     first, second = (_request(call) for call in responses.calls)
     assert first["preferences"] == {"limitResults": 1000, "verbose": False}
@@ -103,9 +103,9 @@ def test_filters_kwarg_is_sent_with_the_cursor() -> None:
         responses.POST, _WEBAPP_URL, json=_service_response("WebApp", []), status=200
     )
 
-    df = CCM("qualys_tas", _CONFIG).collect("webapps", filters=[criteria])
+    df = CCM("qualys", _CONFIG).collect("webapps", filters=[criteria])
 
-    assert list(df["id"]) == [7]
+    assert list(df["webapp_id"]) == ["7"]
     first, second = (_request(call) for call in responses.calls)
     assert first["preferences"]["verbose"] is True
     assert first["filters"]["Criteria"] == [criteria]
@@ -129,9 +129,9 @@ def test_non_success_response_code_raises() -> None:
         status=200,
     )
 
-    ccm = CCM("qualys_tas", _CONFIG)
+    ccm = CCM("qualys", _CONFIG)
     with pytest.raises(IncompleteCollection, match="bad criteria"):
-        ccm.collect("findings")
+        ccm.collect("webapps_findings")
 
 
 @responses.activate
@@ -143,24 +143,24 @@ def test_more_records_without_last_id_raises() -> None:
         status=200,
     )
 
-    ccm = CCM("qualys_tas", _CONFIG)
+    ccm = CCM("qualys", _CONFIG)
     with pytest.raises(IncompleteCollection, match="no lastId"):
-        ccm.collect("findings")
+        ccm.collect("webapps_findings")
 
 
 def test_unknown_kwarg_raises() -> None:
-    ccm = CCM("qualys_tas", _CONFIG)
+    ccm = CCM("qualys", _CONFIG)
     with pytest.raises(IncompleteCollection, match="Unsupported kwargs"):
-        ccm.collect("findings", qql="severity:5")
+        ccm.collect("webapps_findings", qql="severity:5")
 
 
 @responses.activate
 def test_401_fails_on_first_attempt() -> None:
     responses.add(responses.POST, _FINDING_URL, status=401, body="Unauthorized")
 
-    ccm = CCM("qualys_tas", _CONFIG)
+    ccm = CCM("qualys", _CONFIG)
     with pytest.raises(IncompleteCollection, match="HTTP 401") as excinfo:
-        ccm.collect("findings")
+        ccm.collect("webapps_findings")
     assert isinstance(excinfo.value.__cause__, AuthenticationError)
     assert len(responses.calls) == 1
 
@@ -179,9 +179,9 @@ def test_invalid_credentials_response_code_is_an_authentication_error() -> None:
         status=200,
     )
 
-    ccm = CCM("qualys_tas", _CONFIG)
+    ccm = CCM("qualys", _CONFIG)
     with pytest.raises(IncompleteCollection, match="INVALID_CREDENTIALS") as excinfo:
-        ccm.collect("findings")
+        ccm.collect("webapps_findings")
     assert isinstance(excinfo.value.__cause__, AuthenticationError)
     assert len(responses.calls) == 1
 
@@ -190,6 +190,6 @@ def test_invalid_credentials_response_code_is_an_authentication_error() -> None:
 def test_requests_carry_x_requested_with() -> None:
     responses.add(responses.POST, _FINDING_URL, json=_service_response("Finding", []))
 
-    CCM("qualys_tas", _CONFIG).collect("findings")
+    CCM("qualys", _CONFIG).collect("webapps_findings")
 
     assert responses.calls[0].request.headers["X-Requested-With"] == "posture"

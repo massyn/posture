@@ -3,10 +3,11 @@
 [← back to collector docs](../collectors/qualys.md)
 
 These steps create a dedicated, read-only API user for the CCM integration.
-The other Qualys collectors ([Policy Compliance](qualys_compliance.md),
-[Global AssetView](qualys_gav.md), [TotalAppSec](qualys_tas.md)) reuse this
-user and add their own module access on top, so start here even if you only
-need one of them.
+One user and one set of `QUALYS_*` credentials cover every Qualys table:
+VMDR, Policy Compliance, TotalAppSec and Global AssetView / CSAM. Create the
+user, then grant access to each module you want collected. A table whose
+module the user (or the subscription) has no access to fails on its own; the
+other tables still collect.
 
 Menu labels vary between Qualys releases, so the exact wording on your
 subscription may differ.
@@ -28,13 +29,17 @@ creating the user.
 
 ## What the collector needs
 
-The collector calls three VMDR APIs: host list (`/api/5.0/fo/asset/host/`),
-KnowledgeBase (`/api/4.0/fo/knowledge_base/vuln/`) and host list detection
-(`/api/4.0/fo/asset/host/vm/detection/`). The **Reader** role can call all
-three, but only returns hosts in the asset groups assigned to the user. A
-Reader with no asset groups authenticates fine and returns empty tables,
-with no error to say so. Getting the scope right is the step most often
-missed.
+| Tables | Module | API | Access comes from |
+| --- | --- | --- | --- |
+| `vm_hosts`, `vm_knowledgebase`, `vm_detections` | VMDR | `/api/{4,5}.0/fo/...` on the API server | Reader role and asset groups ([below](#create-the-user-account)) |
+| `compliance_policies`, `compliance_policy_controls`, `compliance_posture` | Policy Compliance | `/api/{2,4}.0/fo/compliance/...` on the API server | Reader role and asset groups ([below](#policy-compliance)) |
+| `webapps`, `webapps_findings` | TotalAppSec (WAS) | `/qps/rest/3.0/search/was/...` on the API server | Role and tag scope ([below](#totalappsec)) |
+| `assets`, `assets_software`, `assets_open_ports` | Global AssetView / CSAM | `/rest/2.0/search/am/asset` on the gateway | Role and tag scope ([below](#global-assetview--csam)) |
+
+The **Reader** role can call every VMDR API, but only returns hosts in the
+asset groups assigned to the user. A Reader with no asset groups
+authenticates fine and returns empty tables, with no error to say so.
+Getting the scope right is the step most often missed.
 
 ## Create the user account
 
@@ -97,6 +102,85 @@ Check your subscription's password policy (**Users** > **Setup** >
 **Security**): if passwords expire, the collector stops authenticating when
 this one does.
 
+## Grant module access
+
+Each section below is only needed for the tables you want collected.
+
+### Policy Compliance
+
+* **Subscription**: posture info requires Policy Compliance (or SCA) with
+  the API add-on. Without it, the compliance tables fail and the others are
+  unaffected.
+* In the **Users** module, edit the `CCM Read Only` user.
+* **User Role**: keep `Reader` with **API** ticked. Make sure the user has
+  access to the **Policy Compliance** module (on subscriptions with both VM
+  and PC, the user role page lists the modules the user can use).
+* **Asset Groups**: make sure the assigned asset groups include every host
+  your compliance policies evaluate. PC hosts are often in separate asset
+  groups from VM hosts, so a user set up only for VMDR can miss them. Every
+  compliance policy is listed regardless of scope, but posture rows are only
+  returned for hosts in the user's asset groups.
+* **Permissions**: some releases hide compliance hosts from Readers unless
+  **Manage compliance** is ticked. If policies are listed but posture is
+  empty for hosts you know are in scope, tick it.
+* Select **Save**.
+
+### TotalAppSec
+
+TotalAppSec (Web Application Scanning) does not use VMDR asset groups:
+access comes from a **role** with the **API Access** permission, and
+visibility from the user's **tag scope**. A web application is only visible
+when one of its tags matches one of the user's scope tags.
+Subscription-level OAuth clients cannot be used: Qualys does not accept them
+on any Web Application Scanning endpoint.
+
+You need a Manager, or a user with the Edit User permission.
+
+* Open the **Administration** module and go to **Role Management**.
+* Check whether the built-in **WAS Reader** role (or **TAS Reader**,
+  depending on release) includes **API Access** under **Access
+  Permissions**. If it does, use it. If not, select **Create Role**, name it
+  e.g. `CCM WAS Reader`, and grant:
+    * **Access Permissions**: **API Access** and **WAS** (TotalAppSec)
+      module access.
+    * **Web Application Permissions**: view only. Leave create, edit,
+      delete, scan and purge unticked.
+* Select **Save**.
+* In **Administration** > **User Management**, edit the `CCM Read Only`
+  user, add the WAS reader role, and under **Scope** give the user every web
+  application the collection should cover, typically **Full Scope**. If you
+  scope by tags instead, an application with none of those tags is
+  invisible to the collector, with no error to say so.
+* Select **Save**.
+
+Create a new role rather than adding **API Access** to the built-in one if
+other users have it: editing a shared role changes the permissions of every
+user who has it.
+
+### Global AssetView / CSAM
+
+The asset tables authenticate against the subscription's gateway
+(`POST /auth`) and call the asset search API. Global AssetView / CSAM does
+not use VMDR asset groups: access comes from a **role** that grants API and
+read permissions, and visibility from the user's **tag scope**.
+
+* Open the **Administration** module and go to **Role Management**.
+* Select **Create Role** and name it, e.g. `CCM Asset Reader`. Grant only:
+    * **Access Permissions**: **API Access**.
+    * **CSAM** (or **Global AssetView**) module: **Module Access** and the
+      asset **read/view** permissions.
+    * **Asset Management**: read/view assets. Leave create, edit, delete and
+      tag management unticked.
+* Select **Save**.
+* In **Administration** > **User Management**, edit the `CCM Read Only`
+  user, add the `CCM Asset Reader` role, and under **Scope** give the user
+  every asset the collection should cover, typically **Full Scope**.
+* Select **Save**.
+
+Qualys doesn't state whether the free Global AssetView tier includes this
+API or only paid CSAM; if authentication succeeds but the asset search is
+refused, check the subscription's entitlement.
+
 ## Find the API server URL
 
 The API server depends on the platform your subscription is hosted on. To
@@ -105,8 +189,12 @@ Scanner Appliances** > **Security Operations Center (SOC)**: the host
 starting `qualysapi.` is the API server (e.g.
 `qualysapi.qg1.apps.qualys.com.au:443`; drop the `:443`). The page has no
 separate "API server" label, and does not list the gateway. You can also
-match the portal address you log in to against this table; the gateway
-column is for the [Global AssetView collector](qualys_gav.md):
+match the portal address you log in to against this table.
+
+The asset tables use the gateway. It is derived from the API server for
+every platform below, so you only need to set it (`QUALYS_GATEWAY_URL`) if
+your subscription is on a private cloud platform whose API server doesn't
+start `qualysapi.`:
 
 | Platform | API server (`base_url`) | Gateway (`gateway_url`) |
 | --- | --- | --- |
@@ -129,7 +217,7 @@ but use the `qualysapi.` host from **Help** > **About** or the table above.
 
 ## Troubleshooting
 
-The collector stops on the first account-level error rather than retrying,
+A table fails on the first account-level error rather than retrying,
 since retrying the same credentials cannot succeed and every failed attempt
 counts towards Qualys's failed-login lockout. The error carries Qualys's own
 code and text, which map to these causes (from Qualys's API error table):
@@ -148,10 +236,11 @@ means the API is not enabled, for the user or for the subscription.
 ## Record the credentials
 
 Store the following values securely. These map directly to the collector's
-required config:
+config:
 
 | Value | Config key | Environment variable |
 | --- | --- | --- |
 | API server URL (e.g. `https://qualysapi.qualys.com`) | `base_url` | `QUALYS_BASE_URL` |
 | Username (generated by Qualys) | `username` | `QUALYS_USERNAME` |
 | Password (set at first login) | `password` | `QUALYS_PASSWORD` |
+| Gateway URL, only if it can't be derived (see above) | `gateway_url` | `QUALYS_GATEWAY_URL` |

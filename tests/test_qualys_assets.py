@@ -11,10 +11,11 @@ from posture.exceptions import AuthenticationError, IncompleteCollection
 GATEWAY = "https://gateway.qg1.apps.qualys.com"
 AUTH_URL = GATEWAY + "/auth"
 SEARCH_URL = GATEWAY + "/rest/2.0/search/am/asset"
+# The gateway is derived from base_url; no gateway_url needed.
 CONFIG = {
     "username": "u",
     "password": "p",
-    "gateway_url": "gateway.qg1.apps.qualys.com",
+    "base_url": "qualysapi.qg1.apps.qualys.com",
 }
 
 ASSET = {
@@ -69,10 +70,10 @@ def test_assets_paginate_and_explode_software_and_ports() -> None:
         status=200,
     )
 
-    ccm = CCM("qualys_gav", CONFIG)
+    ccm = CCM("qualys", CONFIG)
     assets = ccm.collect("assets")
-    software = ccm.collect("asset_software")
-    ports = ccm.collect("asset_open_ports")
+    software = ccm.collect("assets_software")
+    ports = ccm.collect("assets_open_ports")
 
     assert list(assets["asset_id"]) == ["2001", "2002"]
     assert assets.loc[0, "host_id"] == "3077710"
@@ -100,7 +101,7 @@ def test_filters_and_asset_last_updated_kwargs() -> None:
     responses.add(responses.POST, SEARCH_URL, json=_page([], has_more=0), status=200)
     criteria = [{"field": "asset.name", "operator": "EQUALS", "value": "web-01"}]
 
-    df = CCM("qualys_gav", CONFIG).collect(
+    df = CCM("qualys", CONFIG).collect(
         "assets", filters=criteria, asset_last_updated="2026-10-01T00:00Z"
     )
 
@@ -111,14 +112,14 @@ def test_filters_and_asset_last_updated_kwargs() -> None:
 
 
 @responses.activate
-def test_token_expiry_is_tracked_for_proactive_refresh() -> None:
+def test_token_expiry_is_tracked_for_refresh() -> None:
     responses.add(responses.POST, AUTH_URL, body="jwt-token", status=201)
     responses.add(responses.POST, SEARCH_URL, json=_page([], has_more=0), status=200)
 
-    ccm = CCM("qualys_gav", CONFIG)
+    ccm = CCM("qualys", CONFIG)
     ccm.collect("assets")
 
-    remaining = ccm._token_expires_at - datetime.now(timezone.utc)
+    remaining = ccm._routes["assets"].token_expires_at - datetime.now(timezone.utc)
     assert 3.9 * 3600 < remaining.total_seconds() <= 4 * 3600
 
 
@@ -126,9 +127,11 @@ def test_token_expiry_is_tracked_for_proactive_refresh() -> None:
 def test_bad_credentials_raise_authentication_error() -> None:
     responses.add(responses.POST, AUTH_URL, status=401)
 
-    ccm = CCM("qualys_gav", CONFIG)
-    with pytest.raises(AuthenticationError):
+    ccm = CCM("qualys", CONFIG)
+    with pytest.raises(IncompleteCollection) as excinfo:
         ccm.collect("assets")
+    assert isinstance(excinfo.value.__cause__, AuthenticationError)
+    assert len(responses.calls) == 1
 
 
 @responses.activate
@@ -138,6 +141,6 @@ def test_more_assets_without_cursor_raises() -> None:
         responses.POST, SEARCH_URL, json=_page([ASSET], has_more=1), status=200
     )
 
-    ccm = CCM("qualys_gav", CONFIG)
+    ccm = CCM("qualys", CONFIG)
     with pytest.raises(IncompleteCollection, match="lastSeenAssetId"):
         ccm.collect("assets")

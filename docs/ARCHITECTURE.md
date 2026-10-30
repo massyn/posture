@@ -560,7 +560,7 @@ why something is built the way it is, not how to configure or call it.
   (`viewableIPs[].ipList`) from a separate per-asset-id endpoint, not a
   nested list of objects on the asset list response — expanding that blob
   into one row per IP happens in `_fetch_page` as a fetch-time transform of
-  raw text, the same shape as `qualys.py` converting XML into dicts before
+  raw text, the same shape as `qualys/fo_api.py` converting XML into dicts before
   parse.py ever sees the data.
   **Caveat:** `MANIFEST` column paths in `tenablesc.py` were built from the
   reference extraction script and Tenable.sc's public API reference, not a
@@ -568,16 +568,37 @@ why something is built the way it is, not how to configure or call it.
   `wiz.py`, `appomni.py`, `snyk.py`, `cloudflare.py`, `dnsimple.py`,
   `phriendly_phishing.py`, and `vanta.py`. Verify field names/nesting
   against a real instance's response before relying on this collector.
-- **Qualys** — raw `requests` against API v2 (mostly; the KnowledgeBase endpoint
-  moved to v4 — see `qualys.py`'s module docstring for the EOS history), which
-  returns XML rather than JSON. The collector converts each response into plain
-  dicts at fetch time, so `parse.py` never has to know XML exists. Pagination
-  follows the full next-page URL Qualys returns in a truncated response rather than
-  a token. `vulnerability_detections` is derived from the per-host detection list
-  (fetched internally as `host_detections`) — one row per (host, QID), mirroring
-  the `vulnerabilities` / `vulnerability_remediations` shape in `crowdstrike`.
-  `vulnerabilities` here is Qualys' KnowledgeBase (the QID catalogue — severity,
-  CVSS, CVE), not a per-host finding.
+- **Qualys** (`qualys`) — one source for the whole subscription: one set of
+  `QUALYS_*` credentials, a table per dataset across VMDR, Policy Compliance,
+  TotalAppSec and Global AssetView / CSAM. By decision (1.14.0, replacing the
+  separate `qualys_compliance`, `qualys_tas` and `qualys_gav` sources):
+  Qualys's modules sit on three API families, but that is an implementation
+  detail, not something a user should have to configure three times. The
+  `collectors/qualys/` package has one module per family plus one per
+  module's tables, and `collector.py` only routes each table to its module:
+  - `fo_api.py`: the `/api/N.0/fo/` XML API on the API server (`base_url`),
+    Basic auth, shared by `vm.py` and `compliance.py`. Responses are
+    converted into plain dicts at fetch time (streamed with `iterparse`), so
+    `parse.py` never has to know XML exists, and pagination follows the full
+    next-page URL Qualys returns in a truncated response rather than a token.
+    Fatal 409 codes and 401/403 account errors fail at once rather than
+    retrying into Qualys's failed-login lockout; the per-window call budget
+    is paced proactively from `X-RateLimit-*` headers.
+  - `vm.py`: `vm_hosts`, `vm_knowledgebase` (the QID catalogue: severity,
+    CVSS, CVE; not a per-host finding) and `vm_detections`, one row per
+    (host, QID), derived from the per-host detection list (fetched internally
+    as `host_detections`).
+  - `compliance.py`, `webapps.py`, `assets.py`: see their entries under
+    "Qualys Policy Compliance tables", "Qualys TotalAppSec tables" and
+    "Qualys Global AssetView / CSAM tables" below.
+
+  Every family authenticates its own requests (Basic auth passed per
+  request, the gateway JWT fetched lazily on the first asset request), so a
+  module the subscription doesn't licence fails only its own tables. Column
+  names are aligned across tables: ids are `str` (`host_id`, `qid`,
+  `webapp_id`, `asset_id`, ...), and dates follow one vocabulary
+  (`first_found`/`last_found`/`last_tested`/`last_updated`, `created`,
+  `last_modified`).
 - **Wiz** — raw `requests` against Wiz's single GraphQL endpoint (`.../graphql`,
   tenant/region-specific — no cross-tenant discovery mechanism exists, unlike
   Crowdstrike's `X-Cs-Region` header, so `api_endpoint` is required config).
@@ -851,7 +872,7 @@ why something is built the way it is, not how to configure or call it.
   object) rather than genuinely nested JSON — `_nest_dotted_keys` reshapes
   each record into a real nested dict at fetch time so `parse.py`'s
   dotted-path column lookup works unchanged, the same "transform before
-  parse.py ever sees it" shape `qualys.py`/`tenablesc.py` use for XML.
+  parse.py ever sees it" shape `qualys/fo_api.py`/`tenablesc.py` use for XML.
   `assets` is a unified multi-cloud/identity/code/image inventory
   spanning dozens of asset types under one `xdm.asset.*` envelope;
   `MANIFEST` only declares the core fields present on every type (id,
@@ -1004,7 +1025,7 @@ why something is built the way it is, not how to configure or call it.
   `vulnerability_remediations`. `posture_scores`
   (`getScoreRankWidgetData`) reshapes a `{key: {...metrics}}` dict per
   scoring period into one flat record per key at fetch time — the same
-  "transform before parse.py ever sees it" shape `qualys.py`/`tenablesc.py`
+  "transform before parse.py ever sees it" shape `qualys/fo_api.py`/`tenablesc.py`
   use for their own non-record-list envelopes — and folds both groupings
   the query returns in one call (by platform, by compliance standard) into
   one resource distinguished by a `group_by` column, rather than querying
@@ -1072,7 +1093,7 @@ why something is built the way it is, not how to configure or call it.
   `monitors` requests `custom_uptime_ratios=1-7-30-90` +
   `all_time_uptime_ratio` and splits the dash-joined ratio/`custom_down_durations`
   strings into `uptime_ratio_<n>d`/`down_duration_<n>d` columns at fetch
-  time (the `qualys.py`/`cortex_cloud.py` "reshape before parse.py" shape);
+  time (the `qualys/fo_api.py`/`cortex_cloud.py` "reshape before parse.py" shape);
   `monitor_logs`/`monitor_response_times` explode each monitor's nested
   `logs`/`response_times` array into their own grain in `_fetch_page`
   rather than via a `derived_from` manifest, since each needs its own
@@ -1302,52 +1323,57 @@ why something is built the way it is, not how to configure or call it.
   with a 600s timeout. Verify against a real deployment before relying on
   this collector.
 
-- **Qualys TotalAppSec** (`qualys_tas`) — raw `requests` against the WAS v3
-  search API (`/qps/rest/3.0/search/was/webapp` and `.../finding`), no
-  vendor SDK. Separate from `qualys.py` by decision: VMDR's v2 API is XML
-  over GET with a follow-up-URL cursor, WAS search is JSON over POST with a
-  `ServiceRequest` body — same host and Basic auth, nothing else shared. So
-  it has its own `QUALYS_TAS_*` env vars, even when the values match
-  `QUALYS_*`. WAS v4 (July 2026) was skipped because its public reference
-  was too thin to build against; subscription-level OAuth is rejected by
-  every WAS endpoint. Pagination is `hasMoreRecords` + `lastId`, the next
-  page re-sending the criteria plus `id GREATER lastId`; more-records with
-  no `lastId` raises rather than ending early with a partial snapshot. QPS
-  reports some failures as HTTP 200 with a non-`SUCCESS` `responseCode`, so
-  every body is checked. The `filters` kwarg is a list of Qualys criteria
-  dicts, passed through verbatim. Qualys's search samples are XML; the
-  JSON envelope comes from its separate JSON-support page.
+- **Qualys TotalAppSec tables** (`webapps`, `webapps_findings` in `qualys`,
+  `collectors/qualys/webapps.py`) — raw `requests` against the WAS v3 search
+  API (`/qps/rest/3.0/search/was/webapp` and `.../finding`), no vendor SDK.
+  Its own module rather than part of `fo_api.py`: WAS search is JSON over
+  POST with a `ServiceRequest` body, sharing only the host and Basic auth
+  with the `/fo/` API. WAS v4 (July 2026) was skipped because its public
+  reference was too thin to build against; subscription-level OAuth is
+  rejected by every WAS endpoint. Pagination is `hasMoreRecords` + `lastId`,
+  the next page re-sending the criteria plus `id GREATER lastId`;
+  more-records with no `lastId` raises rather than ending early with a
+  partial snapshot. QPS reports some failures as HTTP 200 with a
+  non-`SUCCESS` `responseCode`, so every body is checked. The `filters`
+  kwarg is a list of Qualys criteria dicts, passed through verbatim.
+  Qualys's search samples are XML; the JSON envelope comes from its separate
+  JSON-support page.
 
-- **Qualys Policy Compliance** (`qualys_compliance`, covering Secure
-  Configuration) — a subclass of `QualysCollector`, by decision: Policy
-  Compliance lives on the same v2-style XML API as VMDR, so auth, 409 and
-  rate-limit handling, streaming XML-to-dict and the `WARNING/URL` cursor are
-  inherited, and it keeps `env_prefix` `QUALYS` so one set of `QUALYS_*`
-  credentials drives both. The PCRS posture-streaming JSON API was rejected:
-  it needs a separate gateway host and JWT flow, and Qualys's docs contradict
-  each other on whether its supported versions still cover SCA.
-  `compliance_policies` uses `/api/4.0/fo/compliance/policy/` (v2/v3 EOL
-  December 2026); `compliance_policy_controls` is derived from its
-  `CONTROL_LIST` (`CONTROL` added to `qualys.py`'s `_ALWAYS_LIST_TAGS`).
-  `compliance_posture` (`/api/2.0/fo/compliance/posture/info/`) requires a
-  policy and only truncates with a single `policy_id`, so it walks policies
-  one at a time with a `(policy index, follow-up URL)` cursor; policy ids come
-  from `compliance_policies` (`requires`) unless the `policy_ids` kwarg names
-  them. The policy id is injected into each posture record at fetch time, and
-  Qualys's `N/A` date placeholder is mapped to null there too. Exception
+- **Qualys Policy Compliance tables** (`compliance_*` in `qualys`, covering
+  Secure Configuration, `collectors/qualys/compliance.py`) — on the same
+  `/fo/` XML API as VMDR, so it reuses `fo_api.py`'s auth, 409 and
+  rate-limit handling, streaming XML-to-dict and `WARNING/URL` cursor. The
+  PCRS posture-streaming JSON API was rejected: it needs the gateway host and
+  JWT flow, and Qualys's docs contradict each other on whether its supported
+  versions still cover SCA. `compliance_policies` uses
+  `/api/4.0/fo/compliance/policy/` (v2/v3 EOL December 2026);
+  `compliance_policy_controls` is derived from its `CONTROL_LIST` (`CONTROL`
+  is in `fo_api.py`'s `_ALWAYS_LIST_TAGS`). `compliance_posture`
+  (`/api/2.0/fo/compliance/posture/info/`) requires a policy and only
+  truncates with a single `policy_id`, so it walks policies one at a time
+  with a `(policy index, follow-up URL)` cursor; policy ids come from
+  `compliance_policies` (`requires`) unless the `policy_ids` kwarg names
+  them. The policy id is injected into each posture record at fetch time,
+  and Qualys's `N/A` date placeholder is mapped to null there too. Exception
   details aren't collected because the docs give no element names for them.
 
-- **Qualys Global AssetView** (`qualys_gav`) — raw `requests` against the
-  shared GAV/CSAM asset search API (`POST /rest/2.0/search/am/asset`), no
-  vendor SDK. A third Qualys API family: it lives on the subscription's
-  gateway host (`gateway_url`, required) with JWT auth, so it has its own
-  collector and `QUALYS_GAV_*` config, the same decision as `qualys_tas`.
-  `POST {gateway_url}/auth` (`token=true`) returns the JWT as plain text;
-  tokens last four hours, so `_authenticate` sets `_token_expires_at` for the
-  base class's proactive refresh. Pagination is `pageSize` (max 300) and
-  `lastSeenAssetId`, with `hasMore` 1/0; more-assets with no
-  `lastSeenAssetId` raises rather than ending early. `asset_software` and
-  `asset_open_ports` are derived from `assets`' nested lists, so `assets`'
+- **Qualys Global AssetView / CSAM tables** (`assets`, `assets_software`,
+  `assets_open_ports` in `qualys`, `collectors/qualys/assets.py`) — raw
+  `requests` against the shared GAV/CSAM asset search API
+  (`POST /rest/2.0/search/am/asset`), no vendor SDK. It lives on the
+  subscription's gateway host with JWT auth. The gateway is derived from
+  `base_url` (`qualysapi.X` becomes `gateway.X`, with the two pre-`qgN`
+  platforms mapped explicitly); the optional `gateway_url` overrides it for
+  a private cloud platform, and an underivable one fails only these tables.
+  `POST {gateway}/auth` (`token=true`) returns the JWT as plain text,
+  fetched lazily on the first asset request so a subscription without CSAM
+  never logs in to the gateway. Tokens last four hours and are refreshed
+  ahead of expiry by `AssetsApi` itself (the base class's
+  `_token_expires_at` would re-authenticate every family); a 401 drops the
+  token and raises `UnauthorizedSignal`. Pagination is `pageSize` (max 300)
+  and `lastSeenAssetId`, with `hasMore` 1/0; more-assets with no
+  `lastSeenAssetId` raises rather than ending early. `assets_software` and
+  `assets_open_ports` are derived from `assets`' nested lists, so `assets`'
   raw records are cached to disk. kwargs: `filters` (CSAM criteria, passed
   through as the JSON filter body) and `asset_last_updated`.
 

@@ -342,32 +342,17 @@
 
 [Credentials](credentials/qualys.md)
 
-- [hosts](collectors/qualys.md#hosts)
-- [vulnerabilities](collectors/qualys.md#vulnerabilities)
-- [vulnerability_detections](collectors/qualys.md#vulnerability_detections)
-
-## [Qualys Global AssetView](collectors/qualys_gav.md)
-
-[Credentials](credentials/qualys_gav.md)
-
-- [asset_open_ports](collectors/qualys_gav.md#asset_open_ports)
-- [asset_software](collectors/qualys_gav.md#asset_software)
-- [assets](collectors/qualys_gav.md#assets)
-
-## [Qualys Policy Compliance](collectors/qualys_compliance.md)
-
-[Credentials](credentials/qualys_compliance.md)
-
-- [compliance_policies](collectors/qualys_compliance.md#compliance_policies)
-- [compliance_policy_controls](collectors/qualys_compliance.md#compliance_policy_controls)
-- [compliance_posture](collectors/qualys_compliance.md#compliance_posture)
-
-## [Qualys TotalAppSec](collectors/qualys_tas.md)
-
-[Credentials](credentials/qualys_tas.md)
-
-- [findings](collectors/qualys_tas.md#findings)
-- [webapps](collectors/qualys_tas.md#webapps)
+- [assets](collectors/qualys.md#assets)
+- [assets_open_ports](collectors/qualys.md#assets_open_ports)
+- [assets_software](collectors/qualys.md#assets_software)
+- [compliance_policies](collectors/qualys.md#compliance_policies)
+- [compliance_policy_controls](collectors/qualys.md#compliance_policy_controls)
+- [compliance_posture](collectors/qualys.md#compliance_posture)
+- [vm_detections](collectors/qualys.md#vm_detections)
+- [vm_hosts](collectors/qualys.md#vm_hosts)
+- [vm_knowledgebase](collectors/qualys.md#vm_knowledgebase)
+- [webapps](collectors/qualys.md#webapps)
+- [webapps_findings](collectors/qualys.md#webapps_findings)
 
 ## [Rapid7 InsightVM](collectors/rapid7_insightvm.md)
 
