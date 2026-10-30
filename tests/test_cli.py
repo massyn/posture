@@ -498,15 +498,22 @@ def test_version_prints_the_package_version(capsys) -> None:
     assert capsys.readouterr().out.strip() == posture.__version__
 
 
-def test_main_writes_utf8_whatever_the_default_encoding(monkeypatch) -> None:
-    # Windows encodes a piped stdout as the ANSI code page (cp1252), which a
-    # UTF-8 terminal or recorder renders as garbage.
-    out = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
-    err = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+def test_main_writes_utf8_with_lf_whatever_the_platform_defaults(
+    monkeypatch,
+) -> None:
+    # Windows encodes a piped stdout as the ANSI code page (cp1252) and ends
+    # its lines with \r\n, which a UTF-8 terminal or recorder shows as
+    # garbage and stray carriage returns.
+    out_bytes, err_bytes = io.BytesIO(), io.BytesIO()
+    out = io.TextIOWrapper(out_bytes, encoding="cp1252", newline="\r\n")
+    err = io.TextIOWrapper(err_bytes, encoding="cp1252", newline="\r\n")
     monkeypatch.setattr("sys.stdout", out)
     monkeypatch.setattr("sys.stderr", err)
 
     assert cli.main(["--schema", "macadmins.macos_cves"]) == 0
+    out.flush()
 
     assert out.encoding == "utf-8"
     assert err.encoding == "utf-8"
+    assert out_bytes.getvalue().count(b"\n") > 1
+    assert b"\r" not in out_bytes.getvalue()
