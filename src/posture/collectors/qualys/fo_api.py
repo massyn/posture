@@ -286,9 +286,7 @@ class FoApi:
         self._rate_limit_wait_seconds = float(to_wait) if to_wait is not None else None
 
 
-def _account_error(
-    status: int, code: str | None, message: str
-) -> AuthenticationError:
+def _account_error(status: int, code: str | None, message: str) -> AuthenticationError:
     """The error for an account-level refusal: ``CredentialsRejected`` when it
     refuses the user itself (any 401, or ``_ACCOUNT_REJECTED_CODES``), so the
     collector sends nothing more this run; otherwise a plain
