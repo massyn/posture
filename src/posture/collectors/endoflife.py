@@ -148,7 +148,7 @@ class EndoflifeCollector(Collector):
             )
         if response.status_code == 404:
             raise ValueError(
-                f"endoflife.date returned 404 for {path} — check product ids "
+                f"endoflife.date returned 404 for {path}; check product ids "
                 f"against GET {_BASE_URL}/products"
             )
         response.raise_for_status()

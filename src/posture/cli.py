@@ -1,4 +1,4 @@
-"""``posturecollect`` — extract every table from every registered posture
+"""``posturecollect``: extract every table from every registered posture
 collector and write it to parquet.
 
     posturecollect
@@ -62,6 +62,13 @@ imported. ``--env PATH`` uses that file instead: every variable the default
 only in ``.env`` isn't silently collected during, say, a non-production run.
 Variables already set in the shell still take precedence over either file.
 
+Output is always UTF-8, whatever the platform's default encoding. On Windows,
+Python otherwise encodes stdout/stderr as the ANSI code page (e.g. cp1252)
+whenever they aren't a real console (a pipe, a file, a recorder's
+pseudo-terminal), so a UTF-8 reader shows garbage for any non-ASCII text,
+and a character the code page can't encode (vendor text in a log message)
+raises instead of printing.
+
 ``--catalog``, ``--variables``, ``--schema`` and ``--dry-run`` print a
 listing and exit without collecting anything (see ``posture._inspect``).
 ``--catalog`` and ``--variables`` describe every registered source, narrowed
@@ -73,6 +80,7 @@ a real run would collect with the same environment and flags.
 from __future__ import annotations
 
 import argparse
+import io
 import logging
 import os
 import sys
@@ -124,7 +132,7 @@ def _env_bool(env_var: str, value: str) -> bool:
     if lowered in _FALSE_VALUES:
         return False
     raise SystemExit(
-        f"{env_var}={value!r} is not a boolean — use one of "
+        f"{env_var}={value!r} is not a boolean; use one of "
         f"{', '.join(sorted(_TRUE_VALUES | _FALSE_VALUES))}"
     )
 
@@ -171,7 +179,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=None,
         help=(
             "only collect these source(s) or source.resource table(s), "
-            "regardless of environment variables — the one way to reach a "
+            "regardless of environment variables; the one way to reach a "
             "no-auth source (default: $POSTURE_INCLUDE)"
         ),
     )
@@ -418,6 +426,10 @@ def _log_summary(results: list[dict[str, Any]]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Before parsing: --help/--version print from inside the parser.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
     args = _parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
@@ -444,7 +456,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not sources:
         logger.warning(
-            "No sources to collect — set the required environment "
+            "No sources to collect: set the required environment "
             "variable(s) for a source, or check --include/--exclude"
         )
         return 0

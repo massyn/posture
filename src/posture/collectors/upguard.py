@@ -345,7 +345,7 @@ class UpGuardCollector(Collector):
         if truncated_hostnames:
             logger.warning(
                 "vendor_risks incomplete for %d hosts (page cap hit or retries "
-                "exhausted) — data loss, not a fatal error: %s",
+                "exhausted); data loss, not a fatal error: %s",
                 len(truncated_hostnames),
                 truncated_hostnames,
                 extra={"source": "upguard", "hostnames": truncated_hostnames},
