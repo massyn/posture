@@ -62,12 +62,14 @@ imported. ``--env PATH`` uses that file instead: every variable the default
 only in ``.env`` isn't silently collected during, say, a non-production run.
 Variables already set in the shell still take precedence over either file.
 
-Output is always UTF-8, whatever the platform's default encoding. On Windows,
-Python otherwise encodes stdout/stderr as the ANSI code page (e.g. cp1252)
-whenever they aren't a real console (a pipe, a file, a recorder's
-pseudo-terminal), so a UTF-8 reader shows garbage for any non-ASCII text,
-and a character the code page can't encode (vendor text in a log message)
-raises instead of printing.
+Output is always UTF-8 with LF line endings, whatever the platform's
+defaults. On Windows, Python otherwise encodes stdout/stderr as the ANSI code
+page (e.g. cp1252) and ends lines with CRLF whenever they aren't a real
+console (a pipe, a file, a recorder's pseudo-terminal): a UTF-8 reader shows
+garbage for any non-ASCII text, a character the code page can't encode
+(vendor text in a log message) raises instead of printing, and the stray
+carriage return ends up in captured or piped output. A Windows console still
+starts each line in the first column on a bare LF.
 
 ``--catalog``, ``--variables``, ``--schema`` and ``--dry-run`` print a
 listing and exit without collecting anything (see ``posture._inspect``).
@@ -425,17 +427,17 @@ def _log_summary(results: list[dict[str, Any]]) -> None:
         )
 
 
-def _use_utf8_output() -> None:
-    """Write stdout/stderr as UTF-8 whatever the platform default (see
-    module docstring)."""
+def _use_portable_output() -> None:
+    """Write stdout/stderr as UTF-8 with LF line endings whatever the
+    platform defaults (see module docstring)."""
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
-            stream.reconfigure(encoding="utf-8")
+            stream.reconfigure(encoding="utf-8", newline="\n")
 
 
 def main(argv: list[str] | None = None) -> int:
     # Before parsing: --help/--version print from inside the parser.
-    _use_utf8_output()
+    _use_portable_output()
     args = _parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
