@@ -425,11 +425,17 @@ def _log_summary(results: list[dict[str, Any]]) -> None:
         )
 
 
-def main(argv: list[str] | None = None) -> int:
-    # Before parsing: --help/--version print from inside the parser.
+def _use_utf8_output() -> None:
+    """Write stdout/stderr as UTF-8 whatever the platform default (see
+    module docstring)."""
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Before parsing: --help/--version print from inside the parser.
+    _use_utf8_output()
     args = _parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
