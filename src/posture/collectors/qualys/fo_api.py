@@ -223,19 +223,7 @@ class FoApi:
             # same credentials can never succeed, and every rejected attempt
             # counts towards Qualys's failed-login lockout. Fail on the first.
             if response.status_code == 401 or error_code in _AUTH_403_CODES:
-                error = (
-                    CredentialsRejected
-                    if response.status_code == 401
-                    or error_code in _ACCOUNT_REJECTED_CODES
-                    else AuthenticationError
-                )
-                raise error(
-                    message,
-                    source="qualys",
-                    hint=_ACCOUNT_ERROR_HINTS.get(
-                        error_code, _ACCOUNT_ERROR_HINTS["2000"]
-                    ),
-                )
+                raise _account_error(response.status_code, error_code, message)
             raise PermissionDeniedSignal(message)
         if response.status_code == 409:
             error_code, error_text = _parse_simple_return_error(response.content)
@@ -252,16 +240,11 @@ class FoApi:
                 extra={"source": "qualys"},
             )
             if error_code in _FATAL_409_CODES:
-                error = (
-                    CredentialsRejected
-                    if error_code in _ACCOUNT_REJECTED_CODES
-                    else AuthenticationError
-                )
-                raise error(
+                raise _account_error(
+                    409,
+                    error_code,
                     f"Qualys rejected the request (CODE {error_code}): "
                     f"{error_text or 'no message'}",
-                    source="qualys",
-                    hint=_ACCOUNT_ERROR_HINTS[error_code],
                 )
             wait = response.headers.get("X-RateLimit-ToWait-Sec")
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)
@@ -301,6 +284,22 @@ class FoApi:
 
         self._rate_limit_remaining = int(remaining) if remaining is not None else None
         self._rate_limit_wait_seconds = float(to_wait) if to_wait is not None else None
+
+
+def _account_error(
+    status: int, code: str | None, message: str
+) -> AuthenticationError:
+    """The error for an account-level refusal: ``CredentialsRejected`` when it
+    refuses the user itself (any 401, or ``_ACCOUNT_REJECTED_CODES``), so the
+    collector sends nothing more this run; otherwise a plain
+    ``AuthenticationError`` that fails only the table that asked."""
+    error = (
+        CredentialsRejected
+        if status == 401 or code in _ACCOUNT_REJECTED_CODES
+        else AuthenticationError
+    )
+    hint = _ACCOUNT_ERROR_HINTS.get(code or "", _ACCOUNT_ERROR_HINTS["2000"])
+    return error(message, source="qualys", hint=hint)
 
 
 def _parse_simple_return_error(content: bytes) -> tuple[str | None, str | None]:
