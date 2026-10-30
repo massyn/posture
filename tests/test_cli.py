@@ -402,3 +402,87 @@ def test_include_flag_beats_posture_include(monkeypatch) -> None:
     args = cli._parse_args(["--include", "macadmins"])
     cli._apply_env_defaults(args)
     assert args.include == ["macadmins"]
+
+
+def test_catalog_lists_every_source_narrowed_by_include(monkeypatch, capsys) -> None:
+    for var in ("QUALYS_USERNAME", "QUALYS_PASSWORD", "QUALYS_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("QUALYS_USERNAME", "u")
+
+    exit_code = cli.main(
+        ["--catalog", "--include", "macadmins", "qualys", "--exclude", "qualys.webapps"]
+    )
+
+    out = capsys.readouterr().out.splitlines()
+    assert exit_code == 0
+    assert out[0] == "macadmins (MacAdmins SOFA Feed): no credentials needed"
+    assert "  macadmins.macos_cves" in out
+    assert "qualys (Qualys): missing QUALYS_PASSWORD, QUALYS_BASE_URL" in out
+    assert "  qualys.vm_hosts" in out
+    assert "  qualys.webapps" not in out
+
+
+def test_catalog_without_include_lists_unconfigured_sources(
+    monkeypatch, capsys
+) -> None:
+    monkeypatch.delenv("POSTURE_INCLUDE", raising=False)
+    monkeypatch.delenv("CROWDSTRIKE_CLIENT_ID", raising=False)
+
+    cli.main(["--catalog"])
+
+    assert "  crowdstrike.hosts" in capsys.readouterr().out.splitlines()
+
+
+def test_variables_shows_set_state_but_never_values(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("QUALYS_PASSWORD", "s3cret")
+    monkeypatch.delenv("QUALYS_GATEWAY_URL", raising=False)
+
+    exit_code = cli.main(["--variables", "--include", "qualys.vm_hosts"])
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "s3cret" not in out
+    lines = [line.split() for line in out.splitlines()]
+    assert ["required", "QUALYS_PASSWORD", "set"] in lines
+    assert ["optional", "QUALYS_GATEWAY_URL", "not", "set"] in lines
+
+
+def test_schema_lists_one_tables_columns(capsys) -> None:
+    exit_code = cli.main(["--schema", "macadmins.macos_cves"])
+
+    out = capsys.readouterr().out.splitlines()
+    assert exit_code == 0
+    assert out[0] == "macadmins.macos_cves (MacAdmins SOFA Feed)"
+    assert len(out) > 1
+    assert all(len(line.split()) == 2 for line in out[1:])
+
+
+@pytest.mark.parametrize("table", ["macadmins", "macadmins.nope", "nope.hosts"])
+def test_schema_needs_a_known_table(table: str) -> None:
+    with pytest.raises(SystemExit, match="Unknown --schema table"):
+        cli.main(["--schema", table])
+
+
+@responses.activate
+def test_dry_run_lists_tables_without_collecting(tmp_path: Path, capsys) -> None:
+    exit_code = cli.main(
+        [
+            "--dry-run",
+            "--include",
+            "macadmins",
+            "--exclude",
+            "macadmins.macos_cves",
+            "--output",
+            str(tmp_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert capsys.readouterr().out.splitlines() == ["macadmins.macos_releases"]
+    assert len(responses.calls) == 0
+    assert not list(tmp_path.iterdir())
+
+
+def test_listing_flags_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["--catalog", "--dry-run"])

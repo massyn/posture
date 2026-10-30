@@ -348,6 +348,23 @@ posturecollect --debug                           # verbose debug-level logging
 posturecollect --env .env.nonprod                # read settings from this file instead of .env
 ```
 
+To see what is there before collecting anything:
+
+```bash
+posturecollect --catalog                         # every source and its tables, and whether each source is configured
+posturecollect --catalog --include qualys        # just these sources/tables (--exclude works too)
+posturecollect --variables --include qualys      # required and optional env vars per source, and whether each is set
+posturecollect --schema crowdstrike.hosts        # the columns and types of one table
+posturecollect --dry-run                         # the source.table entries this run would collect, without collecting
+```
+
+`--catalog` and `--variables` cover every registered source, configured or
+not, narrowed by `--include`/`--exclude`. `--variables` shows whether each
+variable is set, never its value. `--dry-run` resolves the selection exactly
+as a real run would (environment, `--env`, `--include`, `--exclude`) and
+prints one `source.table` per line. All four exit without sending a request;
+only one can be used at a time.
+
 `--include` is also the only way to reach a no-auth source (e.g.
 `endoflife`, `macadmins`) — a source with nothing to check is never picked
 up by the default environment-variable scan, so name it explicitly to
