@@ -97,7 +97,7 @@ class PostgresStorage(TableStorage):
         if missing:
             raise StorageConfigError(
                 f"Missing required config: provide 'dsn', or all of "
-                f"{list(_REQUIRED_DISCRETE_KEYS)} (missing {missing}) — "
+                f"{list(_REQUIRED_DISCRETE_KEYS)} (missing {missing}), "
                 "explicitly or via env vars POSTURE_POSTGRES_HOST / "
                 "_DBNAME / _USER / _PASSWORD",
                 source="postgres",

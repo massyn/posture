@@ -600,7 +600,7 @@ class Collector(ABC):
         rep = self._reports.get(resource)
         if rep is None:
             raise ResourceUnknown(
-                f"No report available for '{resource}' — collect() it first",
+                f"No report available for '{resource}'; collect() it first",
                 source=self.env_prefix.lower(),
                 resource=resource,
             )

@@ -379,7 +379,7 @@ class CortexCloudCollector(Collector):
             detail = response.text[:500]
             response.close()
             hints = {
-                401: " (check token/api_key_id — Advanced keys aren't supported)",
+                401: " (check token/api_key_id; Advanced keys aren't supported)",
                 403: " (check the key's role can read Vulnerability Management)",
                 429: " (the 10 requests per rolling 24h quota is exhausted)",
             }

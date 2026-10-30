@@ -158,7 +158,7 @@ class HttpCollector(Collector):
                 _failure_row(
                     host,
                     "Host has no http:// or https:// scheme. The scheme is "
-                    "mandatory and not defaulted — pass 'http://' or "
+                    "mandatory and not defaulted; pass 'http://' or "
                     "'https://' explicitly (a host may be listed under both).",
                     duration_ms=0,
                 )

@@ -99,13 +99,13 @@ _ACCOUNT_ERROR_HINTS = {
     "not)",
     "2002": "the user account is inactive; reactivate it in the Qualys portal",
     "2003": "check the account's registration/activation status in the Qualys "
-    "portal — this is not a rate limit and will not resolve by retrying",
+    "portal; this is not a rate limit and will not resolve by retrying",
     "2011": "SecureID is enabled for this account, which blocks API access; "
     "use an account without SecureID",
     "2012": "the subscription's licence does not include this API; ask Qualys "
     "support or your account manager to enable API access",
     "1960": "another instance of this API is already running on this Qualys "
-    "account and must finish before this one can — this is not a rate limit "
+    "account and must finish before this one can; this is not a rate limit "
     "and will not resolve by retrying",
 }
 _AUTH_403_CODES = {"2002", "2012"}
