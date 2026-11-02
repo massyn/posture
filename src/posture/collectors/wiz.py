@@ -43,8 +43,28 @@ query IssuesTable($first: Int, $after: String, $filterBy: IssueFilters) {
   issues(first: $first, after: $after, filterBy: $filterBy) {
     nodes {
       id
+      type
       status
       severity
+      sourceRule {
+        __typename
+        ... on Control {
+          id
+          name
+        }
+        ... on CloudConfigurationRule {
+          id
+          name
+        }
+        ... on CloudEventRule {
+          id
+          name
+        }
+      }
+      projects {
+        id
+        name
+      }
       createdAt
       updatedAt
       dueAt
@@ -140,8 +160,16 @@ MANIFEST: dict[str, dict[str, Any]] = {
         "field": "issues",
         "columns": {
             "id": ("id", "str"),
+            "type": ("type", "str"),
             "status": ("status", "str"),
             "severity": ("severity", "str"),
+            # sourceRule is a union; __typename tells a Control (e.g. a
+            # toxic-combination or Wiz Code issue) apart from a configuration
+            # or threat-detection rule.
+            "source_rule_type": ("sourceRule.__typename", "str"),
+            "source_rule_id": ("sourceRule.id", "str"),
+            "source_rule_name": ("sourceRule.name", "str"),
+            "projects": ("projects", "json"),
             "created_at": ("createdAt", "datetime"),
             "updated_at": ("updatedAt", "datetime"),
             "due_at": ("dueAt", "datetime"),

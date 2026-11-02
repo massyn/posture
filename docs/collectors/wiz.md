@@ -55,8 +55,13 @@ for table in ccm.tables():
 | Column | Type |
 | --- | --- |
 | `id` | `str` |
+| `type` | `str` |
 | `status` | `str` |
 | `severity` | `str` |
+| `source_rule_type` | `str` |
+| `source_rule_id` | `str` |
+| `source_rule_name` | `str` |
+| `projects` | `json` |
 | `created_at` | `datetime` |
 | `updated_at` | `datetime` |
 | `due_at` | `datetime` |
