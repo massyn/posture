@@ -570,7 +570,7 @@ why something is built the way it is, not how to configure or call it.
   against a real instance's response before relying on this collector.
 - **Qualys** (`qualys`) — one source for the whole subscription: one set of
   `QUALYS_*` credentials, a table per dataset across VMDR, Policy Compliance,
-  TotalAppSec and Global AssetView / CSAM. By decision (1.14.0, replacing the
+  TotalAppSec, Global AssetView / CSAM and Container Security. By decision (1.14.0, replacing the
   separate `qualys_compliance`, `qualys_tas` and `qualys_gav` sources):
   Qualys's modules sit on three API families, but that is an implementation
   detail, not something a user should have to configure three times. The
@@ -587,13 +587,18 @@ why something is built the way it is, not how to configure or call it.
   - `vm.py`: `vm_hosts`, `vm_knowledgebase` (the QID catalogue: severity,
     CVSS, CVE; not a per-host finding) and `vm_detections`, one row per
     (host, QID), derived from the per-host detection list (fetched internally
-    as `host_detections`).
-  - `compliance.py`, `webapps.py`, `assets.py`: see their entries under
-    "Qualys Policy Compliance tables", "Qualys TotalAppSec tables" and
-    "Qualys Global AssetView / CSAM tables" below.
+    as `host_detections`). Hosts are requested with `show_asset_id` and
+    `show_trurisk` and detections with `show_qds`, keeping only the scores:
+    the XML-to-dict conversion drops attributes such as QDS's severity band.
+  - `gateway.py`: the gateway host's JWT login, shared by `assets.py` and
+    `containers.py`.
+  - `compliance.py`, `webapps.py`, `assets.py`, `containers.py`: see their
+    entries under "Qualys Policy Compliance tables", "Qualys TotalAppSec
+    tables", "Qualys Global AssetView / CSAM tables" and "Qualys Container
+    Security tables" below.
 
   Every family authenticates its own requests (Basic auth passed per
-  request, the gateway JWT fetched lazily on the first asset request), so a
+  request, the gateway JWT fetched lazily on the first gateway request), so a
   module the subscription doesn't licence fails only its own tables. The
   exception is a rejection of the user itself (`CredentialsRejected` in
   `errors.py`: a 401, or an inactive, unregistered or SecureID account):
@@ -1329,9 +1334,11 @@ why something is built the way it is, not how to configure or call it.
   with a 600s timeout. Verify against a real deployment before relying on
   this collector.
 
-- **Qualys TotalAppSec tables** (`webapps`, `webapps_findings` in `qualys`,
-  `collectors/qualys/webapps.py`) — raw `requests` against the WAS v3 search
-  API (`/qps/rest/3.0/search/was/webapp` and `.../finding`), no vendor SDK.
+- **Qualys TotalAppSec tables** (`webapps`, `webapps_findings`,
+  `webapps_scans` in `qualys`, `collectors/qualys/webapps.py`) — raw
+  `requests` against the WAS v3 search API
+  (`/qps/rest/3.0/search/was/webapp`, `.../finding` and `.../wasscan`), no
+  vendor SDK. Scan search is verbose so each scan carries its `summary`.
   Its own module rather than part of `fo_api.py`: WAS search is JSON over
   POST with a `ServiceRequest` body, sharing only the host and Basic auth
   with the `/fo/` API. WAS v4 (July 2026) was skipped because its public
@@ -1367,7 +1374,8 @@ why something is built the way it is, not how to configure or call it.
   `assets_open_ports` in `qualys`, `collectors/qualys/assets.py`) — raw
   `requests` against the shared GAV/CSAM asset search API
   (`POST /rest/2.0/search/am/asset`), no vendor SDK. It lives on the
-  subscription's gateway host with JWT auth. The gateway is derived from
+  subscription's gateway host with JWT auth (`gateway.py`,
+  shared with Container Security). The gateway is derived from
   `base_url` (`qualysapi.X` becomes `gateway.X`, with the two pre-`qgN`
   platforms mapped explicitly); the optional `gateway_url` overrides it for
   a private cloud platform, and an underivable one fails only these tables.
@@ -1382,6 +1390,29 @@ why something is built the way it is, not how to configure or call it.
   `assets_open_ports` are derived from `assets`' nested lists, so `assets`'
   raw records are cached to disk. kwargs: `filters` (CSAM criteria, passed
   through as the JSON filter body) and `asset_last_updated`.
+
+- **Qualys Container Security tables** (`container_images`,
+  `container_image_repos`, `container_image_vulnerabilities`, `containers`,
+  `container_registries` in `qualys`, `collectors/qualys/containers.py`) —
+  raw `requests` against the Container Security API (`/csapi/v1.3/...`) on
+  the gateway, sharing the CSAM JWT through `gateway.py`, so collecting both
+  families logs in to the gateway once. Images and containers use the bulk
+  `/images/list` and `/containers/list` endpoints (`limit` 250, the next
+  page's full URL in a `Link: rel=next` header as the cursor) rather than
+  the paged `/images`/`/containers`, whose `pageNumber` x `pageSize` window
+  stops at 10,000 records. Registries are paged by `pageNumber`/`pageSize`
+  against `count`. `container_image_vulnerabilities` is derived from
+  per-image detail calls (`/images/{sha}`, fetched internally as
+  `container_image_details` via `_resumable_fanout`, 100 images per page),
+  since the list endpoints carry only per-severity counts; images whose
+  counts are all present and zero are skipped, and `container_images` is
+  `requires`-cached so the list is not fetched twice. Dates arrive as
+  epoch-millisecond strings and are converted to integers at fetch time for
+  the datetime columns only. kwargs: `filter` (CS QQL). Built from Qualys's
+  public references and Qualys-authored scripts (`Qualys/cs-container-reports`,
+  a Qualys engineer's `container_vuln_csv`), not a live subscription: verify
+  field names, and whether the bulk endpoints need a `filter`, against a real
+  tenant before relying on these tables.
 
 - **CyberArk Privileged Access Manager** (`cyberark`) — raw `requests`
   against the PAM web services (`{base_url}/PasswordVault/API`), no vendor

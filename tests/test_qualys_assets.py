@@ -119,7 +119,9 @@ def test_token_expiry_is_tracked_for_refresh() -> None:
     ccm = CCM("qualys", CONFIG)
     ccm.collect("assets")
 
-    remaining = ccm._routes["assets"].token_expires_at - datetime.now(timezone.utc)
+    remaining = ccm._routes["assets"]._gateway.token_expires_at - datetime.now(
+        timezone.utc
+    )
     assert 3.9 * 3600 < remaining.total_seconds() <= 4 * 3600
 
 

@@ -2,8 +2,8 @@ import pytest
 import responses
 
 from posture import CCM
-from posture.collectors.qualys.assets import gateway_url_for
 from posture.collectors.qualys.errors import CredentialsRejected
+from posture.collectors.qualys.gateway import gateway_url_for
 from posture.exceptions import AuthenticationError, IncompleteCollection
 
 BASE_URL = "https://qualysapi.qg2.apps.qualys.com"

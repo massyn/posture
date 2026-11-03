@@ -53,6 +53,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any
+from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import requests
@@ -216,8 +217,9 @@ class FoApi:
             error_code, error_text = _parse_simple_return_error(response.content)
             response.close()
             message = (
-                f"Qualys rejected the request (HTTP {response.status_code}, "
-                f"CODE {error_code}): {error_text or 'no message'}"
+                f"Qualys {urlparse(url).hostname} rejected the request (HTTP "
+                f"{response.status_code}, CODE {error_code}): "
+                f"{error_text or 'no message'}"
             )
             # Basic auth has no session or token to refresh, so re-sending the
             # same credentials can never succeed, and every rejected attempt
@@ -243,7 +245,8 @@ class FoApi:
                 raise _account_error(
                     409,
                     error_code,
-                    f"Qualys rejected the request (CODE {error_code}): "
+                    f"Qualys {urlparse(url).hostname} rejected the request "
+                    f"(CODE {error_code}): "
                     f"{error_text or 'no message'}",
                 )
             wait = response.headers.get("X-RateLimit-ToWait-Sec")

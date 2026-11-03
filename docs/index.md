@@ -348,11 +348,17 @@
 - [compliance_policies](collectors/qualys.md#compliance_policies)
 - [compliance_policy_controls](collectors/qualys.md#compliance_policy_controls)
 - [compliance_posture](collectors/qualys.md#compliance_posture)
+- [container_image_repos](collectors/qualys.md#container_image_repos)
+- [container_image_vulnerabilities](collectors/qualys.md#container_image_vulnerabilities)
+- [container_images](collectors/qualys.md#container_images)
+- [container_registries](collectors/qualys.md#container_registries)
+- [containers](collectors/qualys.md#containers)
 - [vm_detections](collectors/qualys.md#vm_detections)
 - [vm_hosts](collectors/qualys.md#vm_hosts)
 - [vm_knowledgebase](collectors/qualys.md#vm_knowledgebase)
 - [webapps](collectors/qualys.md#webapps)
 - [webapps_findings](collectors/qualys.md#webapps_findings)
+- [webapps_scans](collectors/qualys.md#webapps_scans)
 
 ## [Rapid7 InsightVM](collectors/rapid7_insightvm.md)
 

@@ -7,6 +7,11 @@
   detection list (``/api/4.0/fo/asset/host/vm/detection/``), fetched
   internally as ``host_detections``.
 
+``vm_hosts`` asks for the asset id and TruRisk score (``show_asset_id``,
+``show_trurisk``) and the detection list for each detection's QDS
+(``show_qds``); only the scores are kept, since the XML-to-dict conversion
+drops attributes such as QDS's severity band.
+
 The ``/api/2.0`` paths of all three are Qualys End-of-Service (EOS warning
 observed on responses) in favour of the versions above, with the same request
 params and XML response shape.
@@ -36,12 +41,19 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "netbios_name": ("NETBIOS", "str"),
             "os": ("OS", "str"),
             "qg_host_id": ("QG_HOSTID", "str"),
+            "asset_id": ("ASSET_ID", "str"),
             "cloud_provider": ("CLOUD_PROVIDER", "str"),
             "cloud_service": ("CLOUD_SERVICE", "str"),
             "cloud_resource_id": ("CLOUD_RESOURCE_ID", "str"),
+            "trurisk_score": ("TRURISK_SCORE", "int"),
+            "asset_criticality_score": ("ASSET_CRITICALITY_SCORE", "int"),
+            "first_found": ("FIRST_FOUND_DATE", "datetime"),
             "last_boot": ("LAST_BOOT", "datetime"),
             "last_vuln_scan": ("LAST_VULN_SCAN_DATETIME", "datetime"),
             "last_vm_scan": ("LAST_VM_SCANNED_DATE", "datetime"),
+            "last_vm_scan_duration": ("LAST_VM_SCANNED_DURATION", "int"),
+            "last_vm_auth_scan": ("LAST_VM_AUTH_SCANNED_DATE", "datetime"),
+            "last_vm_auth_scan_duration": ("LAST_VM_AUTH_SCANNED_DURATION", "int"),
             "last_pc_scan": ("LAST_PC_SCANNED_DATE", "datetime"),
             "agent_version": ("AGENT_INFO.AGENT_VERSION", "str"),
             "agent_status": ("AGENT_INFO.AGENT_STATUS", "str"),
@@ -74,16 +86,23 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "host_dns_name": ("$parent.DNS", "str"),
             "host_os": ("$parent.OS", "str"),
             "qid": ("QID", "str"),
+            "unique_vuln_id": ("UNIQUE_VULN_ID", "str"),
             "detection_type": ("TYPE", "str"),
             "severity": ("SEVERITY", "int"),
             "port": ("PORT", "int"),
             "protocol": ("PROTOCOL", "str"),
+            "ssl": ("SSL", "bool"),
+            "qds": ("QDS", "int"),
             "results": ("RESULTS", "str"),
             "status": ("STATUS", "str"),
             "first_found": ("FIRST_FOUND_DATETIME", "datetime"),
             "last_found": ("LAST_FOUND_DATETIME", "datetime"),
             "last_tested": ("LAST_TEST_DATETIME", "datetime"),
             "last_updated": ("LAST_UPDATE_DATETIME", "datetime"),
+            "last_fixed": ("LAST_FIXED_DATETIME", "datetime"),
+            "last_processed": ("LAST_PROCESSED_DATETIME", "datetime"),
+            "times_found": ("TIMES_FOUND", "int"),
+            "times_reopened": ("TIMES_REOPENED", "int"),
             "is_ignored": ("IS_IGNORED", "bool"),
             "is_disabled": ("IS_DISABLED", "bool"),
         },
@@ -108,6 +127,8 @@ class VmApi:
                     "action": "list",
                     "details": "All/AGs",
                     "show_tags": 1,
+                    "show_asset_id": 1,
+                    "show_trurisk": 1,
                     "host_metadata": "all",
                     **kwargs,
                 },
@@ -127,6 +148,6 @@ class VmApi:
         return self._fo.fetch_list_page(
             cursor,
             path=_HOST_DETECTION_PATH,
-            params={"action": "list", **kwargs},
+            params={"action": "list", "show_qds": 1, **kwargs},
             list_path=("RESPONSE", "HOST_LIST", "HOST"),
         )

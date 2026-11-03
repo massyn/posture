@@ -4,7 +4,8 @@
 
 These steps create a dedicated, read-only API user for the CCM integration.
 One user and one set of `QUALYS_*` credentials cover every Qualys table:
-VMDR, Policy Compliance, TotalAppSec and Global AssetView / CSAM. Create the
+VMDR, Policy Compliance, TotalAppSec, Global AssetView / CSAM and Container
+Security. Create the
 user, then grant access to each module you want collected. A table whose
 module the user (or the subscription) has no access to fails on its own; the
 other tables still collect.
@@ -33,8 +34,9 @@ creating the user.
 | --- | --- | --- | --- |
 | `vm_hosts`, `vm_knowledgebase`, `vm_detections` | VMDR | `/api/{4,5}.0/fo/...` on the API server | Reader role and asset groups ([below](#create-the-user-account)) |
 | `compliance_policies`, `compliance_policy_controls`, `compliance_posture` | Policy Compliance | `/api/{2,4}.0/fo/compliance/...` on the API server | Reader role and asset groups ([below](#policy-compliance)) |
-| `webapps`, `webapps_findings` | TotalAppSec (WAS) | `/qps/rest/3.0/search/was/...` on the API server | Role and tag scope ([below](#totalappsec)) |
+| `webapps`, `webapps_findings`, `webapps_scans` | TotalAppSec (WAS) | `/qps/rest/3.0/search/was/...` on the API server | Role and tag scope ([below](#totalappsec)) |
 | `assets`, `assets_software`, `assets_open_ports` | Global AssetView / CSAM | `/rest/2.0/search/am/asset` on the gateway | Role and tag scope ([below](#global-assetview--csam)) |
+| `container_images`, `container_image_repos`, `container_image_vulnerabilities`, `containers`, `container_registries` | Container Security | `/csapi/v1.3/...` on the gateway | Role ([below](#container-security)) |
 
 The **Reader** role can call every VMDR API, but only returns hosts in the
 asset groups assigned to the user. A Reader with no asset groups
@@ -181,6 +183,35 @@ Qualys doesn't state whether the free Global AssetView tier includes this
 API or only paid CSAM; if authentication succeeds but the asset search is
 refused, check the subscription's entitlement.
 
+### Container Security
+
+The container tables authenticate against the subscription's gateway
+(`POST /auth`, the same login as the asset tables) and call the Container
+Security API (`/csapi/v1.3/...`). Access comes from a **role** with the
+Container Security API and list permissions.
+
+These steps are built from Qualys's published permission names and have
+not been verified against a live Container Security subscription; the
+labels on yours may differ.
+
+* **Subscription**: Container Security must be licensed. Without it, the
+  container tables fail and the others are unaffected.
+* Open the **Administration** module and go to **Role Management**.
+* Select **Create Role** and name it, e.g. `CCM Container Reader`. Grant
+  only:
+    * **Container Security** > **CS Permissions**: **CS API Access**.
+    * **CS Image Permissions**: **List Image/s** (`container_images`,
+      `container_image_repos`, `container_image_vulnerabilities`).
+    * **CS Container Permissions**: **List Container/s** (`containers`).
+    * **CS Registry Permissions**: **List Registry/s**
+      (`container_registries`).
+    * Leave every create, edit, delete and scan permission unticked.
+* Select **Save**.
+* In **Administration** > **User Management**, edit the `CCM Read Only`
+  user, add the `CCM Container Reader` role, and give it the scope the
+  collection should cover, typically **Full Scope**.
+* Select **Save**.
+
 ## Find the API server URL
 
 The API server depends on the platform your subscription is hosted on. To
@@ -191,7 +222,7 @@ starting `qualysapi.` is the API server (e.g.
 separate "API server" label, and does not list the gateway. You can also
 match the portal address you log in to against this table.
 
-The asset tables use the gateway. It is derived from the API server for
+The asset and container tables use the gateway. It is derived from the API server for
 every platform below, so you only need to set it (`QUALYS_GATEWAY_URL`) if
 your subscription is on a private cloud platform whose API server doesn't
 start `qualysapi.`:

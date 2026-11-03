@@ -35,6 +35,7 @@ failed-login lockout.
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -43,6 +44,7 @@ from posture.collectors.qualys.errors import CredentialsRejected
 
 _WEBAPP_SEARCH_PATH = "/qps/rest/3.0/search/was/webapp"
 _FINDING_SEARCH_PATH = "/qps/rest/3.0/search/was/finding"
+_SCAN_SEARCH_PATH = "/qps/rest/3.0/search/was/wasscan"
 
 _AUTH_HINT = (
     "check QUALYS_USERNAME (the login Qualys generated, not the display name) "
@@ -58,9 +60,12 @@ _REQUEST_TIMEOUT_SECONDS = 300
 # Webapp search without verbose returns only a handful of fields (no tags,
 # no OS); finding search's default response already carries every field the
 # manifest reads, and verbose would add bulky request/response evidence.
+# Scan search is verbose so each scan carries its summary (results and
+# authentication status).
 _SEARCHES: dict[str, tuple[str, str, bool]] = {
     "webapps": (_WEBAPP_SEARCH_PATH, "WebApp", True),
     "webapps_findings": (_FINDING_SEARCH_PATH, "Finding", False),
+    "webapps_scans": (_SCAN_SEARCH_PATH, "WasScan", True),
 }
 
 MANIFEST: dict[str, dict[str, Any]] = {
@@ -111,6 +116,30 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "is_ignored": ("isIgnored", "bool"),
             "ignored_reason": ("ignoredReason", "str"),
             "ignored_date": ("ignoredDate", "datetime"),
+        },
+    },
+    "webapps_scans": {
+        "endpoint": _SCAN_SEARCH_PATH,
+        "columns": {
+            "scan_id": ("id", "str"),
+            "name": ("name", "str"),
+            "reference": ("reference", "str"),
+            "type": ("type", "str"),
+            "mode": ("mode", "str"),
+            "multi": ("multi", "bool"),
+            "status": ("status", "str"),
+            "consolidated_status": ("consolidatedStatus", "str"),
+            "results_status": ("summary.resultsStatus", "str"),
+            "auth_status": ("summary.authStatus", "str"),
+            "webapp_id": ("target.webApp.id", "str"),
+            "webapp_name": ("target.webApp.name", "str"),
+            "webapp_url": ("target.webApp.url", "str"),
+            "profile_id": ("profile.id", "str"),
+            "profile_name": ("profile.name", "str"),
+            "launched_by": ("launchedBy.username", "str"),
+            "launched": ("launchedDate", "datetime"),
+            "ended": ("endScanDate", "datetime"),
+            "scan_duration": ("scanDuration", "int"),
         },
     },
 }
@@ -174,8 +203,8 @@ class WebappsApi:
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)
         if response.status_code == 401:
             raise CredentialsRejected(
-                f"Qualys TotalAppSec rejected the credentials (HTTP 401) for "
-                f"'{resource}': {response.text[:200]}",
+                f"Qualys TotalAppSec {urlparse(self._base_url).hostname} rejected "
+                f"the credentials (HTTP 401) for '{resource}': {response.text[:200]}",
                 source="qualys",
                 hint=_AUTH_HINT,
             )

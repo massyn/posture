@@ -28,11 +28,17 @@ df = ccm.collect("assets_software")
 df = ccm.collect("compliance_policies")
 df = ccm.collect("compliance_policy_controls")
 df = ccm.collect("compliance_posture")
+df = ccm.collect("container_image_repos")
+df = ccm.collect("container_image_vulnerabilities")
+df = ccm.collect("container_images")
+df = ccm.collect("container_registries")
+df = ccm.collect("containers")
 df = ccm.collect("vm_detections")
 df = ccm.collect("vm_hosts")
 df = ccm.collect("vm_knowledgebase")
 df = ccm.collect("webapps")
 df = ccm.collect("webapps_findings")
+df = ccm.collect("webapps_scans")
 ```
 
 ## Example: export every table to CSV
@@ -60,11 +66,17 @@ for table in ccm.tables():
 - [compliance_policies](#compliance_policies)
 - [compliance_policy_controls](#compliance_policy_controls)
 - [compliance_posture](#compliance_posture)
+- [container_image_repos](#container_image_repos)
+- [container_image_vulnerabilities](#container_image_vulnerabilities)
+- [container_images](#container_images)
+- [container_registries](#container_registries)
+- [containers](#containers)
 - [vm_detections](#vm_detections)
 - [vm_hosts](#vm_hosts)
 - [vm_knowledgebase](#vm_knowledgebase)
 - [webapps](#webapps)
 - [webapps_findings](#webapps_findings)
+- [webapps_scans](#webapps_scans)
 
 ### assets
 
@@ -177,6 +189,124 @@ Derived from [`compliance_policies`](#compliance_policies) — no separate netwo
 | `first_passed` | `datetime` |
 | `last_passed` | `datetime` |
 
+### container_image_repos
+
+Derived from [`container_images`](#container_images) — no separate network call.
+
+| Column | Type |
+| --- | --- |
+| `image_sha` | `str` |
+| `image_id` | `str` |
+| `registry` | `str` |
+| `repository` | `str` |
+| `tag` | `str` |
+
+### container_image_vulnerabilities
+
+Derived from [`container_image_details`](#container_image_details) — no separate network call.
+
+| Column | Type |
+| --- | --- |
+| `image_sha` | `str` |
+| `image_id` | `str` |
+| `qid` | `str` |
+| `title` | `str` |
+| `severity` | `int` |
+| `customer_severity` | `int` |
+| `qds_score` | `int` |
+| `risk` | `int` |
+| `category` | `str` |
+| `type_detected` | `str` |
+| `result` | `str` |
+| `patch_available` | `bool` |
+| `is_exempted` | `bool` |
+| `cve_ids` | `json` |
+| `software` | `json` |
+| `first_found` | `datetime` |
+| `last_found` | `datetime` |
+| `published` | `datetime` |
+
+### container_images
+
+| Column | Type |
+| --- | --- |
+| `image_sha` | `str` |
+| `image_id` | `str` |
+| `image_uuid` | `str` |
+| `operating_system` | `str` |
+| `architecture` | `str` |
+| `size` | `int` |
+| `repo_digests` | `json` |
+| `source` | `json` |
+| `scan_types` | `json` |
+| `scan_status` | `str` |
+| `is_docker_hub_official` | `bool` |
+| `associated_containers_count` | `int` |
+| `associated_hosts_count` | `int` |
+| `risk_score` | `int` |
+| `max_qds_score` | `int` |
+| `qds_severity` | `str` |
+| `severity1_count` | `int` |
+| `severity2_count` | `int` |
+| `severity3_count` | `int` |
+| `severity4_count` | `int` |
+| `severity5_count` | `int` |
+| `created` | `datetime` |
+| `last_updated` | `datetime` |
+| `last_scanned` | `datetime` |
+| `last_vm_scan` | `datetime` |
+| `last_compliance_scan` | `datetime` |
+
+### container_registries
+
+| Column | Type |
+| --- | --- |
+| `registry_uuid` | `str` |
+| `registry_name` | `str` |
+| `registry_uri` | `str` |
+| `registry_type` | `str` |
+| `provider_type` | `str` |
+| `aws_account_id` | `str` |
+| `aws_region` | `str` |
+| `docker_hub_org` | `str` |
+| `repo_count` | `int` |
+| `total_images` | `int` |
+| `total_scanned_images` | `int` |
+| `total_vulnerable_images` | `int` |
+| `last_schedule_status` | `str` |
+| `created` | `datetime` |
+| `last_updated` | `datetime` |
+| `last_scanned` | `datetime` |
+
+### containers
+
+| Column | Type |
+| --- | --- |
+| `container_id` | `str` |
+| `container_sha` | `str` |
+| `name` | `str` |
+| `state` | `str` |
+| `image_id` | `str` |
+| `image_uuid` | `str` |
+| `sensor_uuid` | `str` |
+| `host` | `json` |
+| `cluster` | `json` |
+| `is_root` | `bool` |
+| `is_exposed_to_world` | `bool` |
+| `risk_score` | `int` |
+| `max_qds_score` | `int` |
+| `qds_severity` | `str` |
+| `severity1_count` | `int` |
+| `severity2_count` | `int` |
+| `severity3_count` | `int` |
+| `severity4_count` | `int` |
+| `severity5_count` | `int` |
+| `created` | `datetime` |
+| `last_updated` | `datetime` |
+| `state_changed` | `datetime` |
+| `last_vm_scan` | `datetime` |
+| `last_compliance_scan` | `datetime` |
+
 ### vm_detections
 
 Derived from [`host_detections`](#host_detections) — no separate network call.
@@ -188,16 +318,23 @@ Derived from [`host_detections`](#host_detections) — no separate network call.
 | `host_dns_name` | `str` |
 | `host_os` | `str` |
 | `qid` | `str` |
+| `unique_vuln_id` | `str` |
 | `detection_type` | `str` |
 | `severity` | `int` |
 | `port` | `int` |
 | `protocol` | `str` |
+| `ssl` | `bool` |
+| `qds` | `int` |
 | `results` | `str` |
 | `status` | `str` |
 | `first_found` | `datetime` |
 | `last_found` | `datetime` |
 | `last_tested` | `datetime` |
 | `last_updated` | `datetime` |
+| `last_fixed` | `datetime` |
+| `last_processed` | `datetime` |
+| `times_found` | `int` |
+| `times_reopened` | `int` |
 | `is_ignored` | `bool` |
 | `is_disabled` | `bool` |
 
@@ -213,12 +350,19 @@ Derived from [`host_detections`](#host_detections) — no separate network call.
 | `netbios_name` | `str` |
 | `os` | `str` |
 | `qg_host_id` | `str` |
+| `asset_id` | `str` |
 | `cloud_provider` | `str` |
 | `cloud_service` | `str` |
 | `cloud_resource_id` | `str` |
+| `trurisk_score` | `int` |
+| `asset_criticality_score` | `int` |
+| `first_found` | `datetime` |
 | `last_boot` | `datetime` |
 | `last_vuln_scan` | `datetime` |
 | `last_vm_scan` | `datetime` |
+| `last_vm_scan_duration` | `int` |
+| `last_vm_auth_scan` | `datetime` |
+| `last_vm_auth_scan_duration` | `int` |
 | `last_pc_scan` | `datetime` |
 | `agent_version` | `str` |
 | `agent_status` | `str` |
@@ -290,4 +434,28 @@ Derived from [`host_detections`](#host_detections) — no separate network call.
 | `is_ignored` | `bool` |
 | `ignored_reason` | `str` |
 | `ignored_date` | `datetime` |
+
+### webapps_scans
+
+| Column | Type |
+| --- | --- |
+| `scan_id` | `str` |
+| `name` | `str` |
+| `reference` | `str` |
+| `type` | `str` |
+| `mode` | `str` |
+| `multi` | `bool` |
+| `status` | `str` |
+| `consolidated_status` | `str` |
+| `results_status` | `str` |
+| `auth_status` | `str` |
+| `webapp_id` | `str` |
+| `webapp_name` | `str` |
+| `webapp_url` | `str` |
+| `profile_id` | `str` |
+| `profile_name` | `str` |
+| `launched_by` | `str` |
+| `launched` | `datetime` |
+| `ended` | `datetime` |
+| `scan_duration` | `int` |
 

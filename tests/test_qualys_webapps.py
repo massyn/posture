@@ -116,6 +116,51 @@ def test_filters_kwarg_is_sent_with_the_cursor() -> None:
 
 
 @responses.activate
+def test_scans_are_verbose_and_flatten_target_and_summary() -> None:
+    responses.add(
+        responses.POST,
+        f"{_BASE}/qps/rest/3.0/search/was/wasscan",
+        json=_service_response(
+            "WasScan",
+            [
+                {
+                    "id": 501,
+                    "name": "Weekly shop scan",
+                    "reference": "was/1700000000.501",
+                    "type": "VULNERABILITY",
+                    "mode": "SCHEDULED",
+                    "multi": "false",
+                    "target": {
+                        "webApp": {"id": 7, "name": "Shop", "url": "https://shop"}
+                    },
+                    "profile": {"id": 3, "name": "Default"},
+                    "launchedBy": {"id": 1, "username": "ccm"},
+                    "launchedDate": "2026-10-01T02:00:00Z",
+                    "endScanDate": "2026-10-01T03:30:00Z",
+                    "scanDuration": 5400,
+                    "status": "FINISHED",
+                    "consolidatedStatus": "FINISHED",
+                    "summary": {"resultsStatus": "SUCCESSFUL", "authStatus": "NONE"},
+                }
+            ],
+        ),
+        status=200,
+    )
+
+    row = CCM("qualys", _CONFIG).collect("webapps_scans").iloc[0]
+
+    assert _request(responses.calls[0])["preferences"]["verbose"] is True
+    assert row["scan_id"] == "501"
+    assert row["webapp_id"] == "7"
+    assert row["profile_name"] == "Default"
+    assert row["launched_by"] == "ccm"
+    assert row["results_status"] == "SUCCESSFUL"
+    assert row["scan_duration"] == 5400
+    assert bool(row["multi"]) is False
+    assert row["ended"].isoformat() == "2026-10-01T03:30:00+00:00"
+
+
+@responses.activate
 def test_non_success_response_code_raises() -> None:
     responses.add(
         responses.POST,
