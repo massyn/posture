@@ -409,3 +409,86 @@ def test_detections_use_v4_endpoint() -> None:
     assert df.iloc[0]["qid"] == "38170"
     assert df.iloc[0]["severity"] == 5
     assert df.iloc[0]["status"] == "Active"
+
+
+@responses.activate
+def test_detections_carry_qds_and_lifecycle_fields() -> None:
+    body = b"""<?xml version="1.0"?>
+<HOST_LIST_VM_DETECTION_OUTPUT>
+  <RESPONSE>
+    <HOST_LIST>
+      <HOST>
+        <ID>1</ID>
+        <DETECTION_LIST>
+          <DETECTION>
+            <UNIQUE_VULN_ID>9</UNIQUE_VULN_ID><QID>38170</QID>
+            <SSL>1</SSL>
+            <QDS severity="HIGH">85</QDS>
+            <TIMES_FOUND>4</TIMES_FOUND><TIMES_REOPENED>1</TIMES_REOPENED>
+            <LAST_FIXED_DATETIME>2026-08-01T00:00:00Z</LAST_FIXED_DATETIME>
+            <LAST_PROCESSED_DATETIME>2026-09-01T00:00:00Z</LAST_PROCESSED_DATETIME>
+          </DETECTION>
+        </DETECTION_LIST>
+      </HOST>
+    </HOST_LIST>
+  </RESPONSE>
+</HOST_LIST_VM_DETECTION_OUTPUT>"""
+    url = BASE_URL + "/api/4.0/fo/asset/host/vm/detection/"
+    responses.add(responses.GET, url, body=body, content_type="text/xml")
+
+    ccm = CCM("qualys", {"username": "u", "password": "p", "base_url": BASE_URL})
+    row = ccm.collect("vm_detections").iloc[0]
+
+    assert _params(responses.calls[0].request)["show_qds"] == "1"
+    assert row["unique_vuln_id"] == "9"
+    assert bool(row["ssl"]) is True
+    assert row["qds"] == 85
+    assert row["times_found"] == 4
+    assert row["times_reopened"] == 1
+    assert row["last_fixed"].isoformat() == "2026-08-01T00:00:00+00:00"
+    assert row["last_processed"].isoformat() == "2026-09-01T00:00:00+00:00"
+
+
+@responses.activate
+def test_hosts_request_and_carry_trurisk_and_asset_id() -> None:
+    body = b"""<?xml version="1.0"?>
+<HOST_LIST_OUTPUT>
+  <RESPONSE>
+    <HOST_LIST>
+      <HOST>
+        <ID>1</ID><ASSET_ID>5001</ASSET_ID>
+        <TRURISK_SCORE>712</TRURISK_SCORE>
+        <ASSET_CRITICALITY_SCORE>4</ASSET_CRITICALITY_SCORE>
+        <FIRST_FOUND_DATE>2026-01-02T03:04:05Z</FIRST_FOUND_DATE>
+        <LAST_VM_SCANNED_DURATION>320</LAST_VM_SCANNED_DURATION>
+        <LAST_VM_AUTH_SCANNED_DATE>2026-09-01T00:00:00Z</LAST_VM_AUTH_SCANNED_DATE>
+        <LAST_VM_AUTH_SCANNED_DURATION>410</LAST_VM_AUTH_SCANNED_DURATION>
+      </HOST>
+    </HOST_LIST>
+  </RESPONSE>
+</HOST_LIST_OUTPUT>"""
+    responses.add(responses.GET, HOSTS_URL, body=body, content_type="text/xml")
+
+    ccm = CCM("qualys", {"username": "u", "password": "p", "base_url": BASE_URL})
+    row = ccm.collect("vm_hosts").iloc[0]
+
+    params = _params(responses.calls[0].request)
+    assert params["show_trurisk"] == "1"
+    assert params["show_asset_id"] == "1"
+    assert row["asset_id"] == "5001"
+    assert row["trurisk_score"] == 712
+    assert row["asset_criticality_score"] == 4
+    assert row["first_found"].isoformat() == "2026-01-02T03:04:05+00:00"
+    assert row["last_vm_scan_duration"] == 320
+    assert row["last_vm_auth_scan"].isoformat() == "2026-09-01T00:00:00+00:00"
+    assert row["last_vm_auth_scan_duration"] == 410
+
+
+@responses.activate
+def test_hosts_kwargs_can_turn_off_trurisk() -> None:
+    responses.add(responses.GET, HOSTS_URL, body=PAGE2_XML, content_type="text/xml")
+
+    ccm = CCM("qualys", {"username": "u", "password": "p", "base_url": BASE_URL})
+    ccm.collect("vm_hosts", show_trurisk=0)
+
+    assert _params(responses.calls[0].request)["show_trurisk"] == "0"

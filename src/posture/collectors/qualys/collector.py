@@ -8,12 +8,13 @@ module here:
   shared by ``vm.py`` (VMDR) and ``compliance.py`` (Policy Compliance).
 - ``webapps.py``: the WAS v3 JSON search API on the API server, Basic auth
   (TotalAppSec).
-- ``assets.py``: the CSAM asset search API on the gateway host, JWT auth
-  (Global AssetView / CSAM).
+- ``gateway.py``: JWT auth on the gateway host, shared by ``assets.py``
+  (the CSAM asset search API, Global AssetView / CSAM) and
+  ``containers.py`` (the Container Security API).
 
 This class only routes each table to the module that fetches it. Every
 family authenticates its own requests, and the gateway JWT is only fetched
-when an ``assets`` table is collected, so a module the subscription doesn't
+when a gateway table is collected, so a module the subscription doesn't
 licence fails its own tables and nothing else.
 
 The exception is the user itself being refused (``CredentialsRejected``: bad
@@ -29,9 +30,10 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from posture.base import Collector
-from posture.collectors.qualys import assets, compliance, vm, webapps
+from posture.collectors.qualys import assets, compliance, containers, vm, webapps
 from posture.collectors.qualys.errors import CredentialsRejected
 from posture.collectors.qualys.fo_api import FoApi
+from posture.collectors.qualys.gateway import GatewayAuth, gateway_url_for
 
 
 class QualysCollector(Collector):
@@ -42,6 +44,7 @@ class QualysCollector(Collector):
         **compliance.MANIFEST,
         **webapps.MANIFEST,
         **assets.MANIFEST,
+        **containers.MANIFEST,
     }
     config_keys: ClassVar[dict[str, bool]] = {
         "username": True,
@@ -59,14 +62,19 @@ class QualysCollector(Collector):
         base_url = self._config["base_url"]
         credentials = (self._config["username"], self._config["password"])
         fo = FoApi(self._session, base_url, credentials)
-        gateway_url = self._config.get("gateway_url") or assets.gateway_url_for(
-            base_url
+        gateway = GatewayAuth(
+            self._session,
+            self._config.get("gateway_url") or gateway_url_for(base_url),
+            credentials,
         )
         apis = (
             vm.VmApi(fo),
             compliance.ComplianceApi(fo, self._get_raw),
             webapps.WebappsApi(self._session, base_url, credentials),
-            assets.AssetsApi(self._session, gateway_url, credentials),
+            assets.AssetsApi(self._session, gateway),
+            containers.ContainersApi(
+                self._session, gateway, self._get_raw, self._resumable_fanout
+            ),
         )
         self._routes = {resource: api for api in apis for resource in api.resources}
         self._credentials_rejected: CredentialsRejected | None = None
