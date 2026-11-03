@@ -218,8 +218,9 @@ def test_401_with_fresh_token_fails_as_no_module_access() -> None:
     _add_auth()
     responses.add(responses.GET, CONTAINERS_URL, status=401, body="Unauthorized")
 
+    ccm = CCM("qualys", CONFIG)
     with pytest.raises(IncompleteCollection, match="just issued") as excinfo:
-        CCM("qualys", CONFIG).collect("containers")
+        ccm.collect("containers")
 
     cause = excinfo.value.__cause__
     assert isinstance(cause, AuthenticationError)
@@ -240,8 +241,9 @@ def test_server_error_keeps_host_and_qualys_text() -> None:
         body='{"errorMessage": "module not enabled"}',
     )
 
+    ccm = CCM("qualys", CONFIG)
     with pytest.raises(IncompleteCollection, match="module not enabled") as excinfo:
-        CCM("qualys", CONFIG).collect("assets")
+        ccm.collect("assets")
 
     assert "gateway.qg1.apps.qualys.com returned HTTP 500" in str(excinfo.value)
 
