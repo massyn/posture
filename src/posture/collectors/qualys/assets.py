@@ -7,9 +7,8 @@ API; Qualys positions it as the replacement for the legacy Asset Management
 (``https://gateway.qgN.apps.qualys.com``), not the ``qualysapi`` host the
 other Qualys tables use, and authenticates with a JWT rather than Basic auth.
 
-Gateway host and JWT auth are shared with Container Security; see
-``gateway.py``. A 401 mid-run drops the token and raises
-``UnauthorizedSignal``, so the base class's retry fetches a fresh one.
+Gateway host, JWT auth and response checks are shared with Container
+Security; see ``gateway.py``.
 
 Pagination: ``pageSize`` (max 300) and ``lastSeenAssetId``; each response
 carries ``hasMore`` (1/0) and the ``lastSeenAssetId`` to resume from, which
@@ -32,7 +31,6 @@ from typing import Any
 
 import requests
 
-from posture.base import RateLimitedSignal, UnauthorizedSignal
 from posture.collectors.qualys.gateway import GatewayAuth
 
 _ASSET_SEARCH_PATH = "/rest/2.0/search/am/asset"
@@ -132,15 +130,7 @@ class AssetsApi:
             headers=self._gateway.headers(),
             timeout=_REQUEST_TIMEOUT_SECONDS,
         )
-        if response.status_code == 429:
-            wait = response.headers.get(
-                "X-RateLimit-ToWait-Sec"
-            ) or response.headers.get("Retry-After")
-            raise RateLimitedSignal(retry_after=float(wait) if wait else None)
-        if response.status_code == 401:
-            self._gateway.invalidate()
-            raise UnauthorizedSignal()
-        response.raise_for_status()
+        self._gateway.check(response, resource)
 
         body = response.json()
         if body.get("responseCode") != "SUCCESS":

@@ -35,6 +35,7 @@ failed-login lockout.
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
@@ -202,8 +203,8 @@ class WebappsApi:
             raise RateLimitedSignal(retry_after=float(wait) if wait else None)
         if response.status_code == 401:
             raise CredentialsRejected(
-                f"Qualys TotalAppSec rejected the credentials (HTTP 401) for "
-                f"'{resource}': {response.text[:200]}",
+                f"Qualys TotalAppSec {urlparse(self._base_url).hostname} rejected "
+                f"the credentials (HTTP 401) for '{resource}': {response.text[:200]}",
                 source="qualys",
                 hint=_AUTH_HINT,
             )

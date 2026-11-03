@@ -40,7 +40,6 @@ from urllib.parse import urljoin
 
 import requests
 
-from posture.base import RateLimitedSignal, UnauthorizedSignal
 from posture.collectors.qualys.gateway import GatewayAuth
 
 _IMAGES_LIST_PATH = "/csapi/v1.3/images/list"
@@ -257,11 +256,12 @@ class ContainersApi:
     ) -> tuple[list[dict[str, Any]], str | None]:
         if cursor is None:
             response = self._get(
+                resource,
                 self._gateway.url + _LIST_PATHS[resource],
                 {"limit": _LIST_LIMIT, **kwargs},
             )
         else:
-            response = self._get(cursor, None)
+            response = self._get(resource, cursor, None)
         fields = _DATETIME_FIELDS[resource]
         records = [
             _with_epoch_ints(r, fields) for r in response.json().get("data") or []
@@ -274,6 +274,7 @@ class ContainersApi:
     ) -> tuple[list[dict[str, Any]], int | None]:
         page_number = cursor or 1
         body = self._get(
+            "container_registries",
             self._gateway.url + _REGISTRY_PATH,
             {"pageNumber": page_number, "pageSize": _REGISTRY_PAGE_SIZE},
         ).json()
@@ -309,7 +310,7 @@ class ContainersApi:
 
     def _fetch_image(self, sha: str) -> dict[str, Any] | None:
         url = self._gateway.url + _IMAGE_DETAIL_PATH.format(sha=sha)
-        response = self._get(url, None, missing_ok=True)
+        response = self._get("container_image_details", url, None, missing_ok=True)
         if response is None:
             # Removed between the image list and this call.
             return None
@@ -325,7 +326,12 @@ class ContainersApi:
         }
 
     def _get(
-        self, url: str, params: dict[str, Any] | None, *, missing_ok: bool = False
+        self,
+        resource: str,
+        url: str,
+        params: dict[str, Any] | None,
+        *,
+        missing_ok: bool = False,
     ) -> requests.Response | None:
         response = self._session.get(
             url,
@@ -333,15 +339,7 @@ class ContainersApi:
             headers=self._gateway.headers(),
             timeout=_REQUEST_TIMEOUT_SECONDS,
         )
-        if response.status_code == 429:
-            wait = response.headers.get(
-                "X-RateLimit-ToWait-Sec"
-            ) or response.headers.get("Retry-After")
-            raise RateLimitedSignal(retry_after=float(wait) if wait else None)
-        if response.status_code == 401:
-            self._gateway.invalidate()
-            raise UnauthorizedSignal()
         if missing_ok and response.status_code == 404:
             return None
-        response.raise_for_status()
+        self._gateway.check(response, resource)
         return response

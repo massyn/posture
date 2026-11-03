@@ -31,6 +31,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from posture.base import RateLimitedSignal, UnauthorizedSignal
 from posture.collectors.qualys.errors import CredentialsRejected
 from posture.exceptions import AuthenticationError
 
@@ -69,6 +70,7 @@ class GatewayAuth:
         self._gateway_url = gateway_url
         self._credentials = credentials
         self._token: str | None = None
+        self.token_issued_at: datetime | None = None
         self.token_expires_at: datetime | None = None
 
     @property
@@ -86,9 +88,55 @@ class GatewayAuth:
             "Accept": "application/json",
         }
 
-    def invalidate(self) -> None:
-        """Drop the token after a 401, so the retry fetches a fresh one."""
-        self._token = None
+    def check(self, response: requests.Response, resource: str) -> None:
+        """Raise for a failed gateway data call, naming the host and keeping
+        Qualys's own response text.
+
+        A 401 normally means the token expired, so it is dropped and
+        ``UnauthorizedSignal`` makes the base class retry with a fresh one.
+        A 401 against a token issued moments ago cannot be expiry: the user
+        or subscription lacks that module's API, so it fails the table with
+        an ``AuthenticationError`` instead of an empty retry loop. Not
+        ``CredentialsRejected``: the login itself worked, so the other
+        tables can still collect.
+        """
+        if response.status_code == 429:
+            wait = response.headers.get(
+                "X-RateLimit-ToWait-Sec"
+            ) or response.headers.get("Retry-After")
+            raise RateLimitedSignal(retry_after=float(wait) if wait else None)
+        detail = response.text[:300].strip() or "no message"
+        if response.status_code == 401:
+            if self._issued_recently():
+                raise AuthenticationError(
+                    f"Qualys gateway {self._host()} refused '{resource}' (HTTP "
+                    f"401) with a token it had just issued: {detail}",
+                    source="qualys",
+                    hint="the login works but this module's API is not "
+                    "available to the user: check the subscription includes "
+                    "the module (Container Security, CSAM/Global AssetView) "
+                    "and the user's role grants its API access and list "
+                    "permissions (Qualys Community Edition has no API)",
+                )
+            self._token = None
+            raise UnauthorizedSignal()
+        if not response.ok:
+            raise requests.HTTPError(
+                f"Qualys gateway {self._host()} returned HTTP "
+                f"{response.status_code} for '{resource}': {detail}",
+                response=response,
+            )
+
+    def _issued_recently(self) -> bool:
+        # A token this young cannot have expired (it lasts four hours).
+        return (
+            self.token_issued_at is not None
+            and datetime.now(timezone.utc) - self.token_issued_at
+            < _TOKEN_REFRESH_MARGIN
+        )
+
+    def _host(self) -> str:
+        return urlparse(self.url).hostname or self.url
 
     def _bearer_token(self) -> str:
         if (
@@ -112,7 +160,8 @@ class GatewayAuth:
                 else AuthenticationError
             )
             raise error(
-                f"Qualys gateway authentication failed (HTTP {response.status_code})",
+                f"Qualys gateway {self._host()} authentication failed "
+                f"(HTTP {response.status_code})",
                 source="qualys",
                 hint="check QUALYS_USERNAME/QUALYS_PASSWORD, that the user has "
                 "API access to the module (CSAM/Global AssetView, Container "
@@ -121,5 +170,6 @@ class GatewayAuth:
             )
         response.raise_for_status()
         self._token = response.text.strip()
-        self.token_expires_at = datetime.now(timezone.utc) + _TOKEN_LIFETIME
+        self.token_issued_at = datetime.now(timezone.utc)
+        self.token_expires_at = self.token_issued_at + _TOKEN_LIFETIME
         return self._token

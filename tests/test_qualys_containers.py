@@ -1,11 +1,13 @@
 import json
+from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 import responses
 
 from posture import CCM
-from posture.exceptions import IncompleteCollection
+from posture.collectors.qualys.errors import CredentialsRejected
+from posture.exceptions import AuthenticationError, IncompleteCollection
 
 GATEWAY = "https://gateway.qg1.apps.qualys.com"
 AUTH_URL = GATEWAY + "/auth"
@@ -195,14 +197,53 @@ def test_registries_page_until_count_reached() -> None:
 def test_expired_token_is_refreshed_on_401() -> None:
     responses.add(responses.POST, AUTH_URL, body="old-token", status=201)
     responses.add(responses.POST, AUTH_URL, body="new-token", status=201)
+    responses.add(responses.GET, CONTAINERS_URL, json={"data": []})
     responses.add(responses.GET, CONTAINERS_URL, status=401)
     responses.add(responses.GET, CONTAINERS_URL, json={"data": []})
 
-    df = CCM("qualys", CONFIG).collect("containers")
+    ccm = CCM("qualys", CONFIG)
+    ccm.collect("containers")
+    gateway = ccm._routes["containers"]._gateway
+    # Age the token so the 401 reads as expiry, not a refusal.
+    gateway.token_issued_at -= timedelta(hours=1)
+    df = ccm.collect("containers", filter="state:RUNNING")
 
     assert len(df) == 0
     gets = [c for c in responses.calls if c.request.method == "GET"]
     assert gets[-1].request.headers["Authorization"] == "Bearer new-token"
+
+
+@responses.activate
+def test_401_with_fresh_token_fails_as_no_module_access() -> None:
+    _add_auth()
+    responses.add(responses.GET, CONTAINERS_URL, status=401, body="Unauthorized")
+
+    with pytest.raises(IncompleteCollection, match="just issued") as excinfo:
+        CCM("qualys", CONFIG).collect("containers")
+
+    cause = excinfo.value.__cause__
+    assert isinstance(cause, AuthenticationError)
+    assert not isinstance(cause, CredentialsRejected)
+    assert "gateway.qg1.apps.qualys.com" in str(cause)
+    assert "Community Edition" in cause.hint
+    auth_calls = [c for c in responses.calls if c.request.url == AUTH_URL]
+    assert len(auth_calls) == 1
+
+
+@responses.activate
+def test_server_error_keeps_host_and_qualys_text() -> None:
+    _add_auth()
+    responses.add(
+        responses.POST,
+        GATEWAY + "/rest/2.0/search/am/asset",
+        status=500,
+        body='{"errorMessage": "module not enabled"}',
+    )
+
+    with pytest.raises(IncompleteCollection, match="module not enabled") as excinfo:
+        CCM("qualys", CONFIG).collect("assets")
+
+    assert "gateway.qg1.apps.qualys.com returned HTTP 500" in str(excinfo.value)
 
 
 @responses.activate

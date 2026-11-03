@@ -485,6 +485,25 @@ def test_hosts_request_and_carry_trurisk_and_asset_id() -> None:
 
 
 @responses.activate
+def test_auth_error_names_the_api_host() -> None:
+    responses.add(
+        responses.GET,
+        HOSTS_URL,
+        status=401,
+        body=_simple_return("2000", "Bad Login/Password"),
+        content_type="text/xml",
+    )
+
+    ccm = CCM("qualys", {"username": "u", "password": "p", "base_url": BASE_URL})
+    with pytest.raises(IncompleteCollection) as excinfo:
+        ccm.collect("vm_hosts")
+
+    assert "Qualys qualysapi.example.com rejected the request" in str(
+        excinfo.value.__cause__
+    )
+
+
+@responses.activate
 def test_hosts_kwargs_can_turn_off_trurisk() -> None:
     responses.add(responses.GET, HOSTS_URL, body=PAGE2_XML, content_type="text/xml")
 
