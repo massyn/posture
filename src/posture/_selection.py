@@ -1,5 +1,5 @@
 """Resolve which ``source -> resources`` ``posturecollect`` collects, from its
-include/exclude lists.
+include/also/exclude lists.
 
 Each entry is ``<source>`` (every resource of that source) or
 ``<source>.<resource>`` (just that one). With no include list, the starting
@@ -7,8 +7,10 @@ set is every source with its required environment variables set
 (``catalog(filter="environment")``), or every registered source when the
 caller asks for them all (``--catalog``/``--variables``, which describe what
 exists rather than what would run); an include list replaces that entirely
-and bypasses the environment check. The exclude list is then subtracted from
-whichever starting set applies, and a source left with no resources is
+and bypasses the environment check. The also list is then added to whichever
+starting set applies, also bypassing the environment check (the way to reach
+a no-auth source alongside the environment-configured ones in a single run).
+The exclude list is subtracted last, and a source left with no resources is
 dropped. Any entry naming an unknown source or resource exits rather than
 being silently ignored.
 """
@@ -30,8 +32,16 @@ def split_list(_env_var: str, value: str) -> list[str]:
     return [item for item in re.split(r"[,\s]+", value) if item]
 
 
-def _parse_entries(flag: str, entries: list[str], all_sources: dict[str, Any]) -> _Spec:
-    spec: _Spec = {}
+def _parse_entries(
+    flag: str,
+    entries: list[str],
+    all_sources: dict[str, Any],
+    spec: _Spec | None = None,
+) -> _Spec:
+    """Parse ``entries`` into a ``_Spec``, merged into ``spec`` (in place)
+    when given: a whole-source entry wins over resource entries, and resource
+    entries for the same source accumulate."""
+    spec = {} if spec is None else spec
     unknown: list[str] = []
     for entry in entries:
         source, _, resource = entry.partition(".")
@@ -56,6 +66,7 @@ def _parse_entries(flag: str, entries: list[str], all_sources: dict[str, Any]) -
 def select_tables(
     include: list[str] | None,
     exclude: list[str] | None,
+    also: list[str] | None = None,
     *,
     every_source: bool = False,
 ) -> dict[str, list[str]]:
@@ -70,6 +81,7 @@ def select_tables(
         )
     else:
         included = _parse_entries("--include", include, all_sources)
+    _parse_entries("--also", also or [], all_sources, included)
 
     tables: dict[str, list[str]] = {}
     for source, wanted in included.items():

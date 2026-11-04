@@ -63,3 +63,40 @@ def test_exclude_applies_to_environment_default(monkeypatch) -> None:
 def test_unknown_entry_exits(include, exclude) -> None:
     with pytest.raises(SystemExit, match="Use <source> or <source>.<resource>"):
         select_tables(include, exclude)
+
+
+def test_also_adds_to_environment_default(monkeypatch) -> None:
+    monkeypatch.setenv("HTTP_HOSTS", "example.com")
+    tables = select_tables(None, None, ["macadmins"])
+    assert "http" in tables  # environment-configured source still collected
+    assert tables["macadmins"] == ["macos_releases", "macos_cves"]
+
+
+def test_also_adds_to_include() -> None:
+    assert select_tables(["endoflife"], None, ["macadmins.macos_cves"]) == {
+        "endoflife": ["products", "cycles"],
+        "macadmins": ["macos_cves"],
+    }
+
+
+def test_also_resource_widens_include_resource() -> None:
+    tables = select_tables(["macadmins.macos_cves"], None, ["macadmins.macos_releases"])
+    assert tables == {"macadmins": ["macos_releases", "macos_cves"]}
+
+
+def test_also_resource_does_not_narrow_include_source() -> None:
+    tables = select_tables(["macadmins"], None, ["macadmins.macos_cves"])
+    assert tables == {"macadmins": ["macos_releases", "macos_cves"]}
+
+
+def test_exclude_applies_after_also() -> None:
+    tables = select_tables(["endoflife"], ["macadmins.macos_cves"], ["macadmins"])
+    assert tables == {
+        "endoflife": ["products", "cycles"],
+        "macadmins": ["macos_releases"],
+    }
+
+
+def test_unknown_also_entry_exits() -> None:
+    with pytest.raises(SystemExit, match="Unknown --also entry"):
+        select_tables(None, None, ["not-a-real-source"])

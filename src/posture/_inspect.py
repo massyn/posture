@@ -5,7 +5,7 @@ and ``--dry-run`` (the tables a real run would collect).
 
 Each returns the lines to print. All but ``schema_lines`` take the
 ``source -> resources`` selection ``cli.main`` resolved from
-``--include``/``--exclude``. Reading the
+``--include``/``--also``/``--exclude``. Reading the
 environment is the only side effect: no collector is instantiated and no
 request is sent. Variable values are never shown, only whether each is set,
 since most of them are credentials.

@@ -4,6 +4,7 @@ collector and write it to parquet.
     posturecollect
     posturecollect --include crowdstrike endoflife
     posturecollect --include crowdstrike.hosts --exclude endoflife
+    posturecollect --also endoflife macadmins
     posturecollect --output ./data --history
     posturecollect --include qualys --debug
     posturecollect --thread 5
@@ -20,10 +21,13 @@ source, e.g. ``endoflife``/``macadmins``, is never picked up here since it
 has nothing to check). ``--include`` overrides that entirely: only the named
 source(s) are collected, unconditionally — this is the one way to reach a
 no-auth source, or to run a single source regardless of what's configured.
-``--exclude`` then removes entries from whichever set applies. Both take
-``<source>`` or ``<source>.<resource>`` entries, and fall back to the
-``POSTURE_INCLUDE``/``POSTURE_EXCLUDE`` environment variables (comma- or
-space-separated) — see ``posture._selection``.
+``--also`` adds its entries to whichever set applies, also regardless of
+environment variables — the way to collect the configured sources and a
+no-auth source in one run. ``--exclude`` then removes entries from the
+result. All three take ``<source>`` or ``<source>.<resource>`` entries, and
+fall back to the ``POSTURE_INCLUDE``/``POSTURE_ALSO``/``POSTURE_EXCLUDE``
+environment variables (comma- or space-separated) — see
+``posture._selection``.
 
 Every resource of every selected source is streamed page-by-page
 (``Collector.collect_page()``) straight into a parquet file via
@@ -74,7 +78,7 @@ starts each line in the first column on a bare LF.
 ``--catalog``, ``--variables``, ``--schema`` and ``--dry-run`` print a
 listing and exit without collecting anything (see ``posture._inspect``).
 ``--catalog`` and ``--variables`` describe every registered source, narrowed
-by ``--include``/``--exclude``; ``--schema SOURCE.RESOURCE`` lists one
+by ``--include``/``--also``/``--exclude``; ``--schema SOURCE.RESOURCE`` lists one
 table's columns and types; ``--dry-run`` lists the ``source.resource`` tables
 a real run would collect with the same environment and flags.
 """
@@ -112,6 +116,7 @@ logger = logging.getLogger("posture.cli")
 
 _ARG_FLAGS = {
     "include": "--include",
+    "also": "--also",
     "exclude": "--exclude",
     "output": "--output",
     "history": "--history",
@@ -123,6 +128,9 @@ _ARG_FLAGS = {
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
+
+#: metavar shared by the --include/--also/--exclude selection flags.
+_SELECTION_METAVAR = "SOURCE[.RESOURCE]"
 
 
 def _env_bool(env_var: str, value: str) -> bool:
@@ -157,6 +165,7 @@ def _env_positive_int(env_var: str, value: str) -> int:
 #: swapped the env file in.
 _ENV_DEFAULTS: dict[str, tuple[str, Any, Any]] = {
     "include": ("POSTURE_INCLUDE", None, split_list),
+    "also": ("POSTURE_ALSO", None, split_list),
     "exclude": ("POSTURE_EXCLUDE", None, split_list),
     "output": ("POSTURE_OUTPUT", "output", lambda _var, value: value),
     "history": ("POSTURE_HISTORY", False, _env_bool),
@@ -177,7 +186,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--include",
         nargs="+",
-        metavar="SOURCE[.RESOURCE]",
+        metavar=_SELECTION_METAVAR,
         default=None,
         help=(
             "only collect these source(s) or source.resource table(s), "
@@ -186,9 +195,20 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--also",
+        nargs="+",
+        metavar=_SELECTION_METAVAR,
+        default=None,
+        help=(
+            "collect these source(s) or source.resource table(s) as well as "
+            "the default (or --include) set, regardless of environment "
+            "variables (default: $POSTURE_ALSO)"
+        ),
+    )
+    parser.add_argument(
         "--exclude",
         nargs="+",
-        metavar="SOURCE[.RESOURCE]",
+        metavar=_SELECTION_METAVAR,
         default=None,
         help=(
             "skip these source(s) or source.resource table(s) "
@@ -245,7 +265,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--catalog",
         action="store_true",
         help=(
-            "list every source and its tables (narrowed by --include/--exclude) "
+            "list every source and its tables (narrowed by --include/--also/--exclude) "
             "and whether each source is configured, then exit"
         ),
     )
@@ -254,7 +274,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help=(
             "list the required and optional environment variables of every "
-            "source (narrowed by --include/--exclude) and whether each is set, "
+            "source (narrowed by --include/--also/--exclude) and whether each is set, "
             "then exit"
         ),
     )
@@ -453,19 +473,19 @@ def main(argv: list[str] | None = None) -> int:
         print(*schema_lines(args.schema), sep="\n")
         return 0
     if args.catalog or args.variables:
-        tables = select_tables(args.include, args.exclude, every_source=True)
+        tables = select_tables(args.include, args.exclude, args.also, every_source=True)
         lines = catalog_lines(tables) if args.catalog else variables_lines(tables)
         print(*lines, sep="\n")
         return 0
 
     _log_parameters(args, argv)
     output_dir = Path(args.output)
-    sources = select_tables(args.include, args.exclude)
+    sources = select_tables(args.include, args.exclude, args.also)
 
     if not sources:
         logger.warning(
             "No sources to collect: set the required environment "
-            "variable(s) for a source, or check --include/--exclude"
+            "variable(s) for a source, or check --include/--also/--exclude"
         )
         return 0
 
