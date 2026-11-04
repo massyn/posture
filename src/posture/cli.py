@@ -129,6 +129,9 @@ _ARG_FLAGS = {
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
 
+#: metavar shared by the --include/--also/--exclude selection flags.
+_SELECTION_METAVAR = "SOURCE[.RESOURCE]"
+
 
 def _env_bool(env_var: str, value: str) -> bool:
     """Parse a boolean environment variable, case-insensitively. Anything
@@ -183,7 +186,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--include",
         nargs="+",
-        metavar="SOURCE[.RESOURCE]",
+        metavar=_SELECTION_METAVAR,
         default=None,
         help=(
             "only collect these source(s) or source.resource table(s), "
@@ -194,7 +197,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--also",
         nargs="+",
-        metavar="SOURCE[.RESOURCE]",
+        metavar=_SELECTION_METAVAR,
         default=None,
         help=(
             "collect these source(s) or source.resource table(s) as well as "
@@ -205,7 +208,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--exclude",
         nargs="+",
-        metavar="SOURCE[.RESOURCE]",
+        metavar=_SELECTION_METAVAR,
         default=None,
         help=(
             "skip these source(s) or source.resource table(s) "
