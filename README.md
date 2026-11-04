@@ -339,6 +339,7 @@ into a warehouse.
 ```bash
 posturecollect --include crowdstrike endoflife   # only these sources, regardless of environment
 posturecollect --include crowdstrike.hosts       # only this one table (<source>.<resource>)
+posturecollect --also endoflife macadmins        # everything configured, plus these sources/tables
 posturecollect --exclude qualys snyk.issues      # everything configured, minus these sources/tables
 posturecollect --output ./data                   # base directory for the parquet files (default: $POSTURE_OUTPUT, else ./output)
 posturecollect --output ./data --history         # one dated file per table per day, instead of overwriting
@@ -352,7 +353,7 @@ To see what is there before collecting anything:
 
 ```bash
 posturecollect --catalog                         # every source and its tables, and whether each source is configured
-posturecollect --catalog --include qualys        # just these sources/tables (--exclude works too)
+posturecollect --catalog --include qualys        # just these sources/tables (--also/--exclude work too)
 posturecollect --variables --include qualys      # required and optional env vars per source, and whether each is set
 posturecollect --schema crowdstrike.hosts        # the columns and types of one table
 posturecollect --dry-run                         # the source.table entries this run would collect, without collecting
@@ -360,25 +361,31 @@ posturecollect --version                         # the installed posture version
 ```
 
 `--catalog` and `--variables` cover every registered source, configured or
-not, narrowed by `--include`/`--exclude`. `--variables` shows whether each
+not, narrowed by `--include`/`--also`/`--exclude`. `--variables` shows whether each
 variable is set, never its value. `--dry-run` resolves the selection exactly
-as a real run would (environment, `--env`, `--include`, `--exclude`) and
+as a real run would (environment, `--env`, `--include`, `--also`, `--exclude`) and
 prints one `source.table` per line. All four exit without sending a request;
 only one can be used at a time.
 
-`--include` is also the only way to reach a no-auth source (e.g.
-`endoflife`, `macadmins`) — a source with nothing to check is never picked
-up by the default environment-variable scan, so name it explicitly to
-collect it.
+A no-auth source (e.g. `endoflife`, `macadmins`) has nothing to check, so
+the default environment-variable scan never picks it up; name it to collect
+it. `--include` collects only what it names, while `--also` adds its entries
+to the default scan (or to `--include`), so one run can collect everything
+you have credentials for plus the free feeds:
 
-`--include` and `--exclude` both take `<source>` (every resource of it) or
-`<source>.<resource>` (just that table) entries. `--exclude` is applied after
-`--include` (or after the default environment scan if there's no
-`--include`), and a source left with no tables is skipped. An entry naming an
-unknown source or resource stops the run with an error. Either can also be
-set as `POSTURE_INCLUDE` / `POSTURE_EXCLUDE` in your shell or `.env`
-(comma- or space-separated, e.g. `POSTURE_EXCLUDE=qualys,snyk.issues`); the
-flag wins if both are given.
+```bash
+posturecollect --also endoflife macadmins
+```
+
+`--include`, `--also` and `--exclude` all take `<source>` (every resource of
+it) or `<source>.<resource>` (just that table) entries. The starting set is
+`--include` (or the default environment scan if there's no `--include`),
+`--also` is added to it, `--exclude` is applied last, and a source left with
+no tables is skipped. An entry naming an unknown source or resource stops the
+run with an error. Each can also be set as `POSTURE_INCLUDE` /
+`POSTURE_ALSO` / `POSTURE_EXCLUDE` in your shell or `.env` (comma- or
+space-separated, e.g. `POSTURE_EXCLUDE=qualys,snyk.issues`); the flag wins
+if both are given.
 
 `--env PATH` uses that file in place of the default `.env`, not on top of
 it: every variable the default `.env` set is cleared first, so a source

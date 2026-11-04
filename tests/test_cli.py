@@ -517,3 +517,24 @@ def test_main_writes_utf8_with_lf_whatever_the_platform_defaults(
     assert err.encoding == "utf-8"
     assert out_bytes.getvalue().count(b"\n") > 1
     assert b"\r" not in out_bytes.getvalue()
+
+
+def test_dry_run_adds_posture_also_to_environment_scan(monkeypatch, capsys) -> None:
+    monkeypatch.delenv("POSTURE_INCLUDE", raising=False)
+    monkeypatch.delenv("POSTURE_EXCLUDE", raising=False)
+    monkeypatch.setenv("HTTP_HOSTS", "example.com")
+    monkeypatch.setenv("POSTURE_ALSO", "macadmins.macos_cves")
+
+    assert cli.main(["--dry-run"]) == 0
+
+    lines = capsys.readouterr().out.splitlines()
+    assert "macadmins.macos_cves" in lines
+    assert "macadmins.macos_releases" not in lines
+    assert any(line.startswith("http.") for line in lines)
+
+
+def test_also_flag_beats_posture_also(monkeypatch) -> None:
+    monkeypatch.setenv("POSTURE_ALSO", "crowdstrike")
+    args = cli._parse_args(["--also", "macadmins"])
+    cli._apply_env_defaults(args)
+    assert args.also == ["macadmins"]
