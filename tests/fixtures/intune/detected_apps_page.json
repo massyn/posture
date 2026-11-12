@@ -1,0 +1,15 @@
+[
+    {
+        "id": "app-1",
+        "displayName": "Google Chrome",
+        "version": "142.0.7444.60",
+        "publisher": "Google LLC",
+        "platform": "windows",
+        "sizeInByte": 412345678,
+        "deviceCount": 3
+    },
+    {
+        "id": "app-2",
+        "displayName": "Zoom Workplace"
+    }
+]

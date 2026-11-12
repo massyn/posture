@@ -18,7 +18,8 @@ Resources: ``managed_devices``, ``users``, ``device_configurations``,
 ``managed_device_detail`` (requires managed_devices ids),
 ``device_configuration_detail`` (requires device_configurations ids),
 ``device_compliance_policies``, ``attack_simulations``,
-``attack_simulation_users`` (requires attack_simulations ids).
+``attack_simulation_users`` (requires attack_simulations ids),
+``detected_apps``, ``detected_app_devices`` (requires detected_apps ids).
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ _GRAPH_BASE_URL = "https://graph.microsoft.com"
 _PAGE_SIZE = 100
 
 # Per-item fan-out (managed_device_detail, device_configuration_detail,
-# attack_simulation_users) issues one request per id/simulation. Bounded
+# attack_simulation_users, detected_app_devices) issues one request per id/simulation. Bounded
 # thread pool overlaps network latency instead of paying it serially — see
 # CLAUDE.md "Performance: per-item fan-out" for the pattern and its limits.
 _MAX_FANOUT_WORKERS = 10
@@ -56,6 +57,8 @@ _ENDPOINTS = {
     "device_compliance_policies": "/v1.0/deviceManagement/deviceCompliancePolicies",
     "attack_simulations": "/v1.0/security/attackSimulation/simulations",
     "attack_simulation_users": "/v1.0/security/attackSimulation/simulations/{id}/report/simulationUsers",
+    "detected_apps": "/v1.0/deviceManagement/detectedApps",
+    "detected_app_devices": "/v1.0/deviceManagement/detectedApps/{id}/managedDevices",
 }
 
 _DEVICE_COLUMNS = {
@@ -205,7 +208,7 @@ MANIFEST: dict[str, dict[str, Any]] = {
         # Not derived_from "attack_simulations": each simulation's user
         # report is its own paginated network call, not data nested inside
         # the simulation record. _simulation_id is injected client-side
-        # (see _fetch_attack_simulation_users_page) since the simulationUsers
+        # (see _fetch_child_list_page) since the simulationUsers
         # response body doesn't carry it — it's implied by the request URL.
         # simulationEvents/trainingEvents are per-user lists of nested
         # objects (click/report timestamps, training progress) — kept as
@@ -231,11 +234,52 @@ MANIFEST: dict[str, dict[str, Any]] = {
             "training_events_json": ("trainingEvents", "json"),
         },
     },
+    "detected_apps": {
+        # Software discovered on managed devices: one row per distinct
+        # app name + version, tenant-wide.
+        "endpoint": _ENDPOINTS["detected_apps"],
+        "columns": {
+            "app_id": ("id", "str"),
+            "display_name": ("displayName", "str"),
+            "version": ("version", "str"),
+            "publisher": ("publisher", "str"),
+            "platform": ("platform", "str"),
+            "size_in_byte": ("sizeInByte", "int"),
+            "device_count": ("deviceCount", "int"),
+        },
+    },
+    "detected_app_devices": {
+        # Which devices have each detected app installed: one paginated
+        # call per detected_apps id. Graph returns a trimmed managedDevice
+        # (id and name), so join on device_id to managed_devices for the
+        # rest. _app_id is injected client-side, as for
+        # attack_simulation_users.
+        "endpoint": _ENDPOINTS["detected_app_devices"],
+        "requires": "detected_apps",
+        "columns": {
+            "app_id": ("_app_id", "str"),
+            "device_id": ("id", "str"),
+            "device_name": ("deviceName", "str"),
+        },
+    },
 }
 
 _DETAIL_RESOURCE_SOURCES = {
     "managed_device_detail": "managed_devices",
     "device_configuration_detail": "device_configurations",
+}
+
+# Child resources fetched as one paginated list per parent id. Each maps to
+# (parent resource, kwarg naming an explicit parent-id list, field injected
+# into every child record carrying its parent id - the response body
+# doesn't include it, it's implied by the request URL).
+_CHILD_LIST_RESOURCES = {
+    "attack_simulation_users": (
+        "attack_simulations",
+        "simulation_ids",
+        "_simulation_id",
+    ),
+    "detected_app_devices": ("detected_apps", "app_ids", "_app_id"),
 }
 
 
@@ -266,8 +310,8 @@ class IntuneCollector(Collector):
     def _fetch_page(
         self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
-        if resource == "attack_simulation_users":
-            return self._fetch_attack_simulation_users_page(kwargs, cursor)
+        if resource in _CHILD_LIST_RESOURCES:
+            return self._fetch_child_list_page(resource, kwargs, cursor)
         if resource in _DETAIL_RESOURCE_SOURCES:
             return self._fetch_detail_page(resource, kwargs, cursor)
         return self._fetch_list_page(resource, kwargs, cursor)
@@ -361,56 +405,53 @@ class IntuneCollector(Collector):
         records = self._resumable_fanout(resource, ids, _fetch_one, _MAX_FANOUT_WORKERS)
         return records, None
 
-    def _fetch_attack_simulation_users_page(
-        self, kwargs: dict[str, Any], cursor: Any
+    def _fetch_child_list_page(
+        self, resource: str, kwargs: dict[str, Any], cursor: Any
     ) -> tuple[list[dict[str, Any]], Any]:
         if cursor is not None:
             return [], None  # entire fan-out already completed on first call
 
-        simulation_ids = kwargs.get("simulation_ids")
-        if simulation_ids is None:
-            raw_simulations = self._get_raw("attack_simulations", {})
-            simulation_ids = [
-                str(s["id"]) for s in raw_simulations if s.get("id") is not None
-            ]
-        if not simulation_ids:
+        parent_resource, ids_kwarg, parent_field = _CHILD_LIST_RESOURCES[resource]
+        parent_ids = kwargs.get(ids_kwarg)
+        if parent_ids is None:
+            raw_parents = self._get_raw(parent_resource, {})
+            parent_ids = [str(p["id"]) for p in raw_parents if p.get("id") is not None]
+        if not parent_ids:
             return [], None
 
-        path_template = _ENDPOINTS["attack_simulation_users"]
+        path_template = _ENDPOINTS[resource]
 
-        def _fetch_one(simulation_id: str) -> list[dict[str, Any]]:
+        def _fetch_one(parent_id: str) -> list[dict[str, Any]]:
             try:
-                sim_records = self._drain_simulation_users(
-                    path_template.format(id=simulation_id)
-                )
+                child_records = self._drain_pages(path_template.format(id=parent_id))
             except requests.exceptions.HTTPError as exc:
                 status = exc.response.status_code if exc.response is not None else None
                 if status == 404:
-                    # A simulation deleted since attack_simulations was
-                    # pulled 404s here — per-simulation, not a
-                    # collection-wide failure. Skip it rather than letting
-                    # the exception propagate and force base.py to discard
-                    # every other simulation's already-fetched users.
+                    # A parent deleted since its list was pulled 404s here -
+                    # per-parent, not a collection-wide failure. Skip it
+                    # rather than letting the exception propagate and force
+                    # base.py to discard every other parent's fetched rows.
                     logger.info(
-                        "attack_simulation_users: no data for simulation "
-                        "(404), skipping",
+                        "%s: no data for parent id (404), skipping",
+                        resource,
                         extra={
                             "source": self.env_prefix.lower(),
-                            "simulation_id": simulation_id,
+                            "resource": resource,
+                            "record_id": parent_id,
                         },
                     )
                     return []
                 raise
-            for record in sim_records:
-                record["_simulation_id"] = simulation_id
-            return sim_records
+            for record in child_records:
+                record[parent_field] = parent_id
+            return child_records
 
         records = self._resumable_fanout(
-            "attack_simulation_users", simulation_ids, _fetch_one, _MAX_FANOUT_WORKERS
+            resource, parent_ids, _fetch_one, _MAX_FANOUT_WORKERS
         )
         return records, None
 
-    def _drain_simulation_users(self, path: str) -> list[dict[str, Any]]:
+    def _drain_pages(self, path: str) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
         url = _GRAPH_BASE_URL + path
         params: dict[str, Any] | None = {"$top": _PAGE_SIZE}

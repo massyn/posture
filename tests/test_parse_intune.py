@@ -79,3 +79,19 @@ def test_attack_simulation_users_page() -> None:
     ]
     assert df["compromised_date_time"].dtype == "datetime64[us, UTC]"
     assert pd.isna(df.loc[1, "compromised_date_time"])  # absent in fixture
+
+
+def test_detected_apps_page() -> None:
+    df = parse(
+        _load("detected_apps_page.json"),
+        MANIFEST["detected_apps"],
+        resource="detected_apps",
+    )
+
+    assert len(df) == 2
+    assert df.loc[0, "app_id"] == "app-1"
+    assert df.loc[0, "display_name"] == "Google Chrome"
+    assert df.loc[0, "version"] == "142.0.7444.60"
+    assert df.loc[0, "size_in_byte"] == 412345678
+    assert df.loc[0, "device_count"] == 3
+    assert pd.isna(df.loc[1, "device_count"])
