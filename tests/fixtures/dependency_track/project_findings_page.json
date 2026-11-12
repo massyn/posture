@@ -1,0 +1,41 @@
+[
+    {
+        "_project_uuid": "proj-1",
+        "component": {
+            "uuid": "comp-1",
+            "name": "log4j-core",
+            "group": "org.apache.logging.log4j",
+            "version": "2.14.1",
+            "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+            "project": "proj-1"
+        },
+        "vulnerability": {
+            "uuid": "vuln-1",
+            "vulnId": "CVE-2021-44228",
+            "source": "NVD",
+            "title": "Log4Shell",
+            "severity": "CRITICAL",
+            "cvssV3BaseScore": 10.0,
+            "epssScore": 0.97565,
+            "epssPercentile": 0.99996,
+            "cwes": [{"cweId": 502, "name": "Deserialization of Untrusted Data"}],
+            "aliases": [{"cveId": "CVE-2021-44228", "ghsaId": "GHSA-jfh8-c2jp-5v3q"}],
+            "published": 1639094400000
+        },
+        "analysis": {"state": "EXPLOITABLE", "isSuppressed": false},
+        "attribution": {
+            "analyzerIdentity": "INTERNAL_ANALYZER",
+            "attributedOn": 1700000000000,
+            "referenceUrl": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+        },
+        "matrix": "proj-1:comp-1:vuln-1"
+    },
+    {
+        "_project_uuid": "proj-1",
+        "component": {"uuid": "comp-2", "name": "lodash", "version": "4.17.15"},
+        "vulnerability": {"uuid": "vuln-2", "vulnId": "GHSA-p6mc-m468-83gw", "source": "GITHUB", "severity": "HIGH"},
+        "analysis": {"isSuppressed": true},
+        "attribution": {"analyzerIdentity": "OSSINDEX_ANALYZER"},
+        "matrix": "proj-1:comp-2:vuln-2"
+    }
+]

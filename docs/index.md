@@ -234,6 +234,8 @@
 
 - [attack_simulation_users](collectors/intune.md#attack_simulation_users)
 - [attack_simulations](collectors/intune.md#attack_simulations)
+- [detected_app_devices](collectors/intune.md#detected_app_devices)
+- [detected_apps](collectors/intune.md#detected_apps)
 - [device_compliance_policies](collectors/intune.md#device_compliance_policies)
 - [device_configuration_detail](collectors/intune.md#device_configuration_detail)
 - [device_configurations](collectors/intune.md#device_configurations)
@@ -291,6 +293,14 @@
 - [user_factors](collectors/okta.md#user_factors)
 - [user_roles](collectors/okta.md#user_roles)
 - [users](collectors/okta.md#users)
+
+## [OWASP Dependency-Track](collectors/dependency_track.md)
+
+[Credentials](credentials/dependency_track.md)
+
+- [project_components](collectors/dependency_track.md#project_components)
+- [project_findings](collectors/dependency_track.md#project_findings)
+- [projects](collectors/dependency_track.md#projects)
 
 ## [Palo Alto Cortex Cloud](collectors/cortex_cloud.md)
 
