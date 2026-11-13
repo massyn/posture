@@ -22,6 +22,7 @@ def test_catalog_lists_all_registered_sources() -> None:
         "cve_db",
         "cyberark",
         "defender_for_cloud",
+        "dependency_track",
         "dnsimple",
         "drata",
         "duo",

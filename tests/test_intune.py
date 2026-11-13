@@ -131,6 +131,53 @@ def test_attack_simulation_users_drains_pagination_per_simulation() -> None:
 
 
 @responses.activate
+def test_detected_app_devices_drains_pagination_per_app() -> None:
+    responses.add(
+        responses.POST,
+        "https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token",
+        json={"access_token": "tok", "expires_in": 3600},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://graph.microsoft.com/v1.0/deviceManagement/detectedApps",
+        json={"value": [{"id": "app-1"}, {"id": "app-gone"}]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://graph.microsoft.com/v1.0/deviceManagement/detectedApps/app-1/managedDevices",
+        json={
+            "value": [{"id": "dev-1", "deviceName": "LAPTOP-1"}],
+            "@odata.nextLink": "https://graph.microsoft.com/v1.0/deviceManagement/detectedApps/app-1/managedDevices?$skiptoken=abc",
+        },
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://graph.microsoft.com/v1.0/deviceManagement/detectedApps/app-1/managedDevices?$skiptoken=abc",
+        json={"value": [{"id": "dev-2", "deviceName": "LAPTOP-2"}]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://graph.microsoft.com/v1.0/deviceManagement/detectedApps/app-gone/managedDevices",
+        json={"error": {"code": "ResourceNotFound"}},
+        status=404,
+    )
+
+    ccm = CCM(
+        "intune",
+        {"tenant_id": "tenant-1", "client_id": "id", "client_secret": "secret"},
+    )
+    df = ccm.collect("detected_app_devices")
+
+    assert list(df["device_id"]) == ["dev-1", "dev-2"]
+    assert list(df["device_name"]) == ["LAPTOP-1", "LAPTOP-2"]
+    assert list(df["app_id"]) == ["app-1", "app-1"]
+
+
+@responses.activate
 def test_ensure_authenticated_refreshes_near_expiry_token() -> None:
     responses.add(
         responses.POST,

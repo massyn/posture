@@ -19,6 +19,8 @@ from posture import CCM
 ccm = CCM("intune")  # credentials from INTUNE_TENANT_ID, INTUNE_CLIENT_ID, INTUNE_CLIENT_SECRET
 df = ccm.collect("attack_simulation_users")
 df = ccm.collect("attack_simulations")
+df = ccm.collect("detected_app_devices")
+df = ccm.collect("detected_apps")
 df = ccm.collect("device_compliance_policies")
 df = ccm.collect("device_configuration_detail")
 df = ccm.collect("device_configurations")
@@ -48,6 +50,8 @@ for table in ccm.tables():
 
 - [attack_simulation_users](#attack_simulation_users)
 - [attack_simulations](#attack_simulations)
+- [detected_app_devices](#detected_app_devices)
+- [detected_apps](#detected_apps)
 - [device_compliance_policies](#device_compliance_policies)
 - [device_configuration_detail](#device_configuration_detail)
 - [device_configurations](#device_configurations)
@@ -101,6 +105,26 @@ for table in ccm.tables():
 | `last_modified_by_email` | `str` |
 | `last_modified_by_id` | `str` |
 | `last_modified_by_display_name` | `str` |
+
+### detected_app_devices
+
+| Column | Type |
+| --- | --- |
+| `app_id` | `str` |
+| `device_id` | `str` |
+| `device_name` | `str` |
+
+### detected_apps
+
+| Column | Type |
+| --- | --- |
+| `app_id` | `str` |
+| `display_name` | `str` |
+| `version` | `str` |
+| `publisher` | `str` |
+| `platform` | `str` |
+| `size_in_byte` | `int` |
+| `device_count` | `int` |
 
 ### device_compliance_policies
 

@@ -521,7 +521,22 @@ why something is built the way it is, not how to configure or call it.
   vulnerabilities. `intune`'s `attack_simulation_users` fetches the targeted-user
   report for each `attack_simulations` id (one paginated call per simulation,
   click/report/training events kept as JSON blobs rather than exploded into further
-  tables).
+  tables). `intune`'s `detected_app_devices` uses the same per-parent paginated
+  fan-out over `detected_apps` ids (shared `_CHILD_LIST_RESOURCES` table), giving the
+  app-to-device mapping for installed software; Graph returns a trimmed device there
+  (id and name), so join to `managed_devices` on `device_id` for the rest.
+- **Dependency-Track**: self-hosted OWASP Dependency-Track, raw `requests`
+  against `<endpoint>/api/v1` with a team API key (`X-Api-Key`). Pagination is
+  `offset`/`limit` (matching the validated in-house script, Citadel todo 421); a page that
+  is not exactly full ends the drain, because older servers ignore paging on
+  `/finding/project/{uuid}` and would otherwise return every row again for page 2.
+  A deliberately small first cut of key tables (the full data set can be huge):
+  `projects`, plus per-project fan-outs `project_components` (which component
+  version is in which project) and `project_findings` (which include suppressed
+  findings by default, so the analysis decision stays visible; pass
+  `suppressed="false"` to drop them). Policy violations, services, dependency
+  graphs and the vulnerability catalogue are not collected yet. Column paths
+  come from the public 4.x OpenAPI spec, not a live server.
 - **UpGuard** — `vendor_risks` fans a single (unpaginated — UpGuard's
   `/risks/vendors` has no pagination) request out per vendor across a thread pool
   (1–60s per vendor, and there can be hundreds). `_fetch_risks_for_hostname` returns
